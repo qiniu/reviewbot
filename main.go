@@ -7,19 +7,23 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/cr-bot/config"
 	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/x/log"
 	gitv2 "k8s.io/test-infra/prow/git/v2"
+
+	// linters import
+	_ "github.com/cr-bot/linters/staticcheck"
 )
 
 type options struct {
-	port int
-
-	dryRun   bool
-	LogLevel string
-
+	port          int
+	dryRun        bool
+	LogLevel      int
 	accessToken   string
 	webhookSecret string
+	codeCacheDir  string
+	config        string
 }
 
 func (o options) Validate() error {
@@ -38,9 +42,11 @@ func gatherOptions() options {
 	fs := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	fs.IntVar(&o.port, "port", 8888, "port to listen on")
 	fs.BoolVar(&o.dryRun, "dry-run", false, "dry run")
-	fs.StringVar(&o.LogLevel, "log-level", "debug", "log level")
+	fs.IntVar(&o.LogLevel, "log-level", 0, "log level")
 	fs.StringVar(&o.accessToken, "access-token", "", "personal access token")
 	fs.StringVar(&o.webhookSecret, "webhook-secret", "", "webhook secret file")
+	fs.StringVar(&o.codeCacheDir, "code-cache-dir", "/tmp", "code cache dir")
+	fs.StringVar(&o.config, "config", "", "config file")
 	fs.Parse(os.Args[1:])
 	return o
 }
@@ -51,8 +57,7 @@ func main() {
 		log.Fatalf("invalid options: %v", err)
 	}
 
-	// TODO: set log level
-	log.SetOutputLevel(log.Ldebug)
+	log.SetOutputLevel(o.LogLevel)
 
 	// TODO: support github app
 	gc := github.NewClient(nil)
@@ -61,17 +66,24 @@ func main() {
 	}
 
 	opt := gitv2.ClientFactoryOpts{
-		CacheDirBase: github.String("/tmp"),
+		CacheDirBase: github.String(o.codeCacheDir),
+		Persist:      github.Bool(true),
 	}
 	v2, err := gitv2.NewClientFactory(opt.Apply)
 	if err != nil {
 		log.Fatalf("failed to create git client factory: %v", err)
 	}
 
+	cfg, err := config.NewConfig(o.config)
+	if err != nil {
+		log.Fatalf("failed to create config: %v", err)
+	}
+
 	s := &Server{
 		gc:               gc,
 		webhookSecret:    []byte(o.webhookSecret),
 		gitClientFactory: v2,
+		config:           cfg,
 	}
 
 	mux := http.NewServeMux()

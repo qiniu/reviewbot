@@ -1,0 +1,14 @@
+qbox: # github organization name
+  staticcheck: # linters
+    enable: true
+    command: staticcheck # linter command, if not set, will use the linter name registered in init stage
+    args: ["./..."]
+    run_if_changed: [".go$"] # only run if changed files match the regex
+
+qbox/kodo: # github repository name, which will override the settings in qbox org
+  staticcheck: # repo specific settings will override the settings in qbox org
+    enable: true
+    workDir: "src/qiniu.com/kodo"
+    command: staticcheck
+    args: ["./..."]
+    run_if_changed: ["src/qiniu.com/kodo/.*\\.go$"] # only run if changed files match the regex

@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strconv"
-	"strings"
 
+	"github.com/cr-bot/config"
+	"github.com/cr-bot/linters"
 	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/x/xlog"
 	gitv2 "k8s.io/test-infra/prow/git/v2"
@@ -15,6 +15,7 @@ import (
 type Server struct {
 	gc               *github.Client
 	gitClientFactory gitv2.ClientFactory
+	config           config.Config
 
 	webhookSecret []byte
 }
@@ -67,25 +68,15 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 	repo := event.GetRepo().GetName()
 	log.Infof("processing pull request %d, org %v, repo %v\n", num, org, repo)
 
-	// ListFiles lists the files for the specified pull request.
-	affectedFiles, response, err := s.gc.PullRequests.ListFiles(ctx, org, repo, num, &github.ListOptions{})
+	pullRequestAffectedFiles, response, err := s.ListPullRequestsFiles(ctx, org, repo, num)
 	if err != nil {
 		return err
 	}
 
 	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("list files failed: %v", response.Status)
+		log.Errorf("list files failed: %v", response)
+		return fmt.Errorf("list files failed: %v", response)
 	}
-
-	// filter out files that are not go files
-	var affectedGoFiles []string
-	for _, f := range affectedFiles {
-		if !strings.HasSuffix(f.GetFilename(), ".go") {
-			continue
-		}
-		affectedGoFiles = append(affectedGoFiles, f.GetFilename())
-	}
-	log.Debugf("PR affected golang files: %v\n", affectedGoFiles)
 
 	// clone the repo
 	// TODO: cache the repo
@@ -100,52 +91,38 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 		return err
 	}
 
-	// run staticcheck
-	executor, err := NewStaticcheckExecutor(r.Directory())
-	if err != nil {
-		log.Errorf("failed to create staticcheck executor: %v", err)
+	var totalComments []*github.PullRequestComment
+
+	for name, lingerConfig := range s.config.Linters(org, repo) {
+		f := linters.LinterHandler(name)
+		if f == nil {
+			continue
+		}
+
+		// 更新完整的工作目录
+		lingerConfig.WorkDir = r.Directory() + "/" + lingerConfig.WorkDir
+
+		log.Infof("name: %v, lingerConfig: %+v", name, lingerConfig)
+		lintResults, err := f(lingerConfig)
+		if err != nil {
+			log.Errorf("failed to run linter: %v", err)
+			return err
+		}
+
+		log.Infof("%s found total %d files with lint errors on repo %v", name, len(lintResults), repo)
+		comments, err := buildPullRequestCommentBody(name, lintResults, pullRequestAffectedFiles)
+		if err != nil {
+			log.Errorf("failed to build pull request comment body: %v", err)
+			return err
+		}
+		log.Infof("%s found valid %d comments related to this PR \n", name, len(comments))
+		totalComments = append(totalComments, comments...)
+	}
+
+	if err := s.PostCommentsWithRetry(ctx, org, repo, num, totalComments); err != nil {
+		log.Errorf("failed to post comments: %v", err)
 		return err
 	}
-
-	output, _ := executor.Run(log, "./...")
-	results := formatStaticcheckOutput(output)
-	// filter out files that are not affected by the PR
-	var filteredLintErrs []StaticcheckOutput
-	for _, g := range affectedGoFiles {
-		if v, ok := results[g]; ok {
-			filteredLintErrs = append(filteredLintErrs, v...)
-		}
-	}
-
-	// TODO: remove old comment if deprecated
-
-	if len(filteredLintErrs) == 0 {
-		log.Infof("no lint errors\n")
-		return nil
-	}
-
-	log.Infof("lint errors: %v\n", filteredLintErrs)
-	// comment on the PR
-	for _, lintErr := range filteredLintErrs {
-		line, err := strconv.ParseInt(lintErr.line, 10, 64)
-		if err != nil {
-			log.Errorf("failed to parse line number: %v", err)
-			return err
-		}
-		if _, _, err := s.gc.PullRequests.CreateComment(ctx, org, repo, num, &github.PullRequestComment{
-			Body:        github.String(fmt.Sprintf("%s: %s", lintErr.code, lintErr.message)),
-			CommitID:    github.String(event.GetPullRequest().GetHead().GetSHA()),
-			Path:        github.String(lintErr.file),
-			Line:        github.Int(int(line)),
-			Side:        github.String("RIGHT"),
-			SubjectType: github.String("file"),
-			InReplyTo:   github.Int64(0),
-			Position:    github.Int(int(line)),
-		}); err != nil {
-			log.Errorf("failed to create comment: %v", err)
-			return err
-		}
-	}
-
+	log.Info("posted comments success\n")
 	return nil
 }
