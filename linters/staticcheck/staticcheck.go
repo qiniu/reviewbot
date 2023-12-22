@@ -107,8 +107,18 @@ func formatStaticcheckOutput(output []byte) (map[string][]linters.LinterOutput, 
 		if outs, ok := result[output.File]; !ok {
 			result[output.File] = []linters.LinterOutput{*output}
 		} else {
-			outs = append(outs, *output)
-			result[output.File] = outs
+			// remove duplicate
+			var existed bool
+			for _, v := range outs {
+				if v.File == output.File && v.Line == output.Line && v.Column == output.Column && v.Message == output.Message {
+					existed = true
+					break
+				}
+			}
+
+			if !existed {
+				result[output.File] = append(result[output.File], *output)
+			}
 		}
 	}
 
