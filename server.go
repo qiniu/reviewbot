@@ -77,9 +77,9 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 		log.Errorf("list files failed: %v", response)
 		return fmt.Errorf("list files failed: %v", response)
 	}
+	log.Infof("found %d files affected by pull request %d\n", len(pullRequestAffectedFiles), num)
 
 	// clone the repo
-	// TODO: cache the repo
 	r, err := s.gitClientFactory.ClientFor(org, repo)
 	if err != nil {
 		log.Errorf("failed to create git client: %v", err)
@@ -90,6 +90,8 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 		log.Errorf("failed to checkout pull request %d: %v", num, err)
 		return err
 	}
+
+	defer r.Clean()
 
 	var totalComments []*github.PullRequestComment
 

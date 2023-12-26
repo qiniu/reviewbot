@@ -10,6 +10,7 @@ import (
 	"github.com/cr-bot/config"
 	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/x/log"
+	"github.com/sirupsen/logrus"
 	gitv2 "k8s.io/test-infra/prow/git/v2"
 
 	// linters import
@@ -19,7 +20,7 @@ import (
 type options struct {
 	port          int
 	dryRun        bool
-	LogLevel      int
+	logLevel      int
 	accessToken   string
 	webhookSecret string
 	codeCacheDir  string
@@ -42,7 +43,7 @@ func gatherOptions() options {
 	fs := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	fs.IntVar(&o.port, "port", 8888, "port to listen on")
 	fs.BoolVar(&o.dryRun, "dry-run", false, "dry run")
-	fs.IntVar(&o.LogLevel, "log-level", 0, "log level")
+	fs.IntVar(&o.logLevel, "log-level", 0, "log level")
 	fs.StringVar(&o.accessToken, "access-token", "", "personal access token")
 	fs.StringVar(&o.webhookSecret, "webhook-secret", "", "webhook secret file")
 	fs.StringVar(&o.codeCacheDir, "code-cache-dir", "/tmp", "code cache dir")
@@ -57,7 +58,8 @@ func main() {
 		log.Fatalf("invalid options: %v", err)
 	}
 
-	log.SetOutputLevel(o.LogLevel)
+	// TODO: use Lshortfile instead
+	log.SetOutputLevel(o.logLevel)
 
 	// TODO: support github app
 	gc := github.NewClient(nil)
@@ -74,11 +76,14 @@ func main() {
 	opt := gitv2.ClientFactoryOpts{
 		CacheDirBase: github.String(o.codeCacheDir),
 		Persist:      github.Bool(true),
+		UseSSH:       github.Bool(true),
 	}
 	v2, err := gitv2.NewClientFactory(opt.Apply)
 	if err != nil {
 		log.Fatalf("failed to create git client factory: %v", err)
 	}
+
+	logrus.SetLevel(logrus.DebugLevel)
 
 	cfg, err := config.NewConfig(o.config)
 	if err != nil {
