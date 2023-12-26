@@ -65,6 +65,12 @@ func main() {
 		gc.WithAuthToken(o.accessToken)
 	}
 
+	if o.codeCacheDir != "" {
+		if err := os.MkdirAll(o.codeCacheDir, 0755); err != nil {
+			log.Fatalf("failed to create code cache dir: %v", err)
+		}
+	}
+
 	opt := gitv2.ClientFactoryOpts{
 		CacheDirBase: github.String(o.codeCacheDir),
 		Persist:      github.Bool(true),
