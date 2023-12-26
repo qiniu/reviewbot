@@ -1,0 +1,7 @@
+Host github.com
+  HostName github.com
+  User git
+  UserKnownHostsFile /github_known_hosts
+  CheckHostIP no
+  StrictHostKeyChecking no
+  IdentityFile /secrets/github_key
