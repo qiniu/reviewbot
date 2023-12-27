@@ -58,7 +58,7 @@ func main() {
 		log.Fatalf("invalid options: %v", err)
 	}
 
-	// TODO: use Lshortfile instead
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	log.SetOutputLevel(o.logLevel)
 
 	// TODO: support github app
