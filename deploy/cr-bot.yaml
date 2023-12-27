@@ -1,0 +1,114 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: cr-bot
+  name: cr-bot
+  namespace: cr-bot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cr-bot
+  template:
+    metadata:
+      labels:
+        app: cr-bot
+    spec:
+      containers:
+      - command:
+        - /cr-bot
+        args:
+        - -log-level=1
+        - -access-token=$(GITHUB_ACCESS_TOKEN)
+        - -webhook-secret=$(GITHUB_WEBHOOK_SECRET)
+        - -config=/etc/config/config.yaml      
+        env:
+        - name: GITHUB_ACCESS_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: access-token
+              name: github
+        - name: GITHUB_WEBHOOK_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: webhook-secret
+              name: github              
+        image: aslan-spock-register.qiniu.io/qa/cr-bot:v0.2.2 # use your own built image instead
+        imagePullPolicy: Always
+        name: cr-bot
+        ports:
+        - containerPort: 8888
+          name: http
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /etc/config
+          name: config
+          readOnly: true
+        - mountPath: /secrets/github_key
+          subPath: github_key
+          name: ssh-secret
+          readOnly: true                    
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: config
+        name: config
+      - name: ssh-secret
+        secret:
+          defaultMode: 256
+          secretName: ssh-secret
+          items:
+          - key: ssh-secret
+            path: github_key
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: cr-bot
+  name: cr-bot
+  namespace: cr-bot
+spec:
+  ports:
+  - name: http
+    port: 8888
+    protocol: TCP
+    targetPort: 8888
+  selector:
+    app: cr-bot
+  type: ClusterIP 
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: nginx
+  labels:
+    app: cr-bot
+  name: cr-bot
+  namespace: cr-bot
+spec:
+  rules:
+  - host: cr-bot.qiniu.io
+    http:
+      paths:
+      - backend:
+          service:
+            name: cr-bot
+            port:
+              number: 8888
+        path: /
+        pathType: Prefix
+  - host: cr-bot.qiniu.io
+    http:
+      paths:
+      - backend:
+          service:
+            name: cr-bot
+            port:
+              number: 8888
+        path: /hook
+        pathType: Prefix   
+---
