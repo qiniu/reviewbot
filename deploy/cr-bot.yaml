@@ -35,7 +35,7 @@ spec:
             secretKeyRef:
               key: webhook-secret
               name: github              
-        image: aslan-spock-register.qiniu.io/qa/cr-bot:v0.1.6 # use your own built image instead
+        image: aslan-spock-register.qiniu.io/qa/cr-bot:v0.2.2 # use your own built image instead
         imagePullPolicy: Always
         name: cr-bot
         ports:
