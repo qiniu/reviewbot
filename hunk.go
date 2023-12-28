@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/google/go-github/v57/github"
+	"github.com/qiniu/x/log"
 )
 
 type HunkChecker interface {
@@ -33,9 +34,10 @@ func NewGithubCommitFileHunkChecker(commitFiles []*github.CommitFile) (*GithubCo
 			return nil, err
 		}
 
-		_, ok := hunks[commitFile.GetFilename()]
+		v, ok := hunks[commitFile.GetFilename()]
 		if ok {
-			return nil, fmt.Errorf("duplicate commitFile: %v", commitFile)
+			log.Warnf("duplicate commitFiles: %v, %v", commitFile, v)
+			continue
 		}
 
 		hunks[commitFile.GetFilename()] = fileHunks
