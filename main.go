@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/cr-bot/config"
 	"github.com/google/go-github/v57/github"
+	"github.com/gregjones/httpcache"
 	"github.com/qiniu/x/log"
 	"github.com/sirupsen/logrus"
 	gitv2 "k8s.io/test-infra/prow/git/v2"
@@ -25,16 +27,26 @@ type options struct {
 	webhookSecret string
 	codeCacheDir  string
 	config        string
+
+	// support github app
+	appID          int64
+	installationID int64
+	appPrivateKey  string
 }
 
 func (o options) Validate() error {
-	if o.accessToken == "" {
-		return errors.New("access-token is required")
+	if o.accessToken == "" && o.appID == 0 {
+		return errors.New("either access-token or github app information should be provided")
+	}
+
+	if o.appID != 0 && o.installationID == 0 {
+		return errors.New("app-installation-id is required when using github app")
 	}
 
 	if o.webhookSecret == "" {
 		return errors.New("webhook-secret is required")
 	}
+
 	return nil
 }
 
@@ -48,6 +60,9 @@ func gatherOptions() options {
 	fs.StringVar(&o.webhookSecret, "webhook-secret", "", "webhook secret file")
 	fs.StringVar(&o.codeCacheDir, "code-cache-dir", "/tmp", "code cache dir")
 	fs.StringVar(&o.config, "config", "", "config file")
+	fs.Int64Var(&o.appID, "app-id", 0, "github app id")
+	fs.Int64Var(&o.installationID, "app-installation-id", 0, "github app installation id")
+	fs.StringVar(&o.appPrivateKey, "app-private-key", "", "github app private key")
 	fs.Parse(os.Args[1:])
 	return o
 }
@@ -61,9 +76,15 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	log.SetOutputLevel(o.logLevel)
 
-	// TODO: support github app
-	gc := github.NewClient(nil)
-	if o.accessToken != "" {
+	var gc *github.Client
+	if o.appID != 0 {
+		tr, err := ghinstallation.NewKeyFromFile(httpcache.NewMemoryCacheTransport(), o.appID, o.installationID, o.appPrivateKey)
+		if err != nil {
+			log.Fatalf("failed to create github app transport: %v", err)
+		}
+		gc = github.NewClient(&http.Client{Transport: tr})
+	} else {
+		gc = github.NewClient(nil)
 		gc.WithAuthToken(o.accessToken)
 	}
 

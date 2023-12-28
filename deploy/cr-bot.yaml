@@ -21,21 +21,28 @@ spec:
         - /cr-bot
         args:
         - -log-level=1
-        - -access-token=$(GITHUB_ACCESS_TOKEN)
         - -webhook-secret=$(GITHUB_WEBHOOK_SECRET)
-        - -config=/etc/config/config.yaml      
+        - -config=/etc/config/config.yaml
+        - -app-id=$(GITHUB_APP_ID)
+        - -app-installation-id=$(GITHUB_APP_INSTALLATION_ID)
+        - -app-private-key=/secrets/github_app_key
         env:
-        - name: GITHUB_ACCESS_TOKEN
-          valueFrom:
-            secretKeyRef:
-              key: access-token
-              name: github
         - name: GITHUB_WEBHOOK_SECRET
           valueFrom:
             secretKeyRef:
               key: webhook-secret
-              name: github              
-        image: aslan-spock-register.qiniu.io/qa/cr-bot:v0.2.2 # use your own built image instead
+              name: github  
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              key: app-id
+              name: github-app
+        - name: GITHUB_APP_INSTALLATION_ID
+          valueFrom:
+            secretKeyRef:
+              key: app-installation-id
+              name: github-app                                
+        image: aslan-spock-register.qiniu.io/qa/cr-bot:v0.2.6 # use your own built image instead
         imagePullPolicy: Always
         name: cr-bot
         ports:
@@ -49,7 +56,11 @@ spec:
         - mountPath: /secrets/github_key
           subPath: github_key
           name: ssh-secret
-          readOnly: true                    
+          readOnly: true 
+        - mountPath: /secrets/github_app_key
+          subPath: github_app_key
+          name: github-app-secret
+          readOnly: true                             
       volumes:
       - configMap:
           defaultMode: 420
@@ -62,6 +73,13 @@ spec:
           items:
           - key: ssh-secret
             path: github_key
+      - name: github-app-secret
+        secret:
+          defaultMode: 256
+          secretName: github-app-secret
+          items:
+          - key: github-app-secret
+            path: github_app_key            
 ---
 apiVersion: v1
 kind: Service
