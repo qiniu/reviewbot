@@ -1,5 +1,4 @@
 # cr-bot 
----
 
 [![Build Status](https://github.com/qiniu/cr-bot/actions/workflows/go.yml/badge.svg)](https://github.com/qiniu/cr-bot/actions/workflows/go.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/qiniu/cr-bot)](https://goreportcard.com/report/github.com/qiniu/cr-bot)
