@@ -53,7 +53,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) processPullRequestEvent(log *xlog.Logger, event *github.PullRequestEvent, eventGUID string) error {
-	// TODO: synchonization 是什么意思？
+	// TODO: synchronization 是什么意思？
 	if event.GetAction() != "opened" && event.GetAction() != "reopened" {
 		log.Debugf("skipping action %s\n", event.GetAction())
 		return nil
@@ -117,7 +117,7 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 			log.Errorf("failed to build pull request comment body: %v", err)
 			return err
 		}
-		log.Infof("%s found valid %d comments related to this PR \n", name, len(comments))
+		log.Infof("%s found valid %d comments related to this PR %d (%s) \n", name, len(comments), num, org+"/"+repo)
 		totalComments = append(totalComments, comments...)
 	}
 
