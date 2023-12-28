@@ -55,7 +55,4 @@ type LinterOutput struct {
 	Column int
 	// Message is the staticcheck Message
 	Message string
-
-	// Label is the staticcheck Label
-	Label string
 }

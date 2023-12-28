@@ -141,10 +141,14 @@ func formatStaticcheckOutput(output []byte) (map[string][]linters.LinterOutput, 
 }
 
 func formatStaticcheckLine(line string) (*linters.LinterOutput, error) {
-	pattern := `^(.*):(\d+):(\d+): (.*) \((.*)\)$`
-	regex := regexp.MustCompile(pattern)
+	pattern := `^(.*):(\d+):(\d+): (.*)$`
+	regex, err := regexp.Compile(pattern)
+	if err != nil {
+		log.Errorf("compile regex failed: %v", err)
+		return nil, err
+	}
 	matches := regex.FindStringSubmatch(line)
-	if len(matches) != 6 {
+	if len(matches) != 5 {
 		return nil, fmt.Errorf("unexpected format, original: %s", line)
 	}
 
@@ -163,6 +167,5 @@ func formatStaticcheckLine(line string) (*linters.LinterOutput, error) {
 		Line:    int(lineNumber),
 		Column:  int(columnNumber),
 		Message: matches[4],
-		Label:   matches[5],
 	}, nil
 }
