@@ -5,3 +5,4 @@
 [![GitHub release](https://img.shields.io/github/v/tag/qiniu/cr-bot.svg?label=release)](https://github.com/qiniu/cr-bot/releases)
 
 Build your own code review bot, enjoy safety, customization and powerful.
+

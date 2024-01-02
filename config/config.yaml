@@ -12,3 +12,8 @@ qbox/kodo: # github repository name, which will override the settings in qbox or
     command: staticcheck
     args: ["./..."]
     run_if_changed: ["src/qiniu.com/kodo/.*\\.go$"] # only run if changed files match the regex
+
+qbox/gaea-admin:
+  staticcheck:
+    enable: true
+    args: ["-debug.no-compile-errors=true", "./..."]
