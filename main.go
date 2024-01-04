@@ -88,7 +88,7 @@ func main() {
 		log.Fatalf("invalid options: %v", err)
 	}
 
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	log.SetFlags(log.LstdFlags | log.Lshortfile | log.Llevel)
 	log.SetOutputLevel(o.logLevel)
 
 	var gc *github.Client
