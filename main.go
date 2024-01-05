@@ -31,7 +31,7 @@ import (
 	gitv2 "k8s.io/test-infra/prow/git/v2"
 
 	// linters import
-	_ "github.com/cr-bot/linters/staticcheck"
+	_ "github.com/cr-bot/linters/go/staticcheck"
 )
 
 type options struct {
