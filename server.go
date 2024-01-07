@@ -21,7 +21,7 @@ import (
 	"net/http"
 
 	"github.com/cr-bot/config"
-	"github.com/cr-bot/linters"
+	"github.com/cr-bot/internal/linters"
 	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/x/xlog"
 	gitv2 "k8s.io/test-infra/prow/git/v2"
@@ -69,7 +69,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) processPullRequestEvent(log *xlog.Logger, event *github.PullRequestEvent, eventGUID string) error {
 	// TODO: synchronization 是什么意思？
-	if event.GetAction() != "opened" && event.GetAction() != "reopened" {
+	if event.GetAction() != "opened" && event.GetAction() != "reopened" && event.GetAction() != "synchronize" {
 		log.Debugf("skipping action %s\n", event.GetAction())
 		return nil
 	}
@@ -108,38 +108,55 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 
 	defer r.Clean()
 
-	var totalComments []*github.PullRequestComment
+	totalLinters := s.config.Linters(org, repo)
+	log.Infof("found %d linters for %s\n", len(totalLinters), org+"/"+repo)
 
-	for name, lingerConfig := range s.config.Linters(org, repo) {
-		f := linters.LinterHandler(name)
-		if f == nil {
+	var totalComments []*github.PullRequestComment
+	for name, lingerConfig := range totalLinters {
+		lts := linters.LintHandlers(name)
+		if lts == nil {
 			continue
 		}
 
 		// 更新完整的工作目录
 		lingerConfig.WorkDir = r.Directory() + "/" + lingerConfig.WorkDir
 
-		log.Infof("name: %v, lingerConfig: %+v", name, lingerConfig)
-		lintResults, err := f(lingerConfig)
-		if err != nil {
-			log.Errorf("failed to run linter: %v", err)
-			return err
-		}
+		for _, fn := range lts {
+			switch f := fn.(type) {
+			case linters.CodeReviewHandlerFunc:
+				log.Infof("CodeReviewHandlerFunc linter %s, config: %+v", name, lingerConfig)
+				lintResults, err := f(lingerConfig, linters.Agent{}, *event)
+				if err != nil {
+					log.Errorf("failed to run linter: %v", err)
+					return err
+				}
 
-		log.Infof("%s found total %d files with lint errors on repo %v", name, len(lintResults), repo)
-		comments, err := buildPullRequestCommentBody(name, lintResults, pullRequestAffectedFiles)
-		if err != nil {
-			log.Errorf("failed to build pull request comment body: %v", err)
-			return err
+				//TODO: move到linters包中
+				log.Infof("%s found total %d files with lint errors on repo %v", name, len(lintResults), repo)
+				comments, err := buildPullRequestCommentBody(name, lintResults, pullRequestAffectedFiles)
+				if err != nil {
+					log.Errorf("failed to build pull request comment body: %v", err)
+					return err
+				}
+
+				log.Infof("%s found valid %d comments related to this PR %d (%s) \n", name, len(comments), num, org+"/"+repo)
+				totalComments = append(totalComments, comments...)
+				if err := s.PostPullReviewCommentsWithRetry(ctx, org, repo, num, totalComments); err != nil {
+					log.Errorf("failed to post comments: %v", err)
+					return err
+				}
+				log.Infof("commented on PR %d (%s) successfully\n", num, org+"/"+repo)
+			case linters.CommentHandlerFunc:
+				log.Infof("CommentHandlerFunc linter %s, config: %+v", name, lingerConfig)
+				agent := linters.NewAgent(s.gc, s.gitClientFactory, s.config)
+				if err := f(lingerConfig, agent, *event); err != nil {
+					log.Errorf("failed to run linter: %v", err)
+					return err
+				}
+				log.Infof("commented on PR %d (%s) successfully\n", num, org+"/"+repo)
+			}
 		}
-		log.Infof("%s found valid %d comments related to this PR %d (%s) \n", name, len(comments), num, org+"/"+repo)
-		totalComments = append(totalComments, comments...)
 	}
 
-	if err := s.PostCommentsWithRetry(ctx, org, repo, num, totalComments); err != nil {
-		log.Errorf("failed to post comments: %v", err)
-		return err
-	}
-	log.Info("posted comments success\n")
 	return nil
 }

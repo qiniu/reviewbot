@@ -23,15 +23,18 @@ import (
 	"strings"
 
 	"github.com/cr-bot/config"
-	"github.com/cr-bot/linters"
+	"github.com/cr-bot/internal/linters"
+	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/x/log"
 )
 
+var lintName = "staticcheck"
+
 func init() {
-	linters.RegisterLinter("staticcheck", staticcheckHandler)
+	linters.RegisterCodeReviewHandler(lintName, staticcheckHandler)
 }
 
-func staticcheckHandler(linterConfig config.Linter) (map[string][]linters.LinterOutput, error) {
+func staticcheckHandler(linterConfig config.Linter, agent linters.Agent, event github.PullRequestEvent) (map[string][]linters.LinterOutput, error) {
 	executor, err := NewStaticcheckExecutor(linterConfig.WorkDir)
 	if err != nil {
 		return nil, err

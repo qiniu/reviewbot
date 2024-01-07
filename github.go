@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cr-bot/linters"
+	"github.com/cr-bot/internal/linters"
 	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/x/log"
 )
@@ -51,7 +51,7 @@ func (s *Server) ListPullRequestsFiles(ctx context.Context, owner string, repo s
 	}
 }
 
-func (s *Server) PostCommentsWithRetry(ctx context.Context, owner string, repo string, number int, comments []*github.PullRequestComment) error {
+func (s *Server) PostPullReviewCommentsWithRetry(ctx context.Context, owner string, repo string, number int, comments []*github.PullRequestComment) error {
 	var existedComments []*github.PullRequestComment
 	err := retryWithBackoff(ctx, func() error {
 		originalComments, resp, err := s.gc.PullRequests.ListComments(ctx, owner, repo, number, nil)
