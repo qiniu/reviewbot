@@ -31,7 +31,7 @@ import (
 	gitv2 "k8s.io/test-infra/prow/git/v2"
 
 	// linters import
-	_ "github.com/cr-bot/internal/linters/git-flow/rebase"
+	_ "github.com/cr-bot/internal/linters/git-flow/rebase-suggestion"
 	_ "github.com/cr-bot/internal/linters/go/staticcheck"
 )
 

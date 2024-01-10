@@ -42,6 +42,16 @@ func CommentHandler(name string) CommentHandlerFunc {
 	return nil
 }
 
+// TotalCommentHandlers returns all registered CommentHandlerFunc.
+func TotalCommentHandlers() map[string]CommentHandlerFunc {
+	var handlers = make(map[string]CommentHandlerFunc, len(commentHandlers))
+	for name, handler := range commentHandlers {
+		handlers[name] = handler
+	}
+
+	return handlers
+}
+
 // CodeReviewHandlerFunc knows how to code review on a PR.
 type CodeReviewHandlerFunc func(config.Linter, Agent, github.PullRequestEvent) (map[string][]LinterOutput, error)
 
@@ -50,15 +60,11 @@ func RegisterCodeReviewHandler(name string, handler CodeReviewHandlerFunc) {
 	codeReviewHandlers[name] = handler
 }
 
-// LintHandlers returns a LinterHandlerFunc for the given linter name.
-func LintHandlers(name string) []interface{} {
-	var handlers []interface{}
-	if handler, ok := codeReviewHandlers[name]; ok {
-		handlers = append(handlers, handler)
-	}
-
-	if handler, ok := commentHandlers[name]; ok {
-		handlers = append(handlers, handler)
+// CodeReviewHandler returns a CodeReviewHandlerFunc for the given linter name.
+func TotalCodeReviewHandlers() map[string]CodeReviewHandlerFunc {
+	var handlers = make(map[string]CodeReviewHandlerFunc, len(codeReviewHandlers))
+	for name, handler := range codeReviewHandlers {
+		handlers[name] = handler
 	}
 
 	return handlers

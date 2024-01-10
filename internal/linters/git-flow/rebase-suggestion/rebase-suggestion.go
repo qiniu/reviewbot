@@ -1,4 +1,4 @@
-package rebase
+package rebase_suggestion
 
 import (
 	"context"
