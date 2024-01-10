@@ -1,10 +1,15 @@
-qbox: # github organization name
-  staticcheck: # linters
-    enable: true
-    command: staticcheck # linter command, if not set, will use the linter name registered in init stage
-    args: ["./..."]
-    run_if_changed: [".go$"] # only run if changed files match the regex
-
+# This is the default config file, you can override it by creating a config.yaml in the same directory
+# by default, all linters are enabled if you don't specify. You can disable them by setting enable to false
+# example1: disable staticcheck for org
+# qbox:
+#  staticcheck:
+#    enable: false
+#   
+# example2: disable staticcheck for repo
+# qbox/kodo:
+#  staticcheck:
+#    enable: false
+#
 qbox/kodo: # github repository name, which will override the settings in qbox org
   staticcheck: # repo specific settings will override the settings in qbox org
     enable: true

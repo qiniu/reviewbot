@@ -34,7 +34,7 @@ func NewConfig(conf string) (Config, error) {
 	return c, nil
 }
 
-func (c Config) Linters(org, repo string) map[string]Linter {
+func (c Config) CustomLinterConfigs(org, repo string) map[string]Linter {
 	if repoConfig, ok := c[org+"/"+repo]; ok {
 		return repoConfig
 	}
