@@ -1,12 +1,12 @@
 /*
  Copyright 2024 Qiniu Cloud (qiniu.com).
- 
+
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
- 
+
      http://www.apache.org/licenses/LICENSE-2.0
- 
+
  Unless required by applicable law or agreed to in writing, software
  distributed under the License is distributed on an "AS IS" BASIS,
  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -158,12 +158,13 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 			lingerConfig.WorkDir = r.Directory() + "/" + lingerConfig.WorkDir
 		}
 
+		log.Infof("running %s on repo %v with config %v", name, fmt.Sprintf("%s/%s", org, repo), lingerConfig)
+
 		agent := linters.NewAgent(s.gc, s.gitClientFactory, s.config)
 		if err := fn(lingerConfig, agent, *event); err != nil {
 			log.Errorf("failed to run linter: %v", err)
 			return err
 		}
-		log.Infof("commented on PR %d (%s) successfully\n", num, org+"/"+repo)
 	}
 
 	return nil
