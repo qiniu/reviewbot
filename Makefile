@@ -31,4 +31,4 @@ docker-build: build
 	docker builder build --push -t $(DOCKER_IMAGE):$(VERSION) .
 
 docker-deploy:
-	kubectl apply -f deploy/cr-bot.yaml
+	kubectl apply -k .
