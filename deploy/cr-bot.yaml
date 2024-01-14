@@ -42,7 +42,7 @@ spec:
             secretKeyRef:
               key: app-installation-id
               name: github-app                                
-        image: aslan-spock-register.qiniu.io/qa/cr-bot:v0.2.6 # use your own built image instead
+        image: aslan-spock-register.qiniu.io/qa/cr-bot:latest # use your own built image instead
         imagePullPolicy: Always
         name: cr-bot
         ports:

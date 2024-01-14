@@ -1,0 +1,7 @@
+resources:
+- deploy/cr-bot.yaml
+images:
+- name: aslan-spock-register.qiniu.io/qa/cr-bot:latest
+  newName: aslan-spock-register.qiniu.io/qa/cr-bot
+  newTag: v0.3.0
+
