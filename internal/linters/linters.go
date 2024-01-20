@@ -17,7 +17,7 @@
 package linters
 
 import (
-	"github.com/cr-bot/config"
+	"github.com/reviewbot/config"
 	"github.com/google/go-github/v57/github"
 	gitv2 "k8s.io/test-infra/prow/git/v2"
 )
@@ -90,7 +90,7 @@ type LinterOutput struct {
 	Message string
 }
 
-// Agent knows necessary information from cr-bot.
+// Agent knows necessary information from reviewbot.
 type Agent struct {
 	gc               *github.Client
 	gitClientFactory gitv2.ClientFactory

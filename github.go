@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cr-bot/internal/linters"
+	"github.com/reviewbot/internal/linters"
 	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/x/log"
 )

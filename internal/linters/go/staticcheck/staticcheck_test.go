@@ -19,7 +19,7 @@ package staticcheck
 import (
 	"testing"
 
-	"github.com/cr-bot/internal/linters"
+	"github.com/reviewbot/internal/linters"
 )
 
 func TestFormatStaticcheckLine(t *testing.T) {
