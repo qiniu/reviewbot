@@ -1,12 +1,12 @@
 /*
  Copyright 2024 Qiniu Cloud (qiniu.com).
- 
+
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
- 
+
      http://www.apache.org/licenses/LICENSE-2.0
- 
+
  Unless required by applicable law or agreed to in writing, software
  distributed under the License is distributed on an "AS IS" BASIS,
  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,8 +17,9 @@
 package linters
 
 import (
-	"github.com/reviewbot/config"
 	"github.com/google/go-github/v57/github"
+	"github.com/qiniu/x/xlog"
+	"github.com/reviewbot/config"
 	gitv2 "k8s.io/test-infra/prow/git/v2"
 )
 
@@ -28,7 +29,7 @@ var (
 )
 
 // CommentHandlerFunc knows how to comment on a PR.
-type CommentHandlerFunc func(config.Linter, Agent, github.PullRequestEvent) error
+type CommentHandlerFunc func(*xlog.Logger, config.Linter, Agent, github.PullRequestEvent) error
 
 // RegisterCommentHandler registers a CommentHandlerFunc for the given linter name.
 func RegisterCommentHandler(name string, handler CommentHandlerFunc) {
@@ -54,7 +55,7 @@ func TotalCommentHandlers() map[string]CommentHandlerFunc {
 }
 
 // CodeReviewHandlerFunc knows how to code review on a PR.
-type CodeReviewHandlerFunc func(config.Linter, Agent, github.PullRequestEvent) (map[string][]LinterOutput, error)
+type CodeReviewHandlerFunc func(*xlog.Logger, config.Linter, Agent, github.PullRequestEvent) (map[string][]LinterOutput, error)
 
 // RegisterCodeReviewHandler registers a CodeReviewHandlerFunc for the given linter name.
 func RegisterCodeReviewHandler(name string, handler CodeReviewHandlerFunc) {
@@ -74,9 +75,9 @@ func TotalCodeReviewHandlers() map[string]CodeReviewHandlerFunc {
 // Linter knows how to execute linters.
 type Linter interface {
 	// Run executes a linter command.
-	Run(args ...string) ([]byte, error)
+	Run(log *xlog.Logger, args ...string) ([]byte, error)
 	// Parse parses the output of a linter command.
-	Parse(output []byte) (map[string][]LinterOutput, error)
+	Parse(log *xlog.Logger, output []byte) (map[string][]LinterOutput, error)
 }
 
 type LinterOutput struct {

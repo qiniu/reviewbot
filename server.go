@@ -21,10 +21,10 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/reviewbot/config"
-	"github.com/reviewbot/internal/linters"
 	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/x/xlog"
+	"github.com/reviewbot/config"
+	"github.com/reviewbot/internal/linters"
 	gitv2 "k8s.io/test-infra/prow/git/v2"
 )
 
@@ -124,7 +124,7 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 
 		log.Infof("running %s on repo %v with config %v", name, fmt.Sprintf("%s/%s", org, repo), lingerConfig)
 
-		lintResults, err := fn(lingerConfig, linters.Agent{}, *event)
+		lintResults, err := fn(log, lingerConfig, linters.Agent{}, *event)
 		if err != nil {
 			log.Errorf("failed to run linter: %v", err)
 			return err
@@ -161,7 +161,7 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 		log.Infof("running %s on repo %v with config %v", name, fmt.Sprintf("%s/%s", org, repo), lingerConfig)
 
 		agent := linters.NewAgent(s.gc, s.gitClientFactory, s.config)
-		if err := fn(lingerConfig, agent, *event); err != nil {
+		if err := fn(log, lingerConfig, agent, *event); err != nil {
 			log.Errorf("failed to run linter: %v", err)
 			return err
 		}

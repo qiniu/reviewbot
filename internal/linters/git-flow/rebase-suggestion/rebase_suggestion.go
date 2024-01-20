@@ -24,10 +24,11 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/reviewbot/config"
-	"github.com/reviewbot/internal/linters"
 	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/x/log"
+	"github.com/qiniu/x/xlog"
+	"github.com/reviewbot/config"
+	"github.com/reviewbot/internal/linters"
 )
 
 var lintName = "rebase-suggestion"
@@ -36,7 +37,7 @@ func init() {
 	linters.RegisterCommentHandler(lintName, rebaseSuggestionHandler)
 }
 
-func rebaseSuggestionHandler(linterConfig config.Linter, agent linters.Agent, event github.PullRequestEvent) error {
+func rebaseSuggestionHandler(log *xlog.Logger, linterConfig config.Linter, agent linters.Agent, event github.PullRequestEvent) error {
 	var (
 		org    = event.GetRepo().GetOwner().GetLogin()
 		repo   = event.GetRepo().GetName()
@@ -53,7 +54,7 @@ func rebaseSuggestionHandler(linterConfig config.Linter, agent linters.Agent, ev
 		return err
 	}
 
-	return handle(context.Background(), agent, org, repo, number, preFilterCommits, existedComments)
+	return handle(context.Background(), log, agent, org, repo, number, preFilterCommits, existedComments)
 }
 
 var rebaseSuggestionFlag = "**[REBASE SUGGESTION]**"
@@ -74,7 +75,7 @@ If you have any questions about this comment, feel free to raise an issue here:
 </details>
  `
 
-func handle(ctx context.Context, agent linters.Agent, org, repo string, number int, prefilterCommits []*github.RepositoryCommit, existedComments []*github.IssueComment) error {
+func handle(ctx context.Context, log *xlog.Logger, agent linters.Agent, org, repo string, number int, prefilterCommits []*github.RepositoryCommit, existedComments []*github.IssueComment) error {
 	var commitMessages []string
 	for _, commit := range prefilterCommits {
 		commitMessages = append(commitMessages, *commit.Commit.Message)
