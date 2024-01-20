@@ -11,7 +11,7 @@ $(error "No kubectl in $(PATH))
 endif
 
 DOCKER_IMAGE ?= aslan-spock-register.qiniu.io/qa/reviewbot
-VERSION ?= v0.1.1
+VERSION ?= latest
 
 default: all
 
@@ -30,5 +30,5 @@ build:
 docker-build: build
 	docker builder build --push -t $(DOCKER_IMAGE):$(VERSION) .
 
-docker-deploy:
+docker-deploy: docker-build
 	kubectl apply -k .

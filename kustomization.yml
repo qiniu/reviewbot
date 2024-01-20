@@ -3,5 +3,5 @@ resources:
 images:
 - name: aslan-spock-register.qiniu.io/qa/reviewbot:latest
   newName: aslan-spock-register.qiniu.io/qa/reviewbot
-  newTag: v0.3.0
+  newTag: latest
 

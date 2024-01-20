@@ -1,4 +1,4 @@
-FROM golang:1.21.5 as builder
+FROM aslan-spock-register.qiniu.io/library/golang:1.21.5 as builder
 
 WORKDIR /app
 
@@ -11,7 +11,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /reviewbot .
 # install lint tools
 RUN GOPATH=/go go install honnef.co/go/tools/cmd/staticcheck@2023.1.6
 
-FROM ubuntu:22.04 as runner
+FROM aslan-spock-register.qiniu.io/library/ubuntu:22.04 as runner
 
 RUN apt-get update && apt-get install -y ca-certificates \
     && apt-get install -y dnsutils \

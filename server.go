@@ -82,7 +82,7 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 	num := event.GetPullRequest().GetNumber()
 	org := event.GetRepo().GetOwner().GetLogin()
 	repo := event.GetRepo().GetName()
-	log.Infof("processing pull request %d, org %v, repo %v\n", num, org, repo)
+	log.Infof("processing pull request %d, (%v/%v)\n", num, org, repo)
 
 	pullRequestAffectedFiles, response, err := s.ListPullRequestsFiles(ctx, org, repo, num)
 	if err != nil {
