@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"path/filepath"
 
 	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/x/xlog"
@@ -119,7 +120,9 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 
 		if lingerConfig.WorkDir != "" {
 			// 更新完整的工作目录
-			lingerConfig.WorkDir = r.Directory() + "/" + lingerConfig.WorkDir
+			lingerConfig.WorkDir = filepath.Join(lingerConfig.WorkDir, lingerConfig.WorkDir)
+		} else {
+			lingerConfig.WorkDir = r.Directory()
 		}
 
 		log.Infof("running %s on repo %v with config %v", name, fmt.Sprintf("%s/%s", org, repo), lingerConfig)
