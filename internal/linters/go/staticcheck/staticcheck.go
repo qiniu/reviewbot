@@ -1,12 +1,12 @@
 /*
  Copyright 2024 Qiniu Cloud (qiniu.com).
- 
+
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
- 
+
      http://www.apache.org/licenses/LICENSE-2.0
- 
+
  Unless required by applicable law or agreed to in writing, software
  distributed under the License is distributed on an "AS IS" BASIS,
  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -23,10 +23,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/reviewbot/config"
-	"github.com/reviewbot/internal/linters"
 	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/x/log"
+	"github.com/qiniu/x/xlog"
+	"github.com/reviewbot/config"
+	"github.com/reviewbot/internal/linters"
 )
 
 var lintName = "staticcheck"
@@ -35,19 +36,22 @@ func init() {
 	linters.RegisterCodeReviewHandler(lintName, staticcheckHandler)
 }
 
-func staticcheckHandler(linterConfig config.Linter, agent linters.Agent, event github.PullRequestEvent) (map[string][]linters.LinterOutput, error) {
+func staticcheckHandler(log *xlog.Logger, linterConfig config.Linter, agent linters.Agent, event github.PullRequestEvent) (map[string][]linters.LinterOutput, error) {
 	executor, err := NewStaticcheckExecutor(linterConfig.WorkDir)
 	if err != nil {
+		log.Errorf("init staticcheck executor failed: %v", err)
 		return nil, err
 	}
 
-	output, err := executor.Run(linterConfig.Args...)
+	output, err := executor.Run(log, linterConfig.Args...)
 	if err != nil {
+		log.Errorf("staticcheck run failed: %v", err)
 		return nil, err
 	}
 
-	parsedOutput, err := executor.Parse(output)
+	parsedOutput, err := executor.Parse(log, output)
 	if err != nil {
+		log.Errorf("staticcheck parse output failed: %v", err)
 		return nil, err
 	}
 
@@ -67,6 +71,7 @@ type Staticcheck struct {
 // NewStaticcheckExecutor returns a new executor that knows how to execute staticcheck commands
 // TODO: with config
 func NewStaticcheckExecutor(dir string) (linters.Linter, error) {
+	log.Infof("staticcheck executor init")
 	g, err := exec.LookPath("staticcheck")
 	if err != nil {
 		return nil, err
@@ -82,7 +87,7 @@ func NewStaticcheckExecutor(dir string) (linters.Linter, error) {
 	}, nil
 }
 
-func (e *Staticcheck) Run(args ...string) ([]byte, error) {
+func (e *Staticcheck) Run(log *xlog.Logger, args ...string) ([]byte, error) {
 	b, err := e.execute(e.dir, e.staticcheck, args...)
 	if err != nil {
 		log.Errorf("staticcheck run with status: %v, mark and continue", err)
@@ -93,8 +98,8 @@ func (e *Staticcheck) Run(args ...string) ([]byte, error) {
 	return b, nil
 }
 
-func (e *Staticcheck) Parse(output []byte) (map[string][]linters.LinterOutput, error) {
-	return formatStaticcheckOutput(output)
+func (e *Staticcheck) Parse(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, error) {
+	return formatStaticcheckOutput(log, output)
 }
 
 // formatStaticcheckOutput formats the output of staticcheck
@@ -104,7 +109,7 @@ func (e *Staticcheck) Parse(output []byte) (map[string][]linters.LinterOutput, e
 // domain/repo/image.go:70:7: receiver name should be a reflection of its identity; don't use generic names such as "this" or "self" (ST1006)
 //
 //	output:  map[file][]linters.LinterOutput
-func formatStaticcheckOutput(output []byte) (map[string][]linters.LinterOutput, error) {
+func formatStaticcheckOutput(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, error) {
 	lines := strings.Split(string(output), "\n")
 
 	var result = make(map[string][]linters.LinterOutput)
