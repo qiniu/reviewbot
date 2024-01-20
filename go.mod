@@ -1,4 +1,4 @@
-module github.com/cr-bot
+module github.com/reviewbot
 
 go 1.21.4
 

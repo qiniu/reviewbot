@@ -24,8 +24,8 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/cr-bot/config"
-	"github.com/cr-bot/internal/linters"
+	"github.com/reviewbot/config"
+	"github.com/reviewbot/internal/linters"
 	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/x/log"
 )
@@ -69,7 +69,7 @@ Which seems insignificant, recommend to use ` + "`git rebase <upstream> <branch>
 
 If you have any questions about this comment, feel free to raise an issue here:
 
-- **https://github.com/qiniu/cr-bot/issues**
+- **https://github.com/qiniu/reviewbot/issues**
 
 </details>
  `

@@ -6,7 +6,7 @@ COPY go.mod go.sum ./
 RUN  go mod download
 COPY . ./
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o /cr-bot .
+RUN CGO_ENABLED=0 GOOS=linux go build -o /reviewbot .
 
 # install lint tools
 RUN GOPATH=/go go install honnef.co/go/tools/cmd/staticcheck@2023.1.6
@@ -31,7 +31,7 @@ ENV PATH /usr/local/go/bin:$PATH
 
 WORKDIR /
 
-COPY --from=builder /cr-bot /cr-bot
+COPY --from=builder /reviewbot /reviewbot
 COPY --from=builder /go/bin/staticcheck /usr/local/bin/staticcheck
 
 # SSH config
@@ -43,4 +43,4 @@ RUN git config --global url."git@github.com:".insteadOf https://github.com/ \
 
 EXPOSE 8888
 
-ENTRYPOINT [ "/cr-bot" ]
+ENTRYPOINT [ "/reviewbot" ]

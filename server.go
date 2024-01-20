@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/cr-bot/config"
-	"github.com/cr-bot/internal/linters"
+	"github.com/reviewbot/config"
+	"github.com/reviewbot/internal/linters"
 	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/x/xlog"
 	gitv2 "k8s.io/test-infra/prow/git/v2"

@@ -1,7 +1,7 @@
 resources:
-- deploy/cr-bot.yaml
+- deploy/reviewbot.yaml
 images:
-- name: aslan-spock-register.qiniu.io/qa/cr-bot:latest
-  newName: aslan-spock-register.qiniu.io/qa/cr-bot
+- name: aslan-spock-register.qiniu.io/qa/reviewbot:latest
+  newName: aslan-spock-register.qiniu.io/qa/reviewbot
   newTag: v0.3.0
 

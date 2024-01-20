@@ -24,7 +24,7 @@ import (
 	"os"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
-	"github.com/cr-bot/config"
+	"github.com/reviewbot/config"
 	"github.com/google/go-github/v57/github"
 	"github.com/gregjones/httpcache"
 	"github.com/qiniu/x/log"
@@ -32,8 +32,8 @@ import (
 	gitv2 "k8s.io/test-infra/prow/git/v2"
 
 	// linters import
-	_ "github.com/cr-bot/internal/linters/git-flow/rebase-suggestion"
-	_ "github.com/cr-bot/internal/linters/go/staticcheck"
+	_ "github.com/reviewbot/internal/linters/git-flow/rebase-suggestion"
+	_ "github.com/reviewbot/internal/linters/go/staticcheck"
 )
 
 type options struct {

@@ -10,7 +10,7 @@ ifeq (, $(shell which kubectl))
 $(error "No kubectl in $(PATH))
 endif
 
-DOCKER_IMAGE ?= aslan-spock-register.qiniu.io/qa/cr-bot
+DOCKER_IMAGE ?= aslan-spock-register.qiniu.io/qa/reviewbot
 VERSION ?= v0.1.1
 
 default: all
