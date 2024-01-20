@@ -1,12 +1,12 @@
 /*
  Copyright 2024 Qiniu Cloud (qiniu.com).
- 
+
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
- 
+
      http://www.apache.org/licenses/LICENSE-2.0
- 
+
  Unless required by applicable law or agreed to in writing, software
  distributed under the License is distributed on an "AS IS" BASIS,
  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -69,6 +69,24 @@ func TestFormatStaticcheckLine(t *testing.T) {
 
 		if output.File != c.expected.File || output.Line != c.expected.Line || output.Column != c.expected.Column || output.Message != c.expected.Message {
 			t.Errorf("expected: %v, got: %v", c.expected, output)
+		}
+	}
+}
+
+func TestIsEmpty(t *testing.T) {
+	tcs := []struct {
+		input    []string
+		expected bool
+	}{
+		{[]string{}, true},
+		{[]string{""}, true},
+		{[]string{" "}, false},
+		{[]string{"a"}, false},
+	}
+	for _, tc := range tcs {
+		actual := isEmpty(tc.input...)
+		if actual != tc.expected {
+			t.Errorf("expected: %v, got: %v", tc.expected, actual)
 		}
 	}
 }

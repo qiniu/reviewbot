@@ -43,6 +43,11 @@ func staticcheckHandler(log *xlog.Logger, linterConfig config.Linter, agent lint
 		return nil, err
 	}
 
+	if isEmpty(linterConfig.Args...) {
+		// turn off compile errors by default
+		linterConfig.Args = append([]string{}, "-debug.no-compile-errors=true", "./...")
+	}
+
 	output, err := executor.Run(log, linterConfig.Args...)
 	if err != nil {
 		log.Errorf("staticcheck run failed: %v", err)
@@ -56,6 +61,16 @@ func staticcheckHandler(log *xlog.Logger, linterConfig config.Linter, agent lint
 	}
 
 	return parsedOutput, nil
+}
+
+func isEmpty(args ...string) bool {
+	for _, arg := range args {
+		if arg != "" {
+			return false
+		}
+	}
+
+	return true
 }
 
 // Staticcheck is an executor that knows how to execute Staticcheck commands.
@@ -82,6 +97,7 @@ func NewStaticcheckExecutor(dir string) (linters.Linter, error) {
 		execute: func(dir, command string, args ...string) ([]byte, error) {
 			c := exec.Command(command, args...)
 			c.Dir = dir
+			log.Printf("final command:  %v \n", c)
 			return c.Output()
 		},
 	}, nil
