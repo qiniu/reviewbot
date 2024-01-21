@@ -1,12 +1,12 @@
 /*
  Copyright 2024 Qiniu Cloud (qiniu.com).
- 
+
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
- 
+
      http://www.apache.org/licenses/LICENSE-2.0
- 
+
  Unless required by applicable law or agreed to in writing, software
  distributed under the License is distributed on an "AS IS" BASIS,
  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -23,13 +23,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/reviewbot/internal/linters"
 	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/x/log"
+	"github.com/reviewbot/internal/linters"
 )
 
 // ListFiles lists all files for the specified pull request.
-func (s *Server) ListPullRequestsFiles(ctx context.Context, owner string, repo string, number int) ([]*github.CommitFile, *github.Response, error) {
+func ListPullRequestsFiles(ctx context.Context, gc *github.Client, owner string, repo string, number int) ([]*github.CommitFile, *github.Response, error) {
 	opts := github.ListOptions{
 		PerPage: 100,
 	}
@@ -37,7 +37,7 @@ func (s *Server) ListPullRequestsFiles(ctx context.Context, owner string, repo s
 	var pullRequestAffectedFiles []*github.CommitFile
 
 	for {
-		files, response, err := s.gc.PullRequests.ListFiles(ctx, owner, repo, number, &opts)
+		files, response, err := gc.PullRequests.ListFiles(ctx, owner, repo, number, &opts)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -52,10 +52,10 @@ func (s *Server) ListPullRequestsFiles(ctx context.Context, owner string, repo s
 	}
 }
 
-func (s *Server) PostPullReviewCommentsWithRetry(ctx context.Context, owner string, repo string, number int, comments []*github.PullRequestComment) error {
+func PostPullReviewCommentsWithRetry(ctx context.Context, gc *github.Client, owner string, repo string, number int, comments []*github.PullRequestComment) error {
 	var existedComments []*github.PullRequestComment
 	err := retryWithBackoff(ctx, func() error {
-		originalComments, resp, err := s.gc.PullRequests.ListComments(ctx, owner, repo, number, nil)
+		originalComments, resp, err := gc.PullRequests.ListComments(ctx, owner, repo, number, nil)
 		if err != nil {
 			return err
 		}
@@ -88,7 +88,7 @@ func (s *Server) PostPullReviewCommentsWithRetry(ctx context.Context, owner stri
 		}
 
 		err := retryWithBackoff(ctx, func() error {
-			_, resp, err := s.gc.PullRequests.CreateComment(ctx, owner, repo, number, comment)
+			_, resp, err := gc.PullRequests.CreateComment(ctx, owner, repo, number, comment)
 			if err != nil {
 				return err
 			}
