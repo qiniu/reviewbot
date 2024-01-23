@@ -129,7 +129,7 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 
 		if lingerConfig.WorkDir != "" {
 			// 更新完整的工作目录
-			lingerConfig.WorkDir = filepath.Join(lingerConfig.WorkDir, lingerConfig.WorkDir)
+			lingerConfig.WorkDir = filepath.Join(r.Directory(), lingerConfig.WorkDir)
 		} else {
 			lingerConfig.WorkDir = r.Directory()
 		}
