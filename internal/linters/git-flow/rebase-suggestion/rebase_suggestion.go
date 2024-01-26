@@ -42,6 +42,7 @@ func rebaseSuggestionHandler(log *xlog.Logger, linterConfig config.Linter, agent
 		org    = event.GetRepo().GetOwner().GetLogin()
 		repo   = event.GetRepo().GetName()
 		number = event.GetNumber()
+		author = event.GetPullRequest().GetUser().GetLogin()
 	)
 
 	preFilterCommits, err := listMatchedCommitMessages(context.Background(), agent, org, repo, number)
@@ -54,17 +55,17 @@ func rebaseSuggestionHandler(log *xlog.Logger, linterConfig config.Linter, agent
 		return err
 	}
 
-	return handle(context.Background(), log, agent, org, repo, number, preFilterCommits, existedComments)
+	return handle(context.Background(), log, agent, org, repo, author, number, preFilterCommits, existedComments)
 }
 
-var rebaseSuggestionFlag = "**[REBASE SUGGESTION]**"
+const rebaseSuggestionFlag = "REBASE SUGGESTION"
 
-var rebaseSuggestionTmpl = rebaseSuggestionFlag + ` This PR has commit message like:
-{{range	.}}
+var rebaseSuggestionTmpl = ` **[{{.Flag}}]** Hi @{{.Author}}, your PR has commit messages like:
+{{range	.TargetCommits}}
 > {{.}}
 {{end}}
 
-Which seems insignificant, recommend to use ` + "`git rebase <upstream> <branch>`" + `to reorganize your PR. 
+Which seems insignificant, recommend to use` + ` **`+"`"+`git rebase <upstream>/<branch>`+"`"+`** `+ `to reorganize your PR.
 
 <details>
 
@@ -75,10 +76,22 @@ If you have any questions about this comment, feel free to raise an issue here:
 </details>
  `
 
-func handle(ctx context.Context, log *xlog.Logger, agent linters.Agent, org, repo string, number int, prefilterCommits []*github.RepositoryCommit, existedComments []*github.IssueComment) error {
+type RebaseSuggestion struct {
+	Author        string
+	Flag          string
+	TargetCommits []string
+}
+
+func handle(ctx context.Context, log *xlog.Logger, agent linters.Agent, org, repo, author string, number int, prefilterCommits []*github.RepositoryCommit, existedComments []*github.IssueComment) error {
 	var commitMessages []string
 	for _, commit := range prefilterCommits {
 		commitMessages = append(commitMessages, *commit.Commit.Message)
+	}
+
+	var rebaseSuggestion = RebaseSuggestion{
+		Author:        author,
+		Flag:          rebaseSuggestionFlag,
+		TargetCommits: commitMessages,
 	}
 
 	tmpl, err := template.New("rebase-suggestion").Parse(rebaseSuggestionTmpl)
@@ -87,7 +100,7 @@ func handle(ctx context.Context, log *xlog.Logger, agent linters.Agent, org, rep
 	}
 
 	var buf bytes.Buffer
-	if err = tmpl.Execute(&buf, commitMessages); err != nil {
+	if err = tmpl.Execute(&buf, rebaseSuggestion); err != nil {
 		return err
 	}
 
