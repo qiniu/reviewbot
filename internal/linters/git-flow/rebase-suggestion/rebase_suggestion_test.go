@@ -13,7 +13,12 @@ func TestRebaseSuggestionTmpl(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	err = tmpl.Execute(&buf, []string{"commit1", "commit2"})
+	var rebaseSuggestion = RebaseSuggestion{
+		Author:        "author",
+		Flag:          rebaseSuggestionFlag,
+		TargetCommits: []string{"commit1", "commit2"},
+	}
+	err = tmpl.Execute(&buf, rebaseSuggestion)
 	if err != nil {
 		t.Fatal(err)
 	}
