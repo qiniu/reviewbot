@@ -23,9 +23,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v57/github"
-	"github.com/gregjones/httpcache"
 	"github.com/qiniu/x/log"
 	"github.com/reviewbot/config"
 	"github.com/sirupsen/logrus"
@@ -56,8 +54,8 @@ func (o options) Validate() error {
 		return errors.New("either access-token or github app information should be provided")
 	}
 
-	if o.appID != 0 && o.installationID == 0 {
-		return errors.New("app-installation-id is required when using github app")
+	if o.appID != 0 && o.appPrivateKey == "" {
+		return errors.New("app-private-key is required when using github app")
 	}
 
 	if o.webhookSecret == "" {
@@ -93,18 +91,6 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile | log.Llevel)
 	log.SetOutputLevel(o.logLevel)
 
-	var gc *github.Client
-	if o.appID != 0 {
-		tr, err := ghinstallation.NewKeyFromFile(httpcache.NewMemoryCacheTransport(), o.appID, o.installationID, o.appPrivateKey)
-		if err != nil {
-			log.Fatalf("failed to create github app transport: %v", err)
-		}
-		gc = github.NewClient(&http.Client{Transport: tr})
-	} else {
-		gc = github.NewClient(nil)
-		gc.WithAuthToken(o.accessToken)
-	}
-
 	if o.codeCacheDir != "" {
 		if err := os.MkdirAll(o.codeCacheDir, 0755); err != nil {
 			log.Fatalf("failed to create code cache dir: %v", err)
@@ -129,10 +115,12 @@ func main() {
 	// }
 
 	s := &Server{
-		gc:               gc,
 		webhookSecret:    []byte(o.webhookSecret),
 		gitClientFactory: v2,
 		config:           cfg,
+		accessToken:      o.accessToken,
+		appID:            o.appID,
+		appPrivateKey:    o.appPrivateKey,
 	}
 
 	mux := http.NewServeMux()

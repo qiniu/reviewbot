@@ -20,8 +20,12 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"path/filepath"
 
+	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v57/github"
+	"github.com/gregjones/httpcache"
+	"github.com/qiniu/x/log"
 	"github.com/qiniu/x/xlog"
 	"github.com/reviewbot/config"
 	"github.com/reviewbot/internal/linters"
@@ -29,11 +33,16 @@ import (
 )
 
 type Server struct {
-	gc               *github.Client
 	gitClientFactory gitv2.ClientFactory
 	config           config.Config
 
 	webhookSecret []byte
+
+	// support developer access token model
+	accessToken string
+	// support github app model
+	appID         int64
+	appPrivateKey string
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -82,9 +91,10 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 	num := event.GetPullRequest().GetNumber()
 	org := event.GetRepo().GetOwner().GetLogin()
 	repo := event.GetRepo().GetName()
-	log.Infof("processing pull request %d, (%v/%v)\n", num, org, repo)
+	installationID := event.GetInstallation().GetID()
+	log.Infof("processing pull request %d, (%v/%v), installationID: %d\n", num, org, repo, installationID)
 
-	pullRequestAffectedFiles, response, err := s.ListPullRequestsFiles(ctx, org, repo, num)
+	pullRequestAffectedFiles, response, err := ListPullRequestsFiles(ctx, s.GithubClient(installationID), org, repo, num)
 	if err != nil {
 		return err
 	}
@@ -119,7 +129,9 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 
 		if lingerConfig.WorkDir != "" {
 			// 更新完整的工作目录
-			lingerConfig.WorkDir = r.Directory() + "/" + lingerConfig.WorkDir
+			lingerConfig.WorkDir = filepath.Join(r.Directory(), lingerConfig.WorkDir)
+		} else {
+			lingerConfig.WorkDir = r.Directory()
 		}
 
 		log.Infof("running %s on repo %v with config %v", name, fmt.Sprintf("%s/%s", org, repo), lingerConfig)
@@ -139,7 +151,7 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 		}
 
 		log.Infof("%s found valid %d comments related to this PR %d (%s) \n", name, len(comments), num, org+"/"+repo)
-		if err := s.PostPullReviewCommentsWithRetry(ctx, org, repo, num, comments); err != nil {
+		if err := PostPullReviewCommentsWithRetry(ctx, s.GithubClient(installationID), org, repo, num, comments); err != nil {
 			log.Errorf("failed to post comments: %v", err)
 			return err
 		}
@@ -160,7 +172,7 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 
 		log.Infof("running %s on repo %v with config %v", name, fmt.Sprintf("%s/%s", org, repo), lingerConfig)
 
-		agent := linters.NewAgent(s.gc, s.gitClientFactory, s.config)
+		agent := linters.NewAgent(s.GithubClient(installationID), s.gitClientFactory, s.config)
 		if err := fn(log, lingerConfig, agent, *event); err != nil {
 			log.Errorf("failed to run linter: %v", err)
 			return err
@@ -168,4 +180,26 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 	}
 
 	return nil
+}
+
+func (s *Server) githubAppClient(installationID int64) *github.Client {
+	tr, err := ghinstallation.NewKeyFromFile(httpcache.NewMemoryCacheTransport(), s.appID, installationID, s.appPrivateKey)
+	if err != nil {
+		log.Fatalf("failed to create github app transport: %v", err)
+	}
+	return github.NewClient(&http.Client{Transport: tr})
+}
+
+func (s *Server) githubAccessTokenClient() *github.Client {
+	gc := github.NewClient(httpcache.NewMemoryCacheTransport().Client())
+	gc.WithAuthToken(s.accessToken)
+	return gc
+}
+
+// GithubClient returns a github client
+func (s *Server) GithubClient(installationID int64) *github.Client {
+	if s.accessToken != "" {
+		return s.githubAccessTokenClient()
+	}
+	return s.githubAppClient(installationID)
 }

@@ -24,7 +24,6 @@ spec:
         - -webhook-secret=$(GITHUB_WEBHOOK_SECRET)
         - -config=/etc/config/config.yaml
         - -app-id=$(GITHUB_APP_ID)
-        - -app-installation-id=$(GITHUB_APP_INSTALLATION_ID)
         - -app-private-key=/secrets/github_app_key
         env:
         - name: GITHUB_WEBHOOK_SECRET
@@ -36,11 +35,6 @@ spec:
           valueFrom:
             secretKeyRef:
               key: app-id
-              name: github-app
-        - name: GITHUB_APP_INSTALLATION_ID
-          valueFrom:
-            secretKeyRef:
-              key: app-installation-id
               name: github-app                                
         image: aslan-spock-register.qiniu.io/qa/reviewbot:latest # use your own built image instead
         imagePullPolicy: Always
