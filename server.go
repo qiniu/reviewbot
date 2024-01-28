@@ -68,7 +68,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch event := event.(type) {
 	case *github.PullRequestEvent:
 		go func() {
-			if err := s.processPullRequestEvent(log, event, eventGUID); err != nil {
+			if err := s.processPullRequestEvent(log, event); err != nil {
 				log.Errorf("process pull request event: %v", err)
 			}
 		}()
@@ -77,7 +77,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) processPullRequestEvent(log *xlog.Logger, event *github.PullRequestEvent, eventGUID string) error {
+func (s *Server) processPullRequestEvent(log *xlog.Logger, event *github.PullRequestEvent) error {
 	// TODO: synchronization 是什么意思？
 	if event.GetAction() != "opened" && event.GetAction() != "reopened" && event.GetAction() != "synchronize" {
 		log.Debugf("skipping action %s\n", event.GetAction())
