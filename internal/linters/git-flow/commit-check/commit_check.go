@@ -74,7 +74,7 @@ func commitMessageCheckHandler(log *xlog.Logger, linterConfig config.Linter, age
 const rebaseSuggestionFlag = "REBASE SUGGESTION"
 const commitCheckFlag = "[Git-flow]"
 
-const commentTmpl = `**{{.flag}}** Hi @{{.Author}}, There are some suggestions for your information:
+const commentTmpl = `**{{.Flag}}** Hi @{{.Author}}, There are some suggestions for your information:
 
 ---
 
@@ -205,19 +205,21 @@ type Ruler func(log *xlog.Logger, commits []*github.RepositoryCommit) (string, e
 
 var rulers = map[string]Ruler{
 	"Rebase suggestions": rebaseCheck,
+	"Amend suggestions":  amendCheck,
 }
 
-const pattern = `^Merge (.*) into (.*)$`
-
-var mergeMsgRegex = regexp.MustCompile(pattern)
-
-const rebaseSuggestionTmpl = `
-Your PR has commit messages like:
+const (
+	pattern              = `^Merge (.*) into (.*)$`
+	rebaseSuggestionTmpl = `
+Your PR has **Merge** type commit messages like:
 {{range	.TargetCommits}}
 > {{.}}
 {{end}}
-Which seems insignificant, recommend to use` + ` **` + "`" + `git rebase <upstream>/<branch>` + "`" + `** ` + `to reorganize your PR.
+Which seems insignificant, recommend to use` + ` **` + "`" + `git rebase <upstream>/<branch>` + "`" + `** command ` + `to reorganize your PR.
 `
+)
+
+var mergeMsgRegex = regexp.MustCompile(pattern)
 
 func rebaseCheck(log *xlog.Logger, commits []*github.RepositoryCommit) (string, error) {
 	var preFilterCommits []string
@@ -252,6 +254,59 @@ func rebaseCheck(log *xlog.Logger, commits []*github.RepositoryCommit) (string, 
 
 	suggestion := `
 ### Rebase suggestions
+	` + buf.String()
+
+	return suggestion, nil
+}
+
+const (
+	amendSuggestionTmpl = `
+Your PR has **duplicate** commit messages like:
+{{range	.TargetCommits}}
+> {{.}}
+{{end}}
+Recommend to use` + ` **` + "`" + `git rebase -i ` + "`" + `** command ` + `to reorganize your PR.
+`
+)
+
+func amendCheck(log *xlog.Logger, commits []*github.RepositoryCommit) (string, error) {
+	var msgs = make(map[string]int, 0)
+	for _, commit := range commits {
+		if commit.Commit != nil && commit.Commit.Message != nil {
+			msgs[*commit.Commit.Message]++
+		}
+	}
+
+	var preFilterCommits []string
+	for msg, count := range msgs {
+		if count > 1 {
+			preFilterCommits = append(preFilterCommits, msg)
+		}
+	}
+
+	if len(preFilterCommits) == 0 {
+		// no duplicated commit messages
+		return "", nil
+	}
+
+	var data = struct {
+		TargetCommits []string
+	}{
+		TargetCommits: preFilterCommits,
+	}
+
+	tmpl, err := template.New("").Parse(amendSuggestionTmpl)
+	if err != nil {
+		return "", err
+	}
+
+	var buf bytes.Buffer
+	if err = tmpl.Execute(&buf, data); err != nil {
+		return "", err
+	}
+
+	suggestion := `
+### Amend suggestions
 	` + buf.String()
 
 	return suggestion, nil
