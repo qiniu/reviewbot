@@ -1,4 +1,4 @@
-package rebase_suggestion
+package commit_check
 
 import (
 	"bytes"
