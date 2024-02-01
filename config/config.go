@@ -7,14 +7,22 @@ import (
 )
 
 // Config maps org or repo to LinterConfig
-type Config map[string]map[string]Linter
+//type Config map[string]map[string]Linter
+
+type Config map[string]LinterList
+
+type LinterList struct {
+	StaticCheck Linter `json:"staticcheck" yaml:"staticcheck" default:"{\"enable\":true}"`
+	GoVet       Linter `json:"govet" yaml:"govet" default:"{\"enable\":true}"`
+	LuaCheck    Linter `json:"luacheck" yaml:"luacheck" default:"{\"enable\":true}"`
+}
 
 type Linter struct {
 	// Enable is whether to enable this linter, if false, linter still run but not report.
-	Enable  bool     `json:"enable,omitempty"`
-	WorkDir string   `json:"workDir,omitempty"`
-	Command string   `json:"command,omitempty"`
-	Args    []string `json:"args,omitempty"`
+	Enable  bool     `json:"enable" yaml:"enable"`
+	WorkDir string   `json:"workDir" yaml:"workDir"`
+	Command string   `json:"command" yaml:"command"`
+	Args    []string `json:"args" yaml:"args"`
 }
 
 // NewConfig returns a new Config.
@@ -29,12 +37,17 @@ func NewConfig(conf string) (Config, error) {
 		return nil, err
 	}
 
-	// TODO: 应该默认开启staticcheck？
+	for k, v := range c {
+		if err = SetDefaults(&v); err != nil {
+			return nil, err
+		}
+		c[k] = v
+	}
 
 	return c, nil
 }
 
-func (c Config) CustomLinterConfigs(org, repo string) map[string]Linter {
+func (c Config) CustomLinterConfigs(org, repo string) LinterList {
 	if repoConfig, ok := c[org+"/"+repo]; ok {
 		return repoConfig
 	}
@@ -43,5 +56,5 @@ func (c Config) CustomLinterConfigs(org, repo string) map[string]Linter {
 		return orgConfig
 	}
 
-	return nil
+	return LinterList{}
 }

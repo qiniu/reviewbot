@@ -19,9 +19,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"path/filepath"
-
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v57/github"
 	"github.com/gregjones/httpcache"
@@ -30,6 +27,8 @@ import (
 	"github.com/reviewbot/config"
 	"github.com/reviewbot/internal/linters"
 	gitv2 "k8s.io/test-infra/prow/git/v2"
+	"net/http"
+	"path/filepath"
 )
 
 type Server struct {
@@ -119,14 +118,19 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 	defer r.Clean()
 
 	customLinterConfigs := s.config.CustomLinterConfigs(org, repo)
-	log.Infof("found %d custom linter configs for %s\n", len(customLinterConfigs), org+"/"+repo)
-
 	for name, fn := range linters.TotalCodeReviewHandlers() {
 		var lingerConfig config.Linter
-		if v, ok := customLinterConfigs[name]; ok {
-			lingerConfig = v
+		//if v, ok := customLinterConfigs[name]; ok {
+		//	lingerConfig = v
+		//}
+		switch name {
+		case "staticcheck":
+			lingerConfig = customLinterConfigs.StaticCheck
+		case "govet":
+			lingerConfig = customLinterConfigs.GoVet
+		case "luacheck":
+			lingerConfig = customLinterConfigs.LuaCheck
 		}
-
 		if lingerConfig.WorkDir != "" {
 			// 更新完整的工作目录
 			lingerConfig.WorkDir = filepath.Join(r.Directory(), lingerConfig.WorkDir)
@@ -161,8 +165,17 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 
 	for name, fn := range linters.TotalCommentHandlers() {
 		var lingerConfig config.Linter
-		if v, ok := customLinterConfigs[name]; ok {
-			lingerConfig = v
+		//if v, ok := customLinterConfigs[name]; ok {
+		//	lingerConfig = v
+		//}
+
+		switch name {
+		case "staticcheck":
+			lingerConfig = customLinterConfigs.StaticCheck
+		case "govet":
+			lingerConfig = customLinterConfigs.GoVet
+		case "luacheck":
+			lingerConfig = customLinterConfigs.LuaCheck
 		}
 
 		if lingerConfig.WorkDir != "" {

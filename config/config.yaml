@@ -1,10 +1,17 @@
 # This is the default config file, you can override it by creating a config.yaml in the same directory
 # by default, all linters are enabled if you don't specify. You can disable them by setting enable to false
 # example1: disable staticcheck for org
-# qbox:
+#qbox:
 #  staticcheck:
 #    enable: false
-#   
+#  govet:
+#    enable: true
+#  luacheck:
+#    enable: true
+#    workDir: "nginx/Lua"
+#    #command: luacheck
+
+#
 # example2: disable staticcheck for repo
 # qbox/kodo:
 #  staticcheck:

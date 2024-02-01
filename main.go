@@ -20,12 +20,12 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/reviewbot/config"
 	"net/http"
 	"os"
 
 	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/x/log"
-	"github.com/reviewbot/config"
 	"github.com/sirupsen/logrus"
 	gitv2 "k8s.io/test-infra/prow/git/v2"
 

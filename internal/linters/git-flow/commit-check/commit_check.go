@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/reviewbot/config"
 	"regexp"
 	"strings"
 	"text/template"
@@ -27,7 +28,6 @@ import (
 	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/x/log"
 	"github.com/qiniu/x/xlog"
-	"github.com/reviewbot/config"
 	"github.com/reviewbot/internal/linters"
 )
 

@@ -18,6 +18,7 @@ package staticcheck
 
 import (
 	"fmt"
+	"github.com/reviewbot/config"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -27,7 +28,6 @@ import (
 	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/x/log"
 	"github.com/qiniu/x/xlog"
-	"github.com/reviewbot/config"
 	"github.com/reviewbot/internal/linters"
 )
 
