@@ -1,34 +1,119 @@
 package commit_check
 
 import (
-	"bytes"
+	"strings"
 	"testing"
-	"text/template"
+
+	"github.com/google/go-github/v57/github"
 )
 
-func TestRebaseSuggestionTmpl(t *testing.T) {
-	tmpl, err := template.New("rebase_suggestion").Parse(rebaseSuggestionTmpl)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var buf bytes.Buffer
-	var rebaseSuggestion = RebaseSuggestion{
-		Author:        "author",
-		Flag:          rebaseSuggestionFlag,
-		TargetCommits: []string{"commit1", "commit2"},
-	}
-	err = tmpl.Execute(&buf, rebaseSuggestion)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	t.Log(buf.String())
-}
-
 func TestRebaseCheckRule(t *testing.T) {
-	var rule = RebaseCheckRule{
-		RebaseSuggestion: RebaseSuggestion
-		}
+
+	tcs := []struct {
+		title    string
+		commits  []*github.RepositoryCommit
+		expected string
+	}{
+		{
+			title: "filter merge commits",
+			commits: []*github.RepositoryCommit{
+				{
+					Commit: &github.Commit{
+						Message: github.String("feat: add feature 1"),
+					},
+				},
+				{
+					Commit: &github.Commit{
+						Message: github.String("Merge a into b"),
+					},
+				},
+				{
+					Commit: &github.Commit{
+						Message: github.String("fix: fix bug 2"),
+					},
+				},
+				{
+					Commit: &github.Commit{
+						Message: github.String("Merge xxx into xxx"),
+					},
+				},
+			},
+			expected: "git merge",
+		},
+		{
+			title: "filter duplicate commits",
+			commits: []*github.RepositoryCommit{
+				{
+					Commit: &github.Commit{
+						Message: github.String("feat: add feature 1"),
+					},
+				},
+				{
+					Commit: &github.Commit{
+						Message: github.String("feat: add feature 1"),
+					},
+				},
+				{
+					Commit: &github.Commit{
+						Message: github.String("fix: fix bug 2"),
+					},
+				},
+			},
+			expected: "duplicated",
+		},
+		{
+			title: "filter duplicate and merge commits",
+			commits: []*github.RepositoryCommit{
+				{
+					Commit: &github.Commit{
+						Message: github.String("feat: add feature 1"),
+					},
+				},
+				{
+					Commit: &github.Commit{
+						Message: github.String("feat: add feature 1"),
+					},
+				},
+				{
+					Commit: &github.Commit{
+						Message: github.String("Merge xxx into xxx"),
+					},
+				},
+			},
+			expected: "feat: add feature 1",
+		},
+		{
+			title: "filter duplicate and merge commits",
+			commits: []*github.RepositoryCommit{
+				{
+					Commit: &github.Commit{
+						Message: github.String("feat: add feature 1"),
+					},
+				},
+				{
+					Commit: &github.Commit{
+						Message: github.String("feat: add feature 2"),
+					},
+				},
+			},
+			expected: "",
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.title, func(t *testing.T) {
+			comments, err := rebaseCheck(nil, tc.commits)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if tc.expected == "" && comments != "" {
+				t.Fatalf("expected %s, got %s", tc.expected, comments)
+			}
+
+			if !strings.Contains(comments, tc.expected) {
+				t.Fatalf("expected %s, got %s", tc.expected, comments)
+			}
+		})
 	}
 }
