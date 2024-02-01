@@ -71,6 +71,37 @@ func commitMessageCheckHandler(log *xlog.Logger, linterConfig config.Linter, age
 	return handle(context.Background(), log, agent, org, repo, author, number, toComments, existedComments)
 }
 
+func listCommits(ctx context.Context, agent linters.Agent, org, repo string, number int) ([]*github.RepositoryCommit, error) {
+	var preFilterCommits []*github.RepositoryCommit
+	opts := &github.ListOptions{}
+	commits, response, err := agent.GitHubClient().PullRequests.ListCommits(context.Background(), org, repo, number, opts)
+	if err != nil {
+		return preFilterCommits, err
+	}
+
+	if response.StatusCode != 200 {
+		log.Errorf("list commits failed: %v", response)
+		return preFilterCommits, fmt.Errorf("list commits failed: %v", response.Body)
+	}
+
+	return commits, nil
+}
+
+func listExistedComments(ctx context.Context, agent linters.Agent, org, repo string, number int) ([]*github.IssueComment, error) {
+	comments, resp, err := agent.GitHubClient().Issues.ListComments(ctx, org, repo, number, &github.IssueListCommentsOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != 200 {
+		log.Errorf("list comments failed: %v", resp)
+		return nil, fmt.Errorf("list comments failed: %v", resp.Body)
+	}
+
+	return comments, nil
+}
+
+// Deprecated: this is old version of commit check, which is not used anymore. Remove this after a while.
 const rebaseSuggestionFlag = "REBASE SUGGESTION"
 const commitCheckFlag = "[Git-flow]"
 
@@ -81,14 +112,9 @@ const commentTmpl = `**{{.Flag}}** Hi @{{.Author}}, There are some suggestions f
 {{range	.Comments}}
 > {{.}}
 {{end}}
+For other ` + "`" + `git-flow` + "`" + ` instructions, recommend refer to [these examples](https://github.com/qiniu/reviewbot/blob/master/docs/engineering-practice/git-flow-instructions_zh.md).
 
-<details>
-
-If you have any questions about this comment, feel free to raise an issue here:
-
-- **https://github.com/qiniu/reviewbot/issues**
-
-</details>
+{{.Footer}}
 `
 
 type RebaseSuggestion struct {
@@ -102,10 +128,12 @@ func handle(ctx context.Context, log *xlog.Logger, agent linters.Agent, org, rep
 		Flag     string
 		Author   string
 		Comments []string
+		Footer   string
 	}{
 		Flag:     commitCheckFlag,
 		Author:   author,
 		Comments: comments,
+		Footer:   linters.CommentFooter,
 	}
 
 	tmpl, err := template.New("").Parse(commentTmpl)
@@ -170,144 +198,92 @@ func handle(ctx context.Context, log *xlog.Logger, agent linters.Agent, org, rep
 	return nil
 }
 
-func listCommits(ctx context.Context, agent linters.Agent, org, repo string, number int) ([]*github.RepositoryCommit, error) {
-	var preFilterCommits []*github.RepositoryCommit
-	opts := &github.ListOptions{}
-	commits, response, err := agent.GitHubClient().PullRequests.ListCommits(context.Background(), org, repo, number, opts)
-	if err != nil {
-		return preFilterCommits, err
-	}
-
-	if response.StatusCode != 200 {
-		log.Errorf("list commits failed: %v", response)
-		return preFilterCommits, fmt.Errorf("list commits failed: %v", response.Body)
-	}
-
-	return commits, nil
-}
-
-func listExistedComments(ctx context.Context, agent linters.Agent, org, repo string, number int) ([]*github.IssueComment, error) {
-	comments, resp, err := agent.GitHubClient().Issues.ListComments(ctx, org, repo, number, &github.IssueListCommentsOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != 200 {
-		log.Errorf("list comments failed: %v", resp)
-		return nil, fmt.Errorf("list comments failed: %v", resp.Body)
-	}
-
-	return comments, nil
-}
-
 // Ruler is a function to check if commit messages match some rules
+// The message returned via Ruler will be added as part of the comment
+// so, It's recommended to use template rulerTmpl to generate a unified format message
 type Ruler func(log *xlog.Logger, commits []*github.RepositoryCommit) (string, error)
+
+const rulerTmpl = `
+### {{.Header}}
+{{.Message}}
+`
 
 var rulers = map[string]Ruler{
 	"Rebase suggestions": rebaseCheck,
-	"Amend suggestions":  amendCheck,
 }
 
 const (
-	pattern              = `^Merge (.*) into (.*)$`
-	rebaseSuggestionTmpl = `
-Your PR has **Merge** type commit messages like:
-{{range	.TargetCommits}}
-> {{.}}
-{{end}}
-Which seems insignificant, recommend to use` + ` **` + "`" + `git rebase <upstream>/<branch>` + "`" + `** command ` + `to reorganize your PR.
-`
+	pattern = `^Merge (.*) into (.*)$`
 )
 
 var mergeMsgRegex = regexp.MustCompile(pattern)
 
+// RebaseCheckRule checks if there are merge commit messages or duplicate messages in the PR
+// If there are, it will return a suggestion message to do git rebase
 func rebaseCheck(log *xlog.Logger, commits []*github.RepositoryCommit) (string, error) {
-	var preFilterCommits []string
+	var mergeTypeCommits []string
+	// filter out duplicated commit messages
+	var msgs = make(map[string]int, 0)
+
+	// filter out merge commit messages
 	for _, commit := range commits {
 		if commit.Commit != nil && commit.Commit.Message != nil {
 			if mergeMsgRegex.MatchString(*commit.Commit.Message) {
-				preFilterCommits = append(preFilterCommits, *commit.Commit.Message)
+				mergeTypeCommits = append(mergeTypeCommits, *commit.Commit.Message)
 			}
-		}
-	}
-
-	// no matched commit messages
-	if len(preFilterCommits) == 0 {
-		return "", nil
-	}
-
-	var data = struct {
-		TargetCommits []string
-	}{
-		TargetCommits: preFilterCommits,
-	}
-
-	tmpl, err := template.New("").Parse(rebaseSuggestionTmpl)
-	if err != nil {
-		return "", err
-	}
-
-	var buf bytes.Buffer
-	if err = tmpl.Execute(&buf, data); err != nil {
-		return "", err
-	}
-
-	suggestion := `
-### Rebase suggestions
-	` + buf.String()
-
-	return suggestion, nil
-}
-
-const (
-	amendSuggestionTmpl = `
-Your PR has **duplicate** commit messages like:
-{{range	.TargetCommits}}
-> {{.}}
-{{end}}
-Recommend to use` + ` **` + "`" + `git rebase -i ` + "`" + `** command ` + `to reorganize your PR.
-`
-)
-
-func amendCheck(log *xlog.Logger, commits []*github.RepositoryCommit) (string, error) {
-	var msgs = make(map[string]int, 0)
-	for _, commit := range commits {
-		if commit.Commit != nil && commit.Commit.Message != nil {
 			msgs[*commit.Commit.Message]++
 		}
 	}
 
-	var preFilterCommits []string
+	var finalComments string
+
+	// check if there are merge commit messages
+	if len(mergeTypeCommits) > 0 {
+		var cmtsForMergeTypeCommits string
+		for _, msg := range mergeTypeCommits {
+			cmtsForMergeTypeCommits += fmt.Sprintf("\n  > %s\n", msg)
+		}
+		finalComments += fmt.Sprintf("* Following commits seems generated via `git merge` \n %s", cmtsForMergeTypeCommits)
+	}
+
+	// check if there are duplicated commit messages
+	var duplicatedCommits string
 	for msg, count := range msgs {
 		if count > 1 {
-			preFilterCommits = append(preFilterCommits, msg)
+			for i := 0; i < count; i++ {
+				duplicatedCommits += fmt.Sprintf("\n  > %s \n", msg)
+			}
 		}
 	}
 
-	if len(preFilterCommits) == 0 {
-		// no duplicated commit messages
+	if duplicatedCommits != "" {
+		finalComments += fmt.Sprintf("* Following commits have **duplicated** messages \n %s", duplicatedCommits)
+	}
+
+	if finalComments == "" {
 		return "", nil
 	}
 
-	var data = struct {
-		TargetCommits []string
-	}{
-		TargetCommits: preFilterCommits,
-	}
+	// add footer
+	finalComments += "\n Which seems insignificant, recommend to use **`git rebase`** command to reorganize your PR. \n"
 
-	tmpl, err := template.New("").Parse(amendSuggestionTmpl)
+	tmpl, err := template.New("ruler").Parse(rulerTmpl)
 	if err != nil {
 		return "", err
 	}
 
 	var buf bytes.Buffer
-	if err = tmpl.Execute(&buf, data); err != nil {
+	var data = struct {
+		Header  string
+		Message string
+	}{
+		Header:  "Rebase suggestions",
+		Message: finalComments,
+	}
+	err = tmpl.Execute(&buf, data)
+	if err != nil {
 		return "", err
 	}
 
-	suggestion := `
-### Amend suggestions
-	` + buf.String()
-
-	return suggestion, nil
+	return buf.String(), nil
 }

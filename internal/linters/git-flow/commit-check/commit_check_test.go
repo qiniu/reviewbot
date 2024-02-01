@@ -25,3 +25,10 @@ func TestRebaseSuggestionTmpl(t *testing.T) {
 
 	t.Log(buf.String())
 }
+
+func TestRebaseCheckRule(t *testing.T) {
+	var rule = RebaseCheckRule{
+		RebaseSuggestion: RebaseSuggestion
+		}
+	}
+}
