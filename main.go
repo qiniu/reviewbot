@@ -20,18 +20,20 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"net/http"
-	"os"
-
 	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/x/log"
 	"github.com/reviewbot/config"
 	"github.com/sirupsen/logrus"
 	gitv2 "k8s.io/test-infra/prow/git/v2"
+	"net/http"
+	"os"
 
 	// linters import
 	_ "github.com/reviewbot/internal/linters/git-flow/commit-check"
+	_ "github.com/reviewbot/internal/linters/git-flow/rebase-suggestion"
+	_ "github.com/reviewbot/internal/linters/go/govet"
 	_ "github.com/reviewbot/internal/linters/go/staticcheck"
+	_ "github.com/reviewbot/internal/linters/lua/luacheck"
 )
 
 type options struct {
@@ -85,6 +87,7 @@ func gatherOptions() options {
 func main() {
 	o := gatherOptions()
 	if err := o.Validate(); err != nil {
+
 		log.Fatalf("invalid options: %v", err)
 	}
 
