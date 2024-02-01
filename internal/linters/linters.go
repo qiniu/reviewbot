@@ -117,3 +117,12 @@ func (a Agent) GitClientFactory() gitv2.ClientFactory {
 func (a Agent) Config() config.Config {
 	return a.config
 }
+
+const CommentFooter = `
+<details>
+
+If you have any questions about this comment, feel free to raise an issue here:
+
+- **https://github.com/qiniu/reviewbot**
+
+</details>`
