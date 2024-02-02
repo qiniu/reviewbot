@@ -32,6 +32,7 @@ import (
 	// linters import
 	_ "github.com/reviewbot/internal/linters/git-flow/commit-check"
 	_ "github.com/reviewbot/internal/linters/go/staticcheck"
+	_ "github.com/reviewbot/internal/linters/lua/luacheck"
 )
 
 type options struct {
