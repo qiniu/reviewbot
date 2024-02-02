@@ -4,7 +4,7 @@
 # qbox:
 #  staticcheck:
 #    enable: false
-#   
+
 # example2: disable staticcheck for repo
 # qbox/kodo:
 #  staticcheck:
