@@ -151,7 +151,7 @@ func handle(ctx context.Context, log *xlog.Logger, agent linters.Agent, org, rep
 	// check if comment already existed
 	for _, comment := range existedComments {
 		if comment.Body != nil && *comment.Body == expectedComment {
-			log.Infof("comment already existed: %v", comment.Body)
+			log.Infof("comment already existed: %v", *comment.Body)
 			return nil
 		}
 	}
