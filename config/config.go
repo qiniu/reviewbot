@@ -9,45 +9,49 @@ import (
 // Config maps org or repo to LinterConfig
 //type Config map[string]map[string]Linter
 
-type Config map[string]LinterList
-
-type LinterList struct {
-	StaticCheck Linter `json:"staticcheck" yaml:"staticcheck" default:"{\"enable\":true}"`
-	GoVet       Linter `json:"govet" yaml:"govet" default:"{\"enable\":true}"`
-	LuaCheck    Linter `json:"luacheck" yaml:"luacheck" default:"{\"enable\":true}"`
-}
+type Config map[string]map[string]Linter
 
 type Linter struct {
 	// Enable is whether to enable this linter, if false, linter still run but not report.
-	Enable  bool     `json:"enable" yaml:"enable"`
-	WorkDir string   `json:"workDir" yaml:"workDir"`
-	Command string   `json:"command" yaml:"command"`
-	Args    []string `json:"args" yaml:"args"`
+	Enable  *bool    `json:"enable,omitempty" yaml:"enable,omitempty"`
+	WorkDir string   `json:"workDir,omitempty" yaml:"workDir,omitempty"`
+	Command string   `json:"command,omitempty" yaml:"command,omitempty"`
+	Args    []string `json:"args,omitempty" yaml:"args,omitempty"`
 }
 
 // NewConfig returns a new Config.
 func NewConfig(conf string) (Config, error) {
-	var c Config
 	f, err := os.ReadFile(conf)
 	if err != nil {
 		return nil, err
 	}
 
+	c := Config{}
 	if err = yaml.Unmarshal(f, &c); err != nil {
 		return nil, err
 	}
 
-	for k, v := range c {
-		if err = SetDefaults(&v); err != nil {
-			return nil, err
+	defaultEnable := true
+	for _, v := range c {
+		for _, val := range v {
+			if val.Enable == nil {
+				val.Enable = &defaultEnable
+			}
 		}
-		c[k] = v
+	}
+
+	if len(c) == 0 {
+		c["qbox"] = map[string]Linter{
+			"staticcheck": {Enable: &defaultEnable},
+			"govet":       {Enable: &defaultEnable},
+			"luacheck":    {Enable: &defaultEnable},
+		}
 	}
 
 	return c, nil
 }
 
-func (c Config) CustomLinterConfigs(org, repo string) LinterList {
+func (c Config) CustomLinterConfigs(org, repo string) map[string]Linter {
 	if repoConfig, ok := c[org+"/"+repo]; ok {
 		return repoConfig
 	}
@@ -56,5 +60,5 @@ func (c Config) CustomLinterConfigs(org, repo string) LinterList {
 		return orgConfig
 	}
 
-	return LinterList{}
+	return nil
 }
