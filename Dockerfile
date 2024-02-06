@@ -11,6 +11,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /reviewbot .
 # install staticcheck lint tools
 RUN GOPATH=/go go install honnef.co/go/tools/cmd/staticcheck@2023.1.6
 
+RUN apt-get update && apt-get install -y cppcheck
+
 FROM aslan-spock-register.qiniu.io/library/ubuntu:22.04 as runner
 
 RUN apt-get update && apt-get install -y ca-certificates \
