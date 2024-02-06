@@ -1,5 +1,7 @@
 # 超实用! 从使用视角的Git协作实战，告别死记硬背
 
+## 本文档实战Demo, 参考B站视频: https://www.bilibili.com/video/BV1uv421172t/?spm_id_from=333.788&vd_source=622c53b841a1184f63ca7930d5602ef1
+
 ## 一切从Fork开始
 * Git clone => 将远程仓库下载到本地
 * Git remote add  => 添加远程仓库地址
