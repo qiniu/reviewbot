@@ -11,7 +11,7 @@ type Config map[string]map[string]Linter
 
 type Linter struct {
 	// Enable is whether to enable this linter, if false, linter still run but not report.
-	Enable  bool     `json:"enable,omitempty"`
+	Enable  *bool    `json:"enable,omitempty"`
 	WorkDir string   `json:"workDir,omitempty"`
 	Command string   `json:"command,omitempty"`
 	Args    []string `json:"args,omitempty"`
