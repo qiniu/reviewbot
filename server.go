@@ -126,6 +126,10 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 			lingerConfig = v
 		}
 
+		if lingerConfig.Enable != nil && !*lingerConfig.Enable {
+			continue
+		}
+
 		if lingerConfig.WorkDir != "" {
 			// use the full work directory
 			lingerConfig.WorkDir = filepath.Join(r.Directory(), lingerConfig.WorkDir)
@@ -163,6 +167,10 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 		var lingerConfig config.Linter
 		if v, ok := customLinterConfigs[name]; ok {
 			lingerConfig = v
+		}
+
+		if lingerConfig.Enable != nil && !*lingerConfig.Enable {
+			continue
 		}
 
 		if lingerConfig.WorkDir != "" {
