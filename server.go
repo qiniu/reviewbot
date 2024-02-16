@@ -78,7 +78,6 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) processPullRequestEvent(log *xlog.Logger, event *github.PullRequestEvent) error {
-	// TODO: synchronization 是什么意思？
 	if event.GetAction() != "opened" && event.GetAction() != "reopened" && event.GetAction() != "synchronize" {
 		log.Debugf("skipping action %s\n", event.GetAction())
 		return nil
@@ -128,7 +127,7 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 		}
 
 		if lingerConfig.WorkDir != "" {
-			// 更新完整的工作目录
+			// use the full work directory
 			lingerConfig.WorkDir = filepath.Join(r.Directory(), lingerConfig.WorkDir)
 		} else {
 			lingerConfig.WorkDir = r.Directory()
@@ -166,7 +165,7 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 		}
 
 		if lingerConfig.WorkDir != "" {
-			// 更新完整的工作目录
+			// use the full work directory
 			lingerConfig.WorkDir = r.Directory() + "/" + lingerConfig.WorkDir
 		}
 
