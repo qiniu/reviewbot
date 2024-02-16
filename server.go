@@ -138,7 +138,8 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 		lintResults, err := fn(log, lingerConfig, linters.Agent{}, *event)
 		if err != nil {
 			log.Errorf("failed to run linter: %v", err)
-			return err
+			// continue to run other linters
+			continue
 		}
 
 		//TODO: move到linters包中
@@ -174,7 +175,8 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 		agent := linters.NewAgent(s.GithubClient(installationID), s.gitClientFactory, s.config)
 		if err := fn(log, lingerConfig, agent, *event); err != nil {
 			log.Errorf("failed to run linter: %v", err)
-			return err
+			// continue to run other linters
+			continue
 		}
 	}
 

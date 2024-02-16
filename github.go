@@ -171,8 +171,8 @@ func buildPullRequestCommentBody(linterName string, lintErrs map[string][]linter
 					return nil, err
 				}
 
-				message := fmt.Sprintf("[%s] %s",
-					linterName, lintErr.Message)
+				message := fmt.Sprintf("[%s] %s\n%s",
+					linterName, lintErr.Message, linters.CommentFooter)
 
 				comments = append(comments, &github.PullRequestComment{
 					Body:     github.String(message),
