@@ -34,7 +34,6 @@ func FormatLinterOutput(log *xlog.Logger, output []byte, FormatLinter FormatLint
 		output, err := FormatLinter(line)
 		if err != nil {
 			log.Warnf("unexpected linter check output: %v", line)
-			// 不直接退出
 			continue
 		}
 

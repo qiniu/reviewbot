@@ -29,8 +29,6 @@ func NewConfig(conf string) (Config, error) {
 		return nil, err
 	}
 
-	// TODO: 应该默认开启staticcheck？
-
 	return c, nil
 }
 
