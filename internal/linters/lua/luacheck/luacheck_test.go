@@ -19,7 +19,7 @@ package luacheck
 import (
 	"testing"
 
-	"github.com/reviewbot/internal/linters"
+	"github.com/qiniu/reviewbot/internal/linters"
 )
 
 func TestFormatLuaCheckLine(t *testing.T) {

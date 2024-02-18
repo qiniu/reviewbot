@@ -18,8 +18,8 @@ package linters
 
 import (
 	"github.com/google/go-github/v57/github"
+	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/x/xlog"
-	"github.com/reviewbot/config"
 	gitv2 "k8s.io/test-infra/prow/git/v2"
 )
 

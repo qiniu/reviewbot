@@ -15,14 +15,14 @@ VERSION ?= latest
 
 default: all
 
-all: test fmt lint build
+all: fmt vet build test
 
 test:
 	go test -v ./...
 fmt:
 	go fmt ./...
-lint:
-	staticcheck ./...	
+vet:
+	go vet ./...		
 
 build:
 	go build .

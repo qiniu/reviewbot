@@ -1,4 +1,4 @@
-module github.com/reviewbot
+module github.com/qiniu/reviewbot
 
 go 1.21.4
 
