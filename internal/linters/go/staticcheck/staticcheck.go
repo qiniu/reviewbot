@@ -20,10 +20,10 @@ import (
 	"os/exec"
 
 	"github.com/google/go-github/v57/github"
+	"github.com/qiniu/reviewbot/config"
+	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/x/log"
 	"github.com/qiniu/x/xlog"
-	"github.com/reviewbot/config"
-	"github.com/reviewbot/internal/linters"
 )
 
 var lintName = "staticcheck"

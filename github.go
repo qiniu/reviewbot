@@ -24,8 +24,8 @@ import (
 	"time"
 
 	"github.com/google/go-github/v57/github"
+	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/x/log"
-	"github.com/reviewbot/internal/linters"
 )
 
 // ListFiles lists all files for the specified pull request.

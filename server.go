@@ -25,10 +25,10 @@ import (
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v57/github"
 	"github.com/gregjones/httpcache"
+	"github.com/qiniu/reviewbot/config"
+	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/x/log"
 	"github.com/qiniu/x/xlog"
-	"github.com/reviewbot/config"
-	"github.com/reviewbot/internal/linters"
 	gitv2 "k8s.io/test-infra/prow/git/v2"
 )
 
