@@ -8,7 +8,7 @@ COPY . ./
 
 RUN CGO_ENABLED=0 GOOS=linux go build -o /reviewbot .
 
-# install lint tools
+# install staticcheck lint tools
 RUN GOPATH=/go go install honnef.co/go/tools/cmd/staticcheck@2023.1.6
 
 FROM aslan-spock-register.qiniu.io/library/ubuntu:22.04 as runner
@@ -17,6 +17,11 @@ RUN apt-get update && apt-get install -y ca-certificates \
     && apt-get install -y dnsutils \
     && apt-get install -y curl git wget vim htop jq telnet \
     && apt-get install -y iputils-ping \
+    && rm -rf /var/lib/apt/lists/*
+
+# install luacheck lint tools
+RUN apt-get update && apt-get install -y luarocks \
+    && luarocks install luacheck \
     && rm -rf /var/lib/apt/lists/*
 
 # 设置golang环境
