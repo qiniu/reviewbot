@@ -174,13 +174,25 @@ func buildPullRequestCommentBody(linterName string, lintErrs map[string][]linter
 				message := fmt.Sprintf("[%s] %s\n%s",
 					linterName, lintErr.Message, linters.CommentFooter)
 
-				comments = append(comments, &github.PullRequestComment{
-					Body:     github.String(message),
-					Path:     github.String(file),
-					Line:     github.Int(lintErr.Line),
-					Side:     github.String("RIGHT"),
-					CommitID: github.String(commitID),
-				})
+				if lintErr.StratLine != 0 {
+					comments = append(comments, &github.PullRequestComment{
+						Body:      github.String(message),
+						Path:      github.String(file),
+						Line:      github.Int(lintErr.Line),
+						StartLine: github.Int(lintErr.StratLine),
+						StartSide: github.String("RIGHT"),
+						Side:      github.String("RIGHT"),
+						CommitID:  github.String(commitID),
+					})
+				} else {
+					comments = append(comments, &github.PullRequestComment{
+						Body:     github.String(message),
+						Path:     github.String(file),
+						Line:     github.Int(lintErr.Line),
+						Side:     github.String("RIGHT"),
+						CommitID: github.String(commitID),
+					})
+				}
 			}
 		}
 	}
