@@ -13,7 +13,7 @@ func TestConfig(t *testing.T) {
 	}
 
 	for k, c := range repoConfig {
-		fmt.Printf("%v: %v \n", k, c)
+		fmt.Printf("%v: %+v \n", k, c)
 	}
 
 }
