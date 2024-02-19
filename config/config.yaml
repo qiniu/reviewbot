@@ -10,6 +10,12 @@
 #  staticcheck:
 #    enable: false
 #
+
+qbox/net-cache: # github repository name, which will override the settings in qbox org
+  luacheck: # repo specific settings will override the settings in qbox org
+    enable: true
+    workDir: "nginx/Lua"
+
 qbox/kodo: # github repository name, which will override the settings in qbox org
   staticcheck: # repo specific settings will override the settings in qbox org
     enable: true
