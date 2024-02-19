@@ -2,11 +2,11 @@ package luacheck
 
 import (
 	"bytes"
+	"context"
 	"os/exec"
 	"strings"
 
-	"github.com/google/go-github/v57/github"
-	"github.com/qiniu/reviewbot/config"
+	gh "github.com/qiniu/reviewbot/internal/github"
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/x/xlog"
 )
@@ -14,33 +14,62 @@ import (
 var lintName = "luacheck"
 
 func init() {
-	linters.RegisterCodeReviewHandler(lintName, luaCheckHandler)
+	linters.RegisterPullRequestHandler(lintName, luaCheckHandler)
 }
 
-func luaCheckHandler(log *xlog.Logger, linterConfig config.Linter, _ linters.Agent, _ github.PullRequestEvent) (map[string][]linters.LinterOutput, error) {
-	executor, err := NewLuaCheckExecutor(linterConfig.WorkDir)
+func luaCheckHandler(log *xlog.Logger, a linters.Agent) error {
+	var (
+		org     = a.PullRequestEvent.GetRepo().GetOwner().GetLogin()
+		repo    = a.PullRequestEvent.GetRepo().GetName()
+		num     = a.PullRequestEvent.GetNumber()
+		orgRepo = org + "/" + repo
+	)
+	
+	executor, err := NewLuaCheckExecutor(a.LinterConfig.WorkDir)
 	if err != nil {
 		log.Errorf("init luacheck executor failed: %v", err)
-		return nil, err
+		return err
 	}
 
-	if linters.IsEmpty(linterConfig.Args...) {
-		linterConfig.Args = append([]string{}, ".")
+	if linters.IsEmpty(a.LinterConfig.Args...) {
+		a.LinterConfig.Args = append([]string{}, ".")
 	}
 
-	output, err := executor.Run(log, linterConfig.Args...)
+	output, err := executor.Run(log, a.LinterConfig.Args...)
 	if err != nil {
 		log.Errorf("luacheck run failed: %v", err)
-		return nil, err
+		return err
 	}
 
-	parsedOutput, err := executor.Parse(log, output)
+	lintResults, err := executor.Parse(log, output)
 	if err != nil {
-		log.Errorf("luacheck parse output failed: %v", err)
-		return nil, err
+		log.Errorf("staticcheck parse output failed: %v", err)
+		return err
 	}
 
-	return parsedOutput, nil
+	if len(lintResults) == 0 {
+		return nil
+	}
+
+	log.Infof("[%s] found total %d files with lint errors on repo %v", lintName, len(lintResults), orgRepo)
+	comments, err := gh.BuildPullRequestCommentBody(lintName, lintResults, a.PullRequestChangedFiles)
+	if err != nil {
+		log.Errorf("failed to build pull request comment body: %v", err)
+		return err
+	}
+
+	if len(comments) == 0 {
+		// no related comments to post, continue to run other linters
+		return nil
+	}
+
+	log.Infof("[%s] found valid %d comments related to this PR %d (%s) \n", lintName, len(comments), num, orgRepo)
+	if err := gh.PostPullReviewCommentsWithRetry(context.Background(), a.GithubClient, org, repo, num, comments); err != nil {
+		log.Errorf("failed to post comments: %v", err)
+		return err
+	}
+	return nil
+
 }
 
 // luacheck is an executor that knows how to execute luacheck commands.

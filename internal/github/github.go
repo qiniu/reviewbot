@@ -14,7 +14,7 @@
  limitations under the License.
 */
 
-package main
+package github
 
 import (
 	"context"
@@ -139,7 +139,7 @@ func GetCommitIDFromContentsURL(contentsURL string) (string, error) {
 	return matches[1], nil
 }
 
-func buildPullRequestCommentBody(linterName string, lintErrs map[string][]linters.LinterOutput, commitFiles []*github.CommitFile) ([]*github.PullRequestComment, error) {
+func BuildPullRequestCommentBody(linterName string, lintErrs map[string][]linters.LinterOutput, commitFiles []*github.CommitFile) ([]*github.PullRequestComment, error) {
 	var comments []*github.PullRequestComment
 	hunkChecker, err := NewGithubCommitFileHunkChecker(commitFiles)
 	if err != nil {

@@ -24,48 +24,29 @@ import (
 )
 
 var (
-	codeReviewHandlers = map[string]CodeReviewHandlerFunc{}
-	commentHandlers    = map[string]CommentHandlerFunc{}
+	PullRequestHandlers = map[string]PullRequestHandlerFunc{}
 )
 
-// CommentHandlerFunc knows how to comment on a PR.
-type CommentHandlerFunc func(*xlog.Logger, config.Linter, Agent, github.PullRequestEvent) error
+// PullRequestHandlerFunc knows how to handle a pull request event.
+type PullRequestHandlerFunc func(*xlog.Logger, Agent) error
 
-// RegisterCommentHandler registers a CommentHandlerFunc for the given linter name.
-func RegisterCommentHandler(name string, handler CommentHandlerFunc) {
-	commentHandlers[name] = handler
+// RegisterPullRequestHandler registers a PullRequestHandlerFunc for the given linter name.
+func RegisterPullRequestHandler(name string, handler PullRequestHandlerFunc) {
+	PullRequestHandlers[name] = handler
 }
 
-// CommentHandler returns a CommentHandlerFunc for the given linter name.
-func CommentHandler(name string) CommentHandlerFunc {
-	if handler, ok := commentHandlers[name]; ok {
+// PullRequestHandler returns a PullRequestHandlerFunc for the given linter name.
+func PullRequestHandler(name string) PullRequestHandlerFunc {
+	if handler, ok := PullRequestHandlers[name]; ok {
 		return handler
 	}
 	return nil
 }
 
-// TotalCommentHandlers returns all registered CommentHandlerFunc.
-func TotalCommentHandlers() map[string]CommentHandlerFunc {
-	var handlers = make(map[string]CommentHandlerFunc, len(commentHandlers))
-	for name, handler := range commentHandlers {
-		handlers[name] = handler
-	}
-
-	return handlers
-}
-
-// CodeReviewHandlerFunc knows how to code review on a PR.
-type CodeReviewHandlerFunc func(*xlog.Logger, config.Linter, Agent, github.PullRequestEvent) (map[string][]LinterOutput, error)
-
-// RegisterCodeReviewHandler registers a CodeReviewHandlerFunc for the given linter name.
-func RegisterCodeReviewHandler(name string, handler CodeReviewHandlerFunc) {
-	codeReviewHandlers[name] = handler
-}
-
-// CodeReviewHandler returns a CodeReviewHandlerFunc for the given linter name.
-func TotalCodeReviewHandlers() map[string]CodeReviewHandlerFunc {
-	var handlers = make(map[string]CodeReviewHandlerFunc, len(codeReviewHandlers))
-	for name, handler := range codeReviewHandlers {
+// TotalPullRequestHandlers returns all registered PullRequestHandlerFunc.
+func TotalPullRequestHandlers() map[string]PullRequestHandlerFunc {
+	var handlers = make(map[string]PullRequestHandlerFunc, len(PullRequestHandlers))
+	for name, handler := range PullRequestHandlers {
 		handlers[name] = handler
 	}
 
@@ -91,31 +72,18 @@ type LinterOutput struct {
 	Message string
 }
 
-// Agent knows necessary information from reviewbot.
+// Agent knows necessary information in order to run linters.
 type Agent struct {
-	gc               *github.Client
-	gitClientFactory gitv2.ClientFactory
-	config           config.Config
-}
-
-func NewAgent(gc *github.Client, gitClientFactory gitv2.ClientFactory, config config.Config) Agent {
-	return Agent{
-		gc:               gc,
-		gitClientFactory: gitClientFactory,
-		config:           config,
-	}
-}
-
-func (a Agent) GitHubClient() *github.Client {
-	return a.gc
-}
-
-func (a Agent) GitClientFactory() gitv2.ClientFactory {
-	return a.gitClientFactory
-}
-
-func (a Agent) Config() config.Config {
-	return a.config
+	// GitHubClient is the GitHub client.
+	GithubClient *github.Client
+	// GitClient is the Git client factory.
+	GitClient gitv2.ClientFactory
+	// LinterConfig is the linter configuration.
+	LinterConfig config.Linter
+	// PullRequestEvent is the event of a pull request.
+	PullRequestEvent github.PullRequestEvent
+	// PullRequestChangedFiles is the changed files of a pull request.
+	PullRequestChangedFiles []*github.CommitFile
 }
 
 const CommentFooter = `
