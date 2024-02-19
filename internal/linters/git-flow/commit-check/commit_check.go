@@ -25,7 +25,6 @@ import (
 	"text/template"
 
 	"github.com/google/go-github/v57/github"
-	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/x/log"
 	"github.com/qiniu/x/xlog"
@@ -34,23 +33,23 @@ import (
 const lintName = "commit-check"
 
 func init() {
-	linters.RegisterCommentHandler(lintName, commitMessageCheckHandler)
+	linters.RegisterPullRequestHandler(lintName, commitMessageCheckHandler)
 }
 
-func commitMessageCheckHandler(log *xlog.Logger, linterConfig config.Linter, agent linters.Agent, event github.PullRequestEvent) error {
+func commitMessageCheckHandler(log *xlog.Logger, a linters.Agent) error {
 	var (
-		org    = event.GetRepo().GetOwner().GetLogin()
-		repo   = event.GetRepo().GetName()
-		number = event.GetNumber()
-		author = event.GetPullRequest().GetUser().GetLogin()
+		org    = a.PullRequestEvent.GetRepo().GetOwner().GetLogin()
+		repo   = a.PullRequestEvent.GetRepo().GetName()
+		number = a.PullRequestEvent.GetNumber()
+		author = a.PullRequestEvent.GetPullRequest().GetUser().GetLogin()
 	)
 
-	commits, err := listCommits(context.Background(), agent, org, repo, number)
+	commits, err := listCommits(context.Background(), a, org, repo, number)
 	if err != nil {
 		return err
 	}
 
-	existedComments, err := listExistedComments(context.Background(), agent, org, repo, number)
+	existedComments, err := listExistedComments(context.Background(), a, org, repo, number)
 	if err != nil {
 		return err
 	}
@@ -68,13 +67,13 @@ func commitMessageCheckHandler(log *xlog.Logger, linterConfig config.Linter, age
 		}
 	}
 
-	return handle(context.Background(), log, agent, org, repo, author, number, toComments, existedComments)
+	return handle(context.Background(), log, a, org, repo, author, number, toComments, existedComments)
 }
 
 func listCommits(ctx context.Context, agent linters.Agent, org, repo string, number int) ([]*github.RepositoryCommit, error) {
 	var preFilterCommits []*github.RepositoryCommit
 	opts := &github.ListOptions{}
-	commits, response, err := agent.GitHubClient().PullRequests.ListCommits(context.Background(), org, repo, number, opts)
+	commits, response, err := agent.GithubClient.PullRequests.ListCommits(context.Background(), org, repo, number, opts)
 	if err != nil {
 		return preFilterCommits, err
 	}
@@ -88,7 +87,7 @@ func listCommits(ctx context.Context, agent linters.Agent, org, repo string, num
 }
 
 func listExistedComments(ctx context.Context, agent linters.Agent, org, repo string, number int) ([]*github.IssueComment, error) {
-	comments, resp, err := agent.GitHubClient().Issues.ListComments(ctx, org, repo, number, &github.IssueListCommentsOptions{})
+	comments, resp, err := agent.GithubClient.Issues.ListComments(ctx, org, repo, number, &github.IssueListCommentsOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +159,7 @@ func handle(ctx context.Context, log *xlog.Logger, agent linters.Agent, org, rep
 	// TODO: remove this after a while
 	for _, comment := range existedComments {
 		if comment.Body != nil && strings.Contains(*comment.Body, rebaseSuggestionFlag) {
-			_, err := agent.GitHubClient().Issues.DeleteComment(context.Background(), org, repo, *comment.ID)
+			_, err := agent.GithubClient.Issues.DeleteComment(context.Background(), org, repo, *comment.ID)
 			if err != nil {
 				log.Warnf("delete comment failed: %v", err)
 				continue
@@ -171,7 +170,7 @@ func handle(ctx context.Context, log *xlog.Logger, agent linters.Agent, org, rep
 	// remove old comments
 	for _, comment := range existedComments {
 		if comment.Body != nil && strings.Contains(*comment.Body, commitCheckFlag) {
-			_, err := agent.GitHubClient().Issues.DeleteComment(context.Background(), org, repo, *comment.ID)
+			_, err := agent.GithubClient.Issues.DeleteComment(context.Background(), org, repo, *comment.ID)
 			if err != nil {
 				log.Warnf("delete comment failed: %v", err)
 				continue
@@ -181,7 +180,7 @@ func handle(ctx context.Context, log *xlog.Logger, agent linters.Agent, org, rep
 
 	// add new comment
 	if len(comments) > 0 {
-		c, resp, err := agent.GitHubClient().Issues.CreateComment(context.Background(), org, repo, number, &github.IssueComment{
+		c, resp, err := agent.GithubClient.Issues.CreateComment(context.Background(), org, repo, number, &github.IssueComment{
 			Body: &expectedComment,
 		})
 		if err != nil {

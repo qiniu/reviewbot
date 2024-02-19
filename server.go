@@ -20,12 +20,12 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"path/filepath"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v57/github"
 	"github.com/gregjones/httpcache"
 	"github.com/qiniu/reviewbot/config"
+	gh "github.com/qiniu/reviewbot/internal/github"
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/x/log"
 	"github.com/qiniu/x/xlog"
@@ -97,7 +97,7 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 	installationID := event.GetInstallation().GetID()
 	log.Infof("processing pull request %d, (%v/%v), installationID: %d\n", num, org, repo, installationID)
 
-	pullRequestAffectedFiles, response, err := ListPullRequestsFiles(ctx, s.GithubClient(installationID), org, repo, num)
+	pullRequestAffectedFiles, response, err := gh.ListPullRequestsFiles(ctx, s.GithubClient(installationID), org, repo, num)
 	if err != nil {
 		return err
 	}
@@ -123,57 +123,7 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 
 	customLinterConfigs := s.config.CustomLinterConfigs(org, repo)
 
-	for name, fn := range linters.TotalCodeReviewHandlers() {
-		var lingerConfig config.Linter
-		if v, ok := customLinterConfigs[name]; ok {
-			lingerConfig = v
-		}
-
-		if lingerConfig.Enable != nil && !*lingerConfig.Enable {
-			continue
-		}
-
-		if lingerConfig.WorkDir != "" {
-			// use the full work directory
-			lingerConfig.WorkDir = filepath.Join(r.Directory(), lingerConfig.WorkDir)
-		} else {
-			lingerConfig.WorkDir = r.Directory()
-		}
-
-		log.Infof("[%s] config on repo %v: %v", name, orgRepo, lingerConfig)
-
-		lintResults, err := fn(log, lingerConfig, linters.Agent{}, *event)
-		if err != nil {
-			log.Errorf("failed to run linter: %v", err)
-			// continue to run other linters
-			continue
-		}
-
-		if len(lintResults) == 0 {
-			// no lint errors, continue to run other linters
-			continue
-		}
-
-		log.Infof("[%s] found total %d files with lint errors on repo %v", name, len(lintResults), orgRepo)
-		comments, err := buildPullRequestCommentBody(name, lintResults, pullRequestAffectedFiles)
-		if err != nil {
-			log.Errorf("failed to build pull request comment body: %v", err)
-			return err
-		}
-
-		if len(comments) == 0 {
-			// no related comments to post, continue to run other linters
-			continue
-		}
-
-		log.Infof("[%s] found valid %d comments related to this PR %d (%s) \n", name, len(comments), num, orgRepo)
-		if err := PostPullReviewCommentsWithRetry(ctx, s.GithubClient(installationID), org, repo, num, comments); err != nil {
-			log.Errorf("failed to post comments: %v", err)
-			return err
-		}
-	}
-
-	for name, fn := range linters.TotalCommentHandlers() {
+	for name, fn := range linters.TotalPullRequestHandlers() {
 		var lingerConfig config.Linter
 		if v, ok := customLinterConfigs[name]; ok {
 			lingerConfig = v
@@ -186,12 +136,21 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 		if lingerConfig.WorkDir != "" {
 			// use the full work directory
 			lingerConfig.WorkDir = r.Directory() + "/" + lingerConfig.WorkDir
+		} else {
+			lingerConfig.WorkDir = r.Directory()
 		}
 
 		log.Infof("[%s] config on repo %v: %v", name, orgRepo, lingerConfig)
 
-		agent := linters.NewAgent(s.GithubClient(installationID), s.gitClientFactory, s.config)
-		if err := fn(log, lingerConfig, agent, *event); err != nil {
+		agent := linters.Agent{
+			GithubClient:            s.GithubClient(installationID),
+			LinterConfig:            lingerConfig,
+			GitClient:               s.gitClientFactory,
+			PullRequestEvent:        *event,
+			PullRequestChangedFiles: pullRequestAffectedFiles,
+		}
+
+		if err := fn(log, agent); err != nil {
 			log.Errorf("failed to run linter: %v", err)
 			// continue to run other linters
 			continue
