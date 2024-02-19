@@ -87,9 +87,13 @@ func (s *Server) processPullRequestEvent(log *xlog.Logger, event *github.PullReq
 }
 
 func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.PullRequestEvent) error {
-	num := event.GetPullRequest().GetNumber()
-	org := event.GetRepo().GetOwner().GetLogin()
-	repo := event.GetRepo().GetName()
+	var (
+		num     = event.GetPullRequest().GetNumber()
+		org     = event.GetRepo().GetOwner().GetLogin()
+		repo    = event.GetRepo().GetName()
+		orgRepo = org + "/" + repo
+	)
+
 	installationID := event.GetInstallation().GetID()
 	log.Infof("processing pull request %d, (%v/%v), installationID: %d\n", num, org, repo, installationID)
 
@@ -118,7 +122,6 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 	defer r.Clean()
 
 	customLinterConfigs := s.config.CustomLinterConfigs(org, repo)
-	log.Infof("found %d custom linter configs for %s\n", len(customLinterConfigs), org+"/"+repo)
 
 	for name, fn := range linters.TotalCodeReviewHandlers() {
 		var lingerConfig config.Linter
@@ -137,7 +140,7 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 			lingerConfig.WorkDir = r.Directory()
 		}
 
-		log.Infof("running %s on repo %v with config %v", name, fmt.Sprintf("%s/%s", org, repo), lingerConfig)
+		log.Infof("[%s] config on repo %v: %v", name, orgRepo, lingerConfig)
 
 		lintResults, err := fn(log, lingerConfig, linters.Agent{}, *event)
 		if err != nil {
@@ -146,21 +149,28 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 			continue
 		}
 
-		//TODO: move到linters包中
-		log.Infof("found total %d files with lint errors on repo %v", len(lintResults), repo)
+		if len(lintResults) == 0 {
+			// no lint errors, continue to run other linters
+			continue
+		}
+
+		log.Infof("[%s] found total %d files with lint errors on repo %v", name, len(lintResults), orgRepo)
 		comments, err := buildPullRequestCommentBody(name, lintResults, pullRequestAffectedFiles)
 		if err != nil {
 			log.Errorf("failed to build pull request comment body: %v", err)
 			return err
 		}
 
-		log.Infof("%s found valid %d comments related to this PR %d (%s) \n", name, len(comments), num, org+"/"+repo)
+		if len(comments) == 0 {
+			// no related comments to post, continue to run other linters
+			continue
+		}
+
+		log.Infof("[%s] found valid %d comments related to this PR %d (%s) \n", name, len(comments), num, orgRepo)
 		if err := PostPullReviewCommentsWithRetry(ctx, s.GithubClient(installationID), org, repo, num, comments); err != nil {
 			log.Errorf("failed to post comments: %v", err)
 			return err
 		}
-		log.Infof("commented on PR %d (%s) successfully\n", num, org+"/"+repo)
-
 	}
 
 	for name, fn := range linters.TotalCommentHandlers() {
@@ -178,7 +188,7 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 			lingerConfig.WorkDir = r.Directory() + "/" + lingerConfig.WorkDir
 		}
 
-		log.Infof("running %s on repo %v with config %v", name, fmt.Sprintf("%s/%s", org, repo), lingerConfig)
+		log.Infof("[%s] config on repo %v: %v", name, orgRepo, lingerConfig)
 
 		agent := linters.NewAgent(s.GithubClient(installationID), s.gitClientFactory, s.config)
 		if err := fn(log, lingerConfig, agent, *event); err != nil {
