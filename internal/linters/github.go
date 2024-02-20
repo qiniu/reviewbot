@@ -14,7 +14,7 @@
  limitations under the License.
 */
 
-package github
+package linters
 
 import (
 	"context"
@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/google/go-github/v57/github"
-	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/x/log"
 )
 
@@ -139,7 +138,7 @@ func GetCommitIDFromContentsURL(contentsURL string) (string, error) {
 	return matches[1], nil
 }
 
-func BuildPullRequestCommentBody(linterName string, lintErrs map[string][]linters.LinterOutput, commitFiles []*github.CommitFile) ([]*github.PullRequestComment, error) {
+func BuildPullRequestCommentBody(linterName string, lintErrs map[string][]LinterOutput, commitFiles []*github.CommitFile) ([]*github.PullRequestComment, error) {
 	var comments []*github.PullRequestComment
 	hunkChecker, err := NewGithubCommitFileHunkChecker(commitFiles)
 	if err != nil {
@@ -172,7 +171,7 @@ func BuildPullRequestCommentBody(linterName string, lintErrs map[string][]linter
 				}
 
 				message := fmt.Sprintf("[%s] %s\n%s",
-					linterName, lintErr.Message, linters.CommentFooter)
+					linterName, lintErr.Message, CommentFooter)
 
 				comments = append(comments, &github.PullRequestComment{
 					Body:     github.String(message),
