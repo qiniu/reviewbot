@@ -25,7 +25,6 @@ import (
 	"github.com/google/go-github/v57/github"
 	"github.com/gregjones/httpcache"
 	"github.com/qiniu/reviewbot/config"
-	gh "github.com/qiniu/reviewbot/internal/github"
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/x/log"
 	"github.com/qiniu/x/xlog"
@@ -97,7 +96,7 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 	installationID := event.GetInstallation().GetID()
 	log.Infof("processing pull request %d, (%v/%v), installationID: %d\n", num, org, repo, installationID)
 
-	pullRequestAffectedFiles, response, err := gh.ListPullRequestsFiles(ctx, s.GithubClient(installationID), org, repo, num)
+	pullRequestAffectedFiles, response, err := linters.ListPullRequestsFiles(ctx, s.GithubClient(installationID), org, repo, num)
 	if err != nil {
 		return err
 	}
@@ -140,7 +139,9 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 			lingerConfig.WorkDir = r.Directory()
 		}
 
-		log.Infof("[%s] config on repo %v: %v", name, orgRepo, lingerConfig)
+		lingerConfig = config.FixLinterConfig(lingerConfig, name)
+
+		log.Infof("[%s] config on repo %v: %+v", name, orgRepo, lingerConfig)
 
 		agent := linters.Agent{
 			GithubClient:            s.GithubClient(installationID),

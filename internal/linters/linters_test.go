@@ -47,7 +47,7 @@ func TestFormatStaticcheckLine(t *testing.T) {
 	}
 
 	for _, c := range tc {
-		output, err := FormatLinterLine(c.input)
+		output, err := GeneralLineParser(c.input)
 		if c.expected == nil && output != nil {
 			t.Errorf("expected error, got: %v", output)
 		} else {

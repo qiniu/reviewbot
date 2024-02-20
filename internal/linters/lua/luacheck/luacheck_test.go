@@ -55,7 +55,7 @@ func TestFormatLuaCheckLine(t *testing.T) {
 	}
 
 	for _, c := range tc {
-		output, err := formatLuaCheckLine(c.input)
+		output, err := luacheckParser(c.input)
 		if c.expected == nil && output != nil {
 			t.Errorf("expected error, got: %v", output)
 		} else {
