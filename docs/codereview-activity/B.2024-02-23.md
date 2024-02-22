@@ -8,7 +8,7 @@
 	- https://github.com/goplus/builder/pull/95#discussion_r1496854240
 * 中间状态的或没有用的代码不要提到要合入的 PR 中
 	- https://github.com/goplus/builder/pull/58#discussion_r1476919423
-* 语义上的偏差往往意味着潜在的问题，并且会导致问题
+* 语义上的偏差往往意味着存在问题，并会导致更多的问题
 	- https://github.com/goplus/builder/pull/67#discussion_r1480887718
 	- https://github.com/goplus/builder/pull/79#discussion_r1494242860
 	- https://github.com/goplus/builder/pull/95#discussion_r1496858557
