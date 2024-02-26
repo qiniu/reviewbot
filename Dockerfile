@@ -24,6 +24,7 @@ RUN apt-get update && apt-get install -y luarocks \
     && luarocks install luacheck \
     && rm -rf /var/lib/apt/lists/*
 
+
 # 设置golang环境
 ENV GOLANG_DOWNLOAD_URL https://go.dev/dl/go1.21.5.linux-amd64.tar.gz
 ENV GOLANG_DOWNLOAD_SHA256 e2bc0b3e4b64111ec117295c088bde5f00eeed1567999ff77bc859d7df70078e
@@ -33,6 +34,8 @@ RUN curl -fsSL "$GOLANG_DOWNLOAD_URL" -o golang.tar.gz \
     && rm golang.tar.gz
 
 ENV PATH /usr/local/go/bin:$PATH
+
+RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b /usr/local/go/bin v1.56.2
 
 WORKDIR /
 

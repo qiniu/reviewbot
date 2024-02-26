@@ -14,7 +14,6 @@ func init() {
 
 func golangciLintHandler(log *xlog.Logger, a linters.Agent) error {
 	if linters.IsEmpty(a.LinterConfig.Args...) {
-		// turn off compile errors by default
 		a.LinterConfig.Args = append([]string{}, "run")
 	}
 
