@@ -79,6 +79,8 @@ type LinterOutput struct {
 	Column int
 	// Message is the staticcheck Message
 	Message string
+	//StratLine required when using multi-line comments
+	StratLine int
 }
 
 // Agent knows necessary information in order to run linters.
