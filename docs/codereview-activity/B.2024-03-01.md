@@ -7,7 +7,7 @@
 * Don't repeat yourself
   - https://github.com/goplus/builder/pull/126#discussion_r1506907174
   - https://github.com/goplus/builder/pull/126#discussion_r1506909206
-* 通过抽象逻辑来提高代码的可读性
+* 通过抽象逻辑来提高代码的可读性和可测试性
   - https://github.com/goplus/builder/pull/123#discussion_r1505460551
 
 <!--
