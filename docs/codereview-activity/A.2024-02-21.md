@@ -16,7 +16,7 @@
     * https://github.com/qiniu/x 有很多好用的库
 
 * https://github.com/goplus/community/pull/148#discussion_r1494609866
-  * 代码风格，尽量遵循Go的风格，尤其是命名，减少map等不固定长度的数据结构作为参数或者返回值
+  * 在生产协作中，代码可读性越高，一般越优雅
 * https://github.com/goplus/community/pull/148#discussion_r1494612992
   * 单元测试，尽量覆盖所有的分支，使用assert抛出问题
 * https://github.com/goplus/community/pull/168/files#r1497894587
