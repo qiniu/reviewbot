@@ -10,6 +10,10 @@
 #  staticcheck:
 #    enable: false
 #
+qbox:
+  golangci-lint:
+    enable: true
+    args: ["run", "-D", "staticcheck"] # disable staticcheck globally since we have a separate linter for it
 
 qbox/net-cache: # github repository name, which will override the settings in qbox org
   luacheck: # repo specific settings will override the settings in qbox org
