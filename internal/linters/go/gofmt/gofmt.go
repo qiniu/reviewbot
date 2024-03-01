@@ -73,125 +73,105 @@ func (g *Gofmt) Run(log *xlog.Logger, args ...string) ([]byte, error) {
 		log.Errorf("gofmt run with status: %v, mark and continue", err)
 		return b, err
 	} else {
-		log.Infof("gofmt succeeded")
+		log.Infof("gofmt running succeeded")
 	}
 	return b, nil
 }
 
 func (g *Gofmt) Parse(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, error) {
-	return formatGofmtOutput(log, output)
+	log.Infof("gofmt output is being parsed")
+	return formatGofmtOutput(output)
 }
 
-//formatGofmtOutput formats the output of gofmt
-//example:
-// diff internal/linters/go/golangci-lint/golangci-lint.go.orig internal/linters/go/golangci-lint/golangci-lint.go
-// --- internal/linters/go/golangci-lint/golangci-lint.go.orig
-// +++ internal/linters/go/golangci-lint/golangci-lint.go
-// @@ -17,7 +17,7 @@
+func formatGofmtOutput(output []byte) (map[string][]linters.LinterOutput, error) {
 
-//  var lintName = "golangci-lint"
-
-// -               // test3333
-// +// test3333
-//  func init() {
-//         linters.RegisterCodeReviewHandler(lintName, golangciLintHandler)
-//  }
-// @@ -33,7 +33,7 @@
-//                 // turn off compile errors by default
-//                 linterConfig.Args = append([]string{}, "-debug.no-compile-errors=true", "./...")
-//         }
-// -              //test 4444444
-// +       //test 4444444
-//         output, err := executor.Run(log, linterConfig.Args...)
-//         if err != nil {
-//                 log.Errorf("golangci-lint run failed: %v", err)
-
-//output: map[file][]linters.LinterOutput
-// map[internal/linters/go/golangci-lint/golangci-lint.go:[
-//{internal/linters/go/golangci-lint/golangci-lint.go 24 7
-// 	var lintName = "golangci-lint"
-
-//    -               // test3333
-//    +// test3333
-// 	func init() {
-// 		  linters.RegisterCodeReviewHandler(lintName, golangciLintHandler)
-// 	}}
-// {internal/linters/go/golangci-lint/golangci-lint.go 40 7
-// 				  // turn off compile errors by default
-// 				  linterConfig.Args = append([]string{}, "-debug.no-compile-errors=true", "./...")
-// 		  }
-//    -              //test 4444444
-//    +      //test 4444444
-// 		  output, err := executor.Run(log, linterConfig.Args...)
-// 		  if err != nil {
-// 				  log.Errorf("golangci-lint run failed: %v", err)
-//    }]]
-
-func formatGofmtOutput(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, error) {
-	lines := strings.Split(string(output), "\n")
 	var result = make(map[string][]linters.LinterOutput)
-	fileErr := make(map[string][]string)
+	lines := strings.Split(string(output), "\n")
+	//map[$filename]map[$diffname][]string
+	fileErr := make(map[string]map[string][]string)
+	//filename eg. test/test.go
 	var filename string
+	//diffname eg. @@ -19,5 +19,5 @@
+	var diffname string
 	for _, line := range lines {
 		if strings.HasPrefix(line, "diff") {
 			fields := strings.Fields(line)
 			if len(fields) >= 3 {
 				filename = fields[2]
 			}
-			fileErr[filename] = []string{}
+			fileErr[filename] = map[string][]string{}
 		} else if filename != "" {
-			fileErr[filename] = append(fileErr[filename], line)
+			if strings.HasPrefix(line, "@@") {
+				diffname = line
+				fileErr[filename][diffname] = []string{}
+
+			} else if diffname != "" && !strings.HasPrefix(line, "-") {
+				fileErr[filename][diffname] = append(fileErr[filename][diffname], line)
+			}
 		}
 	}
 
+	type eachDiffInfo struct {
+		// diffLineCount is means that how many diff lines
+		diffLineCount int
+		// firstDiffLine refers to the first line of  diff lines
+		firstDiffLine int
+		// fixedMessage refers to the diff fixed lines
+		fixedMessage string
+	}
+
+	regexpDiff := regexp.MustCompile(`-(\d+),(\d+)`)
 	for filename, errmsgs := range fileErr {
-		var message string
-		var locationLine, lineNumber int64
-		var nonFirstTime bool
-		for _, errmsg := range errmsgs {
-			if strings.HasPrefix(errmsg, "@@") {
-				//Add the previous set of error messages
-				if nonFirstTime {
-					message += "```"
-					addGofmtOutput(result, filename, locationLine, lineNumber, message)
+		for diffname, errmsg := range errmsgs {
+			//"diffStartLine" refers to the starting line of a diff context, indicating the beginning position of a diff block.
+			var diffStartLine int64
+			match := regexpDiff.FindStringSubmatch(diffname)
+			if len(match) > 2 {
+				diffStartLine, _ = strconv.ParseInt(match[1], 10, 64)
+			}
+
+			var currentInfo eachDiffInfo
+			for i, line := range errmsg {
+				if strings.HasPrefix(line, "+") {
+					if currentInfo.firstDiffLine == 0 {
+						currentInfo.firstDiffLine = i + 1
+					}
+					currentInfo.diffLineCount++
+					currentInfo.fixedMessage += strings.TrimLeft(line, "+") + "\n"
+				} else {
+					if currentInfo.fixedMessage != "" {
+						finalMessage := " Is your code not properly formatted? Here are some suggestions below\n```suggestion\n" + currentInfo.fixedMessage + "```"
+						addGofmtOutput(result, filename, diffStartLine, int64(currentInfo.firstDiffLine), int64(currentInfo.diffLineCount), finalMessage)
+					}
+					currentInfo = eachDiffInfo{}
 				}
-
-				//Parameter Reset
-				message = " Is your code not properly formatted? Here are some suggestions below\n```suggestion"
-				locationLine = 0
-				lineNumber = 0
-				nonFirstTime = true
-
-				//Extract row information
-				re := regexp.MustCompile(`-(\d+),(\d+)`)
-				match := re.FindStringSubmatch(errmsg)
-				if len(match) > 2 {
-					locationLine, _ = strconv.ParseInt(match[1], 10, 64)
-					lineNumber, _ = strconv.ParseInt(match[2], 10, 64)
-				}
-
-			} else if strings.HasPrefix(errmsg, "+") {
-				message += " \n " + strings.TrimLeft(errmsg, "+")
 			}
 		}
-		nonFirstTime = false
-		//Add once to the tail
-		message += "\n```"
-		addGofmtOutput(result, filename, locationLine, lineNumber, message)
-
 	}
 
 	return result, nil
 }
 
-func addGofmtOutput(result map[string][]linters.LinterOutput, filename string, locationLine, lineNumber int64, message string) {
-	output := &linters.LinterOutput{
-		File:      filename,
-		Line:      int(locationLine + lineNumber - 1),
-		Column:    int(lineNumber),
-		Message:   message,
-		StratLine: int(locationLine + 2),
+func addGofmtOutput(result map[string][]linters.LinterOutput, filename string, diffStartLine, firstDiffLine, diffLineCount int64, message string) {
+	var output *linters.LinterOutput
+	//If diffLineCount==1, set a single-line comment on GitHub; otherwise, set a multi-line comment.
+	if diffLineCount == 1 {
+		output = &linters.LinterOutput{
+			File:    filename,
+			Line:    int(diffStartLine + firstDiffLine - 1),
+			Column:  int(diffLineCount),
+			Message: message,
+		}
+	} else {
+		output = &linters.LinterOutput{
+			File:      filename,
+			Line:      int(diffStartLine + firstDiffLine + diffLineCount - 2),
+			Column:    int(diffLineCount),
+			Message:   message,
+			StartLine: int(diffStartLine + firstDiffLine - 1),
+		}
 	}
+
 	if outs, ok := result[output.File]; !ok {
 		result[output.File] = []linters.LinterOutput{*output}
 	} else {

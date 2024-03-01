@@ -1,0 +1,28 @@
+diff testfile/staticcheck.go.orig testfile/staticcheck.go
+--- testfile/staticcheck.go.orig
++++ testfile/staticcheck.go
+@@ -4,5 +4,5 @@
+ 
+ func testunnuser() {
+        fmt.Println("unused")
+-               // wrong format
++       // wrong format
+ }
+diff testfile/test.go.orig testfile/test.go
+--- testfile/test.go.orig
++++ testfile/test.go
+@@ -3,10 +3,10 @@
+ import "fmt"
+ 
+ func test2() {
+-                       //testerr 33333
+-
+-       // 222222222
+-          //testerr 33333
++       //testerr 33333
++
++       // 222222222
++       //testerr 33333
+ 
+        // rrrrrrrrr
+ }
