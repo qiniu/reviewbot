@@ -79,8 +79,8 @@ type LinterOutput struct {
 	Column int
 	// Message is the staticcheck Message
 	Message string
-	//StratLine required when using multi-line comments
-	StratLine int
+	//StartLine required when using multi-line comments
+	StartLine int
 }
 
 // Agent knows necessary information in order to run linters.
@@ -162,22 +162,47 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 	)
 
 	log.Infof("[%s] found total %d files with lint errors on repo %v", linterName, len(lintResults), orgRepo)
-	comments, err := BuildPullRequestCommentBody(linterName, lintResults, a.PullRequestChangedFiles)
+	changedCodeLinterResults, err := filterLintErrs(lintResults, a.PullRequestChangedFiles)
 	if err != nil {
-		log.Errorf("failed to build pull request comment body: %v", err)
+		log.Errorf("failed to filter lint errors: %v", err)
 		return err
 	}
+	log.Infof("[%s] found valid %d linter errors related to this PR %d (%s) \n", linterName, len(changedCodeLinterResults), num, orgRepo)
 
-	if len(comments) == 0 {
-		// no related comments to post, continue to run other linters
-		return nil
+	switch a.LinterConfig.ReportFormat {
+	case config.GithubCheckRuns:
+		if err := CreateGithubChecks(context.Background(), a, changedCodeLinterResults); err != nil {
+			log.Errorf("failed to create github checks: %v", err)
+			return err
+		}
+	case config.GithubPRReview:
+		// List existing comments
+		existedComments, err := ListPullRequestsComments(context.Background(), a.GithubClient, org, repo, num)
+		if err != nil {
+			log.Errorf("failed to list comments: %v", err)
+			return err
+		}
+
+		// Filter out the comments that need to be added
+		// currently, we only add comments, not remove any
+		finalLinterOutputs := filterLinterOutputs(changedCodeLinterResults, existedComments)
+		if len(finalLinterOutputs) == 0 {
+			log.Infof("no new comments need to be added")
+			return nil
+		}
+
+		log.Infof("[%s] new add %d comments for this PR %d (%s) \n", linterName, len(finalLinterOutputs), num, orgRepo)
+
+		comments := constructPullRequestComments(finalLinterOutputs, linterName, a.PullRequestEvent.GetPullRequest().GetHead().GetSHA())
+		// Add the comments
+		if err := CreatePullReviewComments(context.Background(), a.GithubClient, org, repo, num, comments); err != nil {
+			log.Errorf("failed to post comments: %v", err)
+			return err
+		}
+	default:
+		log.Errorf("unsupported report format: %v", a.LinterConfig.ReportFormat)
 	}
 
-	log.Infof("[%s] found valid %d comments related to this PR %d (%s) \n", linterName, len(comments), num, orgRepo)
-	if err := PostPullReviewCommentsWithRetry(context.Background(), a.GithubClient, org, repo, num, comments); err != nil {
-		log.Errorf("failed to post comments: %v", err)
-		return err
-	}
 	return nil
 }
 

@@ -26,7 +26,9 @@ type Linter struct {
 	// For more details, see:
 	// github_checks: https://developer.github.com/v3/checks/runs/#create-a-check-run
 	// github_pr_review: https://developer.github.com/v3/pulls/reviews/#create-a-pull-request-review
-	ReportFormat string `json:"reportFormat,omitempty"`
+	// Note:
+	// * github_checks only support on Github Apps, not support on Github OAuth Apps or authenticated users.
+	ReportFormat GithubReportType `json:"githubReportType,omitempty"`
 }
 
 func (l Linter) String() string {
@@ -86,7 +88,7 @@ func FixLinterConfig(linterConfig Linter, linterName string) Linter {
 
 	// if linterConfig.ReportFormat is empty, set it to "github_checks"
 	if linterConfig.ReportFormat == "" {
-		linterConfig.ReportFormat = "github_checks"
+		linterConfig.ReportFormat = GithubCheckRuns
 	}
 
 	// if linterConfig.Command is empty, set it to linterName
@@ -96,3 +98,11 @@ func FixLinterConfig(linterConfig Linter, linterName string) Linter {
 
 	return linterConfig
 }
+
+// GithubReportType is the type of the report.
+type GithubReportType string
+
+const (
+	GithubCheckRuns GithubReportType = "github_checks"
+	GithubPRReview  GithubReportType = "github_pr_review"
+)

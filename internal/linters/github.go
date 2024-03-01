@@ -19,6 +19,7 @@ package linters
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"regexp"
 	"strings"
 	"time"
@@ -51,43 +52,32 @@ func ListPullRequestsFiles(ctx context.Context, gc *github.Client, owner string,
 	}
 }
 
-func PostPullReviewCommentsWithRetry(ctx context.Context, gc *github.Client, owner string, repo string, number int, comments []*github.PullRequestComment) error {
-	var existedComments []*github.PullRequestComment
-	err := retryWithBackoff(ctx, func() error {
-		originalComments, resp, err := gc.PullRequests.ListComments(ctx, owner, repo, number, nil)
+// ListPullRequestsComments lists all comments on the specified pull request.
+func ListPullRequestsComments(ctx context.Context, gc *github.Client, owner string, repo string, number int) ([]*github.PullRequestComment, error) {
+	var allComments []*github.PullRequestComment
+	opts := &github.PullRequestListCommentsOptions{}
+
+	err := RetryWithBackoff(ctx, func() error {
+		comments, resp, err := gc.PullRequests.ListComments(ctx, owner, repo, number, opts)
 		if err != nil {
 			return err
 		}
-
 		if resp.StatusCode != 200 {
 			return fmt.Errorf("list comments failed: %v", resp)
 		}
 
-		existedComments = originalComments
+		allComments = comments
 		return nil
 	})
 
-	if err != nil {
-		return err
-	}
+	return allComments, err
+}
 
+func CreatePullReviewComments(ctx context.Context, gc *github.Client, owner string, repo string, number int, comments []*github.PullRequestComment) error {
 	for _, comment := range comments {
-		var existed bool
-		for _, existedComment := range existedComments {
-			if comment.GetPath() == existedComment.GetPath() &&
-				comment.GetLine() == existedComment.GetLine() &&
-				comment.GetBody() == existedComment.GetBody() {
-				existed = true
-				break
-			}
-		}
-
-		if existed {
-			continue
-		}
-
-		err := retryWithBackoff(ctx, func() error {
-			_, resp, err := gc.PullRequests.CreateComment(ctx, owner, repo, number, comment)
+		cmt := comment
+		err := RetryWithBackoff(ctx, func() error {
+			_, resp, err := gc.PullRequests.CreateComment(ctx, owner, repo, number, cmt)
 			if err != nil {
 				return err
 			}
@@ -103,10 +93,55 @@ func PostPullReviewCommentsWithRetry(ctx context.Context, gc *github.Client, own
 
 		log.Infof("create comment success: %v", comment)
 	}
+
 	return nil
 }
 
-func retryWithBackoff(ctx context.Context, f func() error) error {
+// CreateGithubChecks creates github checks for the specified pull request.
+func CreateGithubChecks(ctx context.Context, a Agent, lintErrs map[string][]LinterOutput) error {
+	var (
+		headSha    = a.PullRequestEvent.GetPullRequest().GetHead().GetSHA()
+		owner      = a.PullRequestEvent.Repo.GetOwner().GetLogin()
+		repo       = a.PullRequestEvent.Repo.GetName()
+		startTime  = a.PullRequestEvent.GetPullRequest().GetCreatedAt()
+		linterName = a.LinterConfig.Command
+	)
+
+	annotations := toGithubCheckRunAnnotations(lintErrs)
+
+	check := github.CreateCheckRunOptions{
+		Name:      linterName,
+		HeadSHA:   headSha,
+		Status:    github.String("completed"),
+		StartedAt: &startTime,
+		// always set conclusion to success since the lint errors are posted as suggestions
+		// and we don't want to block the PR from being merged
+		Conclusion: github.String("success"),
+		CompletedAt: &github.Timestamp{
+			Time: time.Now(),
+		},
+		Output: &github.CheckRunOutput{
+			Title:       github.String(fmt.Sprintf("%s found %d issues related to your changes", linterName, len(lintErrs))),
+			Summary:     github.String(Reference),
+			Annotations: annotations,
+		},
+	}
+
+	return RetryWithBackoff(ctx, func() error {
+		_, resp, err := a.GithubClient.Checks.CreateCheckRun(ctx, owner, repo, check)
+		if err != nil {
+			return err
+		}
+
+		if resp.StatusCode != http.StatusCreated {
+			return fmt.Errorf("create check run failed: %v", resp)
+		}
+		return nil
+	})
+}
+
+// RetryWithBackoff retries the function with backoff.
+func RetryWithBackoff(ctx context.Context, f func() error) error {
 	var backoff = time.Second
 	for i := 0; i < 5; i++ {
 		err := f()
@@ -126,10 +161,11 @@ func retryWithBackoff(ctx context.Context, f func() error) error {
 	return fmt.Errorf("failed after 5 retries")
 }
 
+var contentsURLRegex = regexp.MustCompile(`ref=(.*)$`)
+
 func GetCommitIDFromContentsURL(contentsURL string) (string, error) {
 	// contentsURL: https://api.github.com/repos/owner/repo/contents/path/to/file?ref=commit_id
 	// commitID: commit_id
-	contentsURLRegex := regexp.MustCompile(`ref=(.*)$`)
 	matches := contentsURLRegex.FindStringSubmatch(contentsURL)
 	if len(matches) != 2 {
 		return "", fmt.Errorf("invalid contentsURL: %s", contentsURL)
@@ -138,63 +174,91 @@ func GetCommitIDFromContentsURL(contentsURL string) (string, error) {
 	return matches[1], nil
 }
 
-func BuildPullRequestCommentBody(linterName string, lintErrs map[string][]LinterOutput, commitFiles []*github.CommitFile) ([]*github.PullRequestComment, error) {
+func constructPullRequestComments(linterOutputs map[string][]LinterOutput, linterName, commitID string) []*github.PullRequestComment {
 	var comments []*github.PullRequestComment
+	for file, outputs := range linterOutputs {
+		for _, output := range outputs {
+
+			message := fmt.Sprintf("[%s] %s\n%s",
+				linterName, output.Message, CommentFooter)
+
+			if output.StartLine != 0 {
+				comments = append(comments, &github.PullRequestComment{
+					Body:      github.String(message),
+					Path:      github.String(file),
+					Line:      github.Int(output.Line),
+					StartLine: github.Int(output.StartLine),
+					StartSide: github.String("RIGHT"),
+					Side:      github.String("RIGHT"),
+					CommitID:  github.String(commitID),
+				})
+			} else {
+				comments = append(comments, &github.PullRequestComment{
+					Body:     github.String(message),
+					Path:     github.String(file),
+					Line:     github.Int(output.Line),
+					Side:     github.String("RIGHT"),
+					CommitID: github.String(commitID),
+				})
+			}
+		}
+	}
+	return comments
+}
+
+// filterPullRequestComments filters out the comments that are already posted by the bot.
+func filterLinterOutputs(outputs map[string][]LinterOutput, comments []*github.PullRequestComment) map[string][]LinterOutput {
+	var results = make(map[string][]LinterOutput)
+	for file, lintFileErrs := range outputs {
+		for _, lintErr := range lintFileErrs {
+			var found bool
+			for _, comment := range comments {
+				if comment.GetPath() == file && comment.GetLine() == lintErr.Line && strings.Contains(comment.GetBody(), lintErr.Message) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				results[file] = append(results[file], lintErr)
+			}
+		}
+	}
+	return results
+}
+
+func filterLintErrs(outputs map[string][]LinterOutput, commitFiles []*github.CommitFile) (map[string][]LinterOutput, error) {
+	var result = make(map[string][]LinterOutput)
 	hunkChecker, err := NewGithubCommitFileHunkChecker(commitFiles)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, commitFile := range commitFiles {
-		file := commitFile.GetFilename()
-		if commitFile.GetPatch() == "" {
-			log.Debugf("empty patch, skipping %v\n", commitFile)
-			continue
-		}
-
-		for lintFile, lintFileErrs := range lintErrs {
-			if !strings.HasSuffix(file, lintFile) {
-				log.Debugf("unrelated file, skipping %v", commitFile)
-				continue
-			}
-
-			for _, lintErr := range lintFileErrs {
-				if !hunkChecker.InHunk(file, lintErr.Line) {
-					log.Debugf("lint err not in hunk, skipping %v, lintErr: %v", commitFile, lintErr)
-					continue
-				}
-
-				commitID, err := GetCommitIDFromContentsURL(commitFile.GetContentsURL())
-				if err != nil {
-					log.Errorf("failed to get commit id from contents url, err: %v, url: %v", err, commitFile.GetContentsURL())
-					return nil, err
-				}
-
-				message := fmt.Sprintf("[%s] %s\n%s",
-					linterName, lintErr.Message, CommentFooter)
-
-				if lintErr.StratLine != 0 {
-					comments = append(comments, &github.PullRequestComment{
-						Body:      github.String(message),
-						Path:      github.String(file),
-						Line:      github.Int(lintErr.Line),
-						StartLine: github.Int(lintErr.StratLine),
-						StartSide: github.String("RIGHT"),
-						Side:      github.String("RIGHT"),
-						CommitID:  github.String(commitID),
-					})
-				} else {
-					comments = append(comments, &github.PullRequestComment{
-						Body:     github.String(message),
-						Path:     github.String(file),
-						Line:     github.Int(lintErr.Line),
-						Side:     github.String("RIGHT"),
-						CommitID: github.String(commitID),
-					})
-				}
+	for file, lintFileErrs := range outputs {
+		for _, lintErr := range lintFileErrs {
+			if hunkChecker.InHunk(file, lintErr.Line) {
+				result[file] = append(result[file], lintErr)
 			}
 		}
 	}
 
-	return comments, nil
+	return result, nil
+}
+
+const Reference = "If you have any questions about this comment, feel free to [raise an issue here](https://github.com/qiniu/reviewbot)."
+
+func toGithubCheckRunAnnotations(linterOutputs map[string][]LinterOutput) []*github.CheckRunAnnotation {
+	var annotations []*github.CheckRunAnnotation
+	for file, outputs := range linterOutputs {
+		for _, output := range outputs {
+			annotation := &github.CheckRunAnnotation{
+				Path:            github.String(file),
+				StartLine:       github.Int(output.Line),
+				EndLine:         github.Int(output.Line),
+				AnnotationLevel: github.String("warning"),
+				Message:         github.String(output.Message),
+			}
+			annotations = append(annotations, annotation)
+		}
+	}
+	return annotations
 }
