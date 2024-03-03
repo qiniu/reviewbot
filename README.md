@@ -1,4 +1,4 @@
-# reviewbot 
+# reviewbot - establish software engineering best practices and efficiently promote them within the organization.
 
 [![Build Status](https://github.com/qiniu/reviewbot/actions/workflows/go.yml/badge.svg)](https://github.com/qiniu/reviewbot/actions/workflows/go.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/qiniu/reviewbot)](https://goreportcard.com/report/github.com/qiniu/reviewbot)
