@@ -10,20 +10,25 @@
 #  staticcheck:
 #    enable: false
 #
-qbox:
-  golangci-lint:
-    enable: true
-    args: ["run", "-D", "staticcheck"] # disable staticcheck globally since we have a separate linter for it
 
-qbox/net-cache: # github repository name, which will override the settings in qbox org
-  luacheck: # repo specific settings will override the settings in qbox org
-    enable: true
-    workDir: "nginx"
+globalDefaultConfig: # global default settings, will be overridden by qbox org and repo specific settings if they exist
+  githubReportType: "github_pr_review" # github_pr_review, github_check_run
 
-qbox/kodo: # github repository name, which will override the settings in qbox org
-  staticcheck: # repo specific settings will override the settings in qbox org
-    enable: true
-    workDir: "src/qiniu.com/kodo"
-    command: staticcheck
-    args: ["-debug.no-compile-errors=true", "./..."]
-    run_if_changed: ["src/qiniu.com/kodo/.*\\.go$"] # only run if changed files match the regex
+customConfig: # custom config for specific orgs or repos
+  qbox: # github organization name
+    golangci-lint:
+      enable: true
+      args: ["run", "-D", "staticcheck"] # disable staticcheck globally since we have a separate linter for it 
+
+  qbox/net-cache: # github repository name, which will override the settings in qbox org
+    luacheck: # repo specific settings will override the settings in qbox org
+      enable: true
+      workDir: "nginx"
+
+  qbox/kodo: # github repository name, which will override the settings in qbox org
+    staticcheck: # repo specific settings will override the settings in qbox org
+      enable: true
+      workDir: "src/qiniu.com/kodo"
+      command: staticcheck
+      args: ["-debug.no-compile-errors=true", "./..."]
+      run_if_changed: ["src/qiniu.com/kodo/.*\\.go$"] # only run if changed files match the regex

@@ -1,7 +1,7 @@
 package config
 
 import (
-	"fmt"
+	"log"
 	"testing"
 )
 
@@ -12,8 +12,6 @@ func TestConfig(t *testing.T) {
 		return
 	}
 
-	for k, c := range repoConfig {
-		fmt.Printf("%v: %+v \n", k, c)
-	}
-
+	log.Printf("repoConfig: %+v\n", repoConfig)
+	log.Printf("repoConfig: %+v\n", repoConfig.CustomConfig)
 }

@@ -139,7 +139,7 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 			lingerConfig.WorkDir = r.Directory()
 		}
 
-		lingerConfig = config.FixLinterConfig(lingerConfig, name)
+		lingerConfig = s.config.FixLinterConfig(lingerConfig, name)
 
 		log.Infof("[%s] config on repo %v: %+v", name, orgRepo, lingerConfig)
 
