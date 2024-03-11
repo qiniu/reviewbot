@@ -55,7 +55,7 @@ func staticcheckHandler(log *xlog.Logger, a linters.Agent) error {
 }
 
 var defaultGozeroFilter = GozeroOutputFilter{
-	regex:   `unknown JSON option "([a-z]+).+"`,
+	regex:   `unknown JSON option "([a-z]+).*"`,
 	options: []string{"optional", "options", "default", "range"},
 }
 
