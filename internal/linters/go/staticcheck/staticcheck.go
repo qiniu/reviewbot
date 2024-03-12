@@ -48,7 +48,7 @@ func staticcheckHandler(log *xlog.Logger, a linters.Agent) error {
 	} else {
 		if *result.Total > 0 {
 			log.Info("add gozero filter")
-			a.OutputFilters = append(a.OutputFilters, &defaultGozeroFilter)
+			a.OutputFilterChain = append(a.OutputFilterChain, &defaultGozeroFilter)
 		}
 	}
 	return linters.GeneralHandler(log, a, linters.GeneralParse)

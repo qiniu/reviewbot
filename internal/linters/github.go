@@ -236,7 +236,7 @@ func filterLintErrs(a Agent, outputs map[string][]LinterOutput, commitFiles []*g
 	for file, lintFileErrs := range outputs {
 	output:
 		for _, lintErr := range lintFileErrs {
-			for _, filter := range a.OutputFilters {
+			for _, filter := range a.OutputFilterChain {
 				if filter.Filter(&lintErr) == nil {
 					//log.Infof(lintErr.Message)
 					break output

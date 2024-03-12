@@ -95,7 +95,7 @@ type Agent struct {
 	PullRequestEvent github.PullRequestEvent
 	// PullRequestChangedFiles is the changed files of a pull request.
 	PullRequestChangedFiles []*github.CommitFile
-	OutputFilters           []OutputFilter
+	OutputFilterChain       []OutputFilter
 }
 
 type OutputFilter interface {
