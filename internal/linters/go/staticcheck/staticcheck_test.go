@@ -37,7 +37,13 @@ func TestGozeroOutputFilter_Filter(t *testing.T) {
 	for _, tt := range tests {
 		output := tt.s.Filter(tt.input)
 		if output != tt.expect {
-			t.Errorf("")
+			t.Errorf("should filter this output")
 		}
+	}
+
+	i := &linters.LinterOutput{Message: `unknown JSON option "test" (SA5008)`}
+	output := defaultGozeroFilter.Filter(i)
+	if output != i {
+		t.Errorf("should not filter this output")
 	}
 }
