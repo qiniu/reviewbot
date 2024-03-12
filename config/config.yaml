@@ -1,15 +1,8 @@
-# This is the default config file, you can override it by creating a config.yaml in the same directory
-# by default, all linters are enabled if you don't specify. You can disable them by setting enable to false
-# example1: disable staticcheck for org
-# qbox:
-#  staticcheck:
-#    enable: false
-
-# example2: disable staticcheck for repo
-# qbox/kodo:
-#  staticcheck:
-#    enable: false
-#
+# Reviewbot follows a zero-configuration approach in its design, where the default behavior implemented in the code should be suitable for the majority of scenarios. 
+# Configuration of the file is only necessary in special cases, such as:
+# 1. Using specific commands for a particular repository.
+# 2. Modifying the default global configuration.
+# 3. Conducting specific gray testing for a particular feature.
 
 globalDefaultConfig: # global default settings, will be overridden by qbox org and repo specific settings if they exist
   githubReportType: "github_pr_review" # github_pr_review, github_check_run
@@ -20,15 +13,41 @@ customConfig: # custom config for specific orgs or repos
       enable: true
       args: ["run", "-D", "staticcheck"] # disable staticcheck globally since we have a separate linter for it 
 
-  qbox/net-cache: # github repository name, which will override the settings in qbox org
-    luacheck: # repo specific settings will override the settings in qbox org
+  qbox/net-cache: 
+    luacheck: 
       enable: true
-      workDir: "nginx"
+      workDir: "nginx" # only run in the nginx directory since there are .luacheckrc files in this directory
 
-  qbox/kodo: # github repository name, which will override the settings in qbox org
-    staticcheck: # repo specific settings will override the settings in qbox org
+  qbox/kodo: 
+    staticcheck: 
       enable: true
-      workDir: "src/qiniu.com/kodo"
-      command: staticcheck
+      workDir: "src/qiniu.com/kodo" # only run in the src/qiniu.com/kodo directory since this is a monorepo
+
+  # NOTE: The following is primarily for the gray test github_check_run feature and will be removed in the future. 
+  qbox/qhr: 
+    golangci-lint: 
+      enable: true
+      githubReportType: "github_check_run"
+      args: ["run", "-D", "staticcheck"] 
+    staticcheck: 
+      enable: true
+      githubReportType: "github_check_run"
       args: ["-debug.no-compile-errors=true", "./..."]
-      run_if_changed: ["src/qiniu.com/kodo/.*\\.go$"] # only run if changed files match the regex
+  qbox/net-gslb: 
+    golangci-lint: 
+      enable: true
+      githubReportType: "github_check_run"
+      args: ["run", "-D", "staticcheck"] 
+    staticcheck: 
+      enable: true
+      githubReportType: "github_check_run"
+      args: ["-debug.no-compile-errors=true", "./..."]     
+  qbox/qtest: 
+    golangci-lint: 
+      enable: true
+      githubReportType: "github_check_run"
+      args: ["run", "-D", "staticcheck"] 
+    staticcheck: 
+      enable: true
+      githubReportType: "github_check_run"
+      args: ["-debug.no-compile-errors=true", "./..."]          
