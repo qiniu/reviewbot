@@ -32,7 +32,9 @@
             * chore: 其他修改
             * ci: 持续集成相关文件修改
             * test: 测试用例新增、修改
-    * 参考阅读: [how to write good commit message](https://cbea.ms/git-commit/)
+    * 参考阅读:
+       * [how to write good commit message](https://cbea.ms/git-commit/)
+       * [约定式提交 - 一种用于给提交信息增加人机可读含义的规范](https://www.conventionalcommits.org/zh-hans/)
 
 ## 如何创建【规范的】PR？
 * 推荐三步走
@@ -89,3 +91,6 @@
 ## 要针对线上版本做紧急Hotfix，该怎么办？
 * git checkout <commit>
 * git switch -c 
+
+## 更多「该怎么办？」
+可以参考 [Git 飞行规则](https://github.com/k88hudson/git-flight-rules/blob/master/README_zh-CN.md)
