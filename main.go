@@ -112,9 +112,12 @@ func main() {
 
 	logrus.SetLevel(logrus.DebugLevel)
 
-	cfg, err := config.NewConfig(o.config)
-	if err != nil {
-		log.Fatalf("failed to create config: %v", err)
+	var cfg config.Config
+	if o.config != "" {
+		cfg, err = config.NewConfig(o.config)
+		if err != nil {
+			log.Fatalf("failed to load config: %v", err)
+		}
 	}
 
 	s := &Server{
