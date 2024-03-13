@@ -25,7 +25,7 @@ require (
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
 	golang.org/x/sys v0.8.0 // indirect
-	google.golang.org/protobuf v1.30.0 // indirect
+	google.golang.org/protobuf v1.33.0 // indirect
 	k8s.io/apimachinery v0.26.5 // indirect
 	k8s.io/utils v0.0.0-20230209194617-a36077c30491 // indirect
 )
