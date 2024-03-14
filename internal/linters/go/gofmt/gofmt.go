@@ -83,6 +83,7 @@ func (g *Gofmt) Parse(log *xlog.Logger, output []byte) (map[string][]linters.Lin
 	return formatGofmtOutput(output)
 }
 
+// Go Doc Comments Info: https://tip.golang.org/doc/comment
 func formatGofmtOutput(output []byte) (map[string][]linters.LinterOutput, error) {
 
 	var result = make(map[string][]linters.LinterOutput)
@@ -118,6 +119,8 @@ func formatGofmtOutput(output []byte) (map[string][]linters.LinterOutput, error)
 		firstDiffLine int
 		// fixedMessage refers to the diff fixed lines
 		fixedMessage string
+		// tmpLine refers to the line immediately following the blank line.
+		tmpLine string
 	}
 
 	regexpDiff := regexp.MustCompile(`-(\d+),(\d+)`)
@@ -138,8 +141,17 @@ func formatGofmtOutput(output []byte) (map[string][]linters.LinterOutput, error)
 					}
 					currentInfo.diffLineCount++
 					currentInfo.fixedMessage += strings.TrimLeft(line, "+") + "\n"
+					if strings.TrimLeft(line, "+") == "" && i+1 < len(errmsg) {
+						//If trimLeft line is only a blank line, temporarily store tmpLine.
+						currentInfo.tmpLine = errmsg[i+1]
+					}
 				} else {
 					if currentInfo.fixedMessage != "" {
+						// If fixedMessage is either just a blank line or ends with a blank line.
+						// In order to display the GitHub suggestion comment correctly, it should be appended with tmpLine.
+						if currentInfo.fixedMessage == "\n" || strings.HasSuffix(currentInfo.fixedMessage, "\n\n") {
+							currentInfo.fixedMessage += currentInfo.tmpLine + "\n"
+						}
 						finalMessage := " Is your code not properly formatted? Here are some suggestions below\n```suggestion\n" + currentInfo.fixedMessage + "```"
 						addGofmtOutput(result, filename, diffStartLine, int64(currentInfo.firstDiffLine), int64(currentInfo.diffLineCount), finalMessage)
 					}
