@@ -172,7 +172,8 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 	// ignore generated files
 	var filesToIgnore []string
 	for file := range changedCodeLinterResults {
-		if isGenerated, err := isGeneratedFile(file); err != nil {
+		absPath := filepath.Join(a.LinterConfig.WorkDir, file)
+		if isGenerated, err := isGeneratedFile(absPath); err != nil {
 			log.Errorf("failed to check if file is generated: %v", err)
 			continue
 		} else {
@@ -301,12 +302,7 @@ func GeneralLineParser(line string) (*LinterOutput, error) {
 }
 
 func isGeneratedFile(file string) (bool, error) {
-	absPath, err := filepath.Abs(file)
-	if err != nil {
-		return false, err
-	}
-
-	data, err := os.ReadFile(absPath)
+	data, err := os.ReadFile(file)
 	if err != nil {
 		return false, err
 	}
