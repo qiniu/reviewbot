@@ -139,7 +139,7 @@ func ExecRun(workDir, command string, args ...string) ([]byte, error) {
 	c := exec.Command(g, args...)
 	c.Dir = workDir
 
-	return c.Output()
+	return c.CombinedOutput()
 }
 
 // GeneralParse parses the output of a linter command.
