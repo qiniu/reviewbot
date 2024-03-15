@@ -114,9 +114,6 @@ func CreateGithubChecks(ctx context.Context, a Agent, lintErrs map[string][]Lint
 		HeadSHA:   headSha,
 		Status:    github.String("completed"),
 		StartedAt: &startTime,
-		// always set conclusion to success since the lint errors are posted as suggestions
-		// and we don't want to block the PR from being merged
-		Conclusion: github.String("success"),
 		CompletedAt: &github.Timestamp{
 			Time: time.Now(),
 		},
@@ -125,6 +122,12 @@ func CreateGithubChecks(ctx context.Context, a Agent, lintErrs map[string][]Lint
 			Summary:     github.String(Reference),
 			Annotations: annotations,
 		},
+	}
+
+	if len(annotations) > 0 {
+		check.Conclusion = github.String("failure")
+	} else {
+		check.Conclusion = github.String("success")
 	}
 
 	return RetryWithBackoff(ctx, func() error {
