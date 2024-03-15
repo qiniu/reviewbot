@@ -297,6 +297,11 @@ func GeneralLineParser(line string) (*LinterOutput, error) {
 		return nil, err
 	}
 
+	log.Infof("file is %s", (matches[1]))
+	log.Info(int(lineNumber))
+	log.Info(int(columnNumber))
+	log.Infof("message is %s", matches[4])
+
 	return &LinterOutput{
 		File:    matches[1],
 		Line:    int(lineNumber),
