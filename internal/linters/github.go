@@ -53,9 +53,12 @@ func ListPullRequestsFiles(ctx context.Context, gc *github.Client, owner string,
 }
 
 // ListPullRequestsComments lists all comments on the specified pull request.
+// TODO(CarlJi): add pagination support.
 func ListPullRequestsComments(ctx context.Context, gc *github.Client, owner string, repo string, number int) ([]*github.PullRequestComment, error) {
 	var allComments []*github.PullRequestComment
-	opts := &github.PullRequestListCommentsOptions{}
+	opts := &github.PullRequestListCommentsOptions{
+		ListOptions: github.ListOptions{PerPage: 100},
+	}
 
 	err := RetryWithBackoff(ctx, func() error {
 		comments, resp, err := gc.PullRequests.ListComments(ctx, owner, repo, number, opts)
