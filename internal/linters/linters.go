@@ -116,18 +116,13 @@ func GeneralHandler(log *xlog.Logger, a Agent, parse func(*xlog.Logger, []byte) 
 		log.Errorf("%s run failed: %v, mark and continue", cmd, err)
 	}
 
-	if len(output) == 0 {
-		return nil
-	}
+	// even if the output is empty, we still need to parse it
+	// since we need delete the existed comments related to the linter
 
 	lintResults, err := parse(log, output)
 	if err != nil {
 		log.Errorf("failed to parse output failed: %v, cmd: %v", err, cmd)
 		return err
-	}
-
-	if len(lintResults) == 0 {
-		return nil
 	}
 
 	return Report(log, a, lintResults)
@@ -204,22 +199,31 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 			return err
 		}
 
-		// Filter out the comments that need to be added
-		// currently, we only add comments, not remove any
-		finalLinterOutputs := filterLinterOutputs(changedCodeLinterResults, existedComments)
-		if len(finalLinterOutputs) == 0 {
-			log.Infof("no new comments need to be added")
-			return nil
+		// filter out the comments that are not related to the linter
+		var existedCommentsToKeep []*github.PullRequestComment
+		var linterFlag = linterNamePrefix(linterName)
+		for _, comment := range existedComments {
+			if strings.HasPrefix(comment.GetBody(), linterFlag) {
+				existedCommentsToKeep = append(existedCommentsToKeep, comment)
+			}
 		}
+		log.Infof("%s found %d existed comments for this PR %d (%s) \n", linterFlag, len(existedCommentsToKeep), num, orgRepo)
 
-		log.Infof("[%s] new add %d comments for this PR %d (%s) \n", linterName, len(finalLinterOutputs), num, orgRepo)
+		toAdds, toDeletes := filterLinterOutputs(changedCodeLinterResults, existedCommentsToKeep)
+		if err := DeletePullReviewComments(context.Background(), a.GithubClient, org, repo, toDeletes); err != nil {
+			log.Errorf("failed to delete comments: %v", err)
+			return err
+		}
+		log.Infof("%s delete %d comments for this PR %d (%s) \n", linterFlag, len(toDeletes), num, orgRepo)
 
-		comments := constructPullRequestComments(finalLinterOutputs, linterName, a.PullRequestEvent.GetPullRequest().GetHead().GetSHA())
+		comments := constructPullRequestComments(toAdds, linterFlag, a.PullRequestEvent.GetPullRequest().GetHead().GetSHA())
 		// Add the comments
 		if err := CreatePullReviewComments(context.Background(), a.GithubClient, org, repo, num, comments); err != nil {
 			log.Errorf("failed to post comments: %v", err)
 			return err
 		}
+		log.Infof("[%s] add %d comments for this PR %d (%s) \n", linterName, len(toAdds), num, orgRepo)
+
 	default:
 		log.Errorf("unsupported report format: %v", a.LinterConfig.ReportFormat)
 	}
