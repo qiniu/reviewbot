@@ -73,6 +73,7 @@ func ListPullRequestsComments(ctx context.Context, gc *github.Client, owner stri
 	return allComments, err
 }
 
+// CreatePullReviewComments creates the specified comments on the pull request.
 func CreatePullReviewComments(ctx context.Context, gc *github.Client, owner string, repo string, number int, comments []*github.PullRequestComment) error {
 	for _, comment := range comments {
 		cmt := comment
@@ -92,6 +93,31 @@ func CreatePullReviewComments(ctx context.Context, gc *github.Client, owner stri
 		}
 
 		log.Infof("create comment success: %v", comment)
+	}
+
+	return nil
+}
+
+// DeletePullReviewComments deletes the specified comments on the pull request.
+func DeletePullReviewComments(ctx context.Context, gc *github.Client, owner, repo string, comments []*github.PullRequestComment) error {
+	for _, comment := range comments {
+		cmt := comment
+		err := RetryWithBackoff(ctx, func() error {
+			resp, err := gc.PullRequests.DeleteComment(ctx, owner, repo, cmt.GetID())
+			if err != nil {
+				return err
+			}
+			if resp.StatusCode != 204 {
+				return fmt.Errorf("delete comment failed: %v", resp)
+			}
+			return nil
+		})
+
+		if err != nil {
+			return err
+		}
+
+		log.Infof("delete comment success: %v", comment)
 	}
 
 	return nil
@@ -177,12 +203,16 @@ func GetCommitIDFromContentsURL(contentsURL string) (string, error) {
 	return matches[1], nil
 }
 
+func linterNamePrefix(linterName string) string {
+	return fmt.Sprintf("[%s]", linterName)
+}
+
 func constructPullRequestComments(linterOutputs map[string][]LinterOutput, linterName, commitID string) []*github.PullRequestComment {
 	var comments []*github.PullRequestComment
 	for file, outputs := range linterOutputs {
 		for _, output := range outputs {
 
-			message := fmt.Sprintf("[%s] %s\n%s",
+			message := fmt.Sprintf("%s %s\n%s",
 				linterName, output.Message, CommentFooter)
 
 			if output.StartLine != 0 {
@@ -210,23 +240,35 @@ func constructPullRequestComments(linterOutputs map[string][]LinterOutput, linte
 }
 
 // filterPullRequestComments filters out the comments that are already posted by the bot.
-func filterLinterOutputs(outputs map[string][]LinterOutput, comments []*github.PullRequestComment) map[string][]LinterOutput {
-	var results = make(map[string][]LinterOutput)
+func filterLinterOutputs(outputs map[string][]LinterOutput, comments []*github.PullRequestComment) (toAdds map[string][]LinterOutput, toDeletes []*github.PullRequestComment) {
+	toAdds = make(map[string][]LinterOutput)
+
+	var validComments = make(map[int64]struct{})
 	for file, lintFileErrs := range outputs {
 		for _, lintErr := range lintFileErrs {
 			var found bool
 			for _, comment := range comments {
 				if comment.GetPath() == file && comment.GetLine() == lintErr.Line && strings.Contains(comment.GetBody(), lintErr.Message) {
 					found = true
+					validComments[comment.GetID()] = struct{}{}
 					break
 				}
 			}
+
+			// if the linter err is not found, add it to the toAdds
 			if !found {
-				results[file] = append(results[file], lintErr)
+				toAdds[file] = append(toAdds[file], lintErr)
 			}
 		}
 	}
-	return results
+
+	// filter out the comments that are not in the linter outputs
+	for _, comment := range comments {
+		if _, ok := validComments[comment.GetID()]; !ok {
+			toDeletes = append(toDeletes, comment)
+		}
+	}
+	return toAdds, toDeletes
 }
 
 func filterLintErrs(outputs map[string][]LinterOutput, commitFiles []*github.CommitFile) (map[string][]LinterOutput, error) {
