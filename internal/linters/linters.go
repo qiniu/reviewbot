@@ -276,6 +276,7 @@ func Parse(log *xlog.Logger, output []byte, lineParser LineParser) (map[string][
 
 // common format LinterLine
 func GeneralLineParser(line string) (*LinterOutput, error) {
+	log.Infof("line is %v", line)
 	pattern := `^(.*):(\d+):(\d+): (.*)$`
 	regex, err := regexp.Compile(pattern)
 	if err != nil {
@@ -296,11 +297,6 @@ func GeneralLineParser(line string) (*LinterOutput, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	log.Infof("file is %s", (matches[1]))
-	log.Info(int(lineNumber))
-	log.Info(int(columnNumber))
-	log.Infof("message is %s", matches[4])
 
 	return &LinterOutput{
 		File:    matches[1],
