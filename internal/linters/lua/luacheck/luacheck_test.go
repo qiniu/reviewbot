@@ -28,25 +28,25 @@ func TestFormatLuaCheckLine(t *testing.T) {
 		expected *linters.LinterOutput
 	}{
 		{" video/mp4/libs/mp4lib.lua:184:11: value assigned to variable mem_data is overwritten on line 202 before use", &linters.LinterOutput{
-			File:    " video/mp4/libs/mp4lib.lua:184:11",
+			File:    "video/mp4/libs/mp4lib.lua",
 			Line:    184,
 			Column:  11,
 			Message: "value assigned to variable mem_data is overwritten on line 202 before use",
 		}},
 		{" utils/jsonschema.lua:723:121: line is too long (142 > 120)", &linters.LinterOutput{
-			File:    " utils/jsonschema.lua",
+			File:    "utils/jsonschema.lua",
 			Line:    723,
 			Column:  121,
 			Message: "line is too long (142 > 120)",
 		}},
 		{" utils/httpc/http_simple.lua:24:1: setting read-only global variable _VERSION", &linters.LinterOutput{
-			File:    " utils/httpc/http_simple.lua",
+			File:    "utils/httpc/http_simple.lua",
 			Line:    24,
 			Column:  1,
 			Message: "setting read-only global variable _VERSION",
 		}},
 		{" test/qtest_access.lua:1220:1: inconsistent indentation (SPACE followed by TAB)", &linters.LinterOutput{
-			File:    " test/qtest_access.lua",
+			File:    "test/qtest_access.lua",
 			Line:    1220,
 			Column:  1,
 			Message: "inconsistent indentation (SPACE followed by TAB)",
@@ -56,21 +56,19 @@ func TestFormatLuaCheckLine(t *testing.T) {
 
 	for _, c := range tc {
 		output, err := luacheckParser(c.input)
-		if c.expected == nil && output != nil {
-			t.Errorf("expected error, got: %v", output)
-		} else {
-			continue
-		}
-
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-
 		if output == nil {
 			if c.expected != nil {
 				t.Errorf("expected: %v, got: %v", c.expected, output)
 			}
 			continue
+		}
+
+		if c.expected == nil && output != nil {
+			t.Errorf("expected error, got: %v", output)
+		}
+
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
 		}
 
 		if output.File != c.expected.File || output.Line != c.expected.Line || output.Column != c.expected.Column || output.Message != c.expected.Message {

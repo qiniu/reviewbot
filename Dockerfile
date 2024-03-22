@@ -24,6 +24,9 @@ RUN apt-get update && apt-get install -y luarocks \
     && luarocks install luacheck \
     && rm -rf /var/lib/apt/lists/*
 
+# install cppcheck lint tools
+RUN apt-get update && apt-get install -y cppcheck \
+    && rm -rf /var/lib/apt/lists/*
 
 # 设置golang环境
 ENV GOLANG_DOWNLOAD_URL https://go.dev/dl/go1.21.5.linux-amd64.tar.gz

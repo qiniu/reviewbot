@@ -48,16 +48,6 @@ func TestFormatStaticcheckLine(t *testing.T) {
 
 	for _, c := range tc {
 		output, err := GeneralLineParser(c.input)
-		if c.expected == nil && output != nil {
-			t.Errorf("expected error, got: %v", output)
-		} else {
-			continue
-		}
-
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-
 		if output == nil {
 			if c.expected != nil {
 				t.Errorf("expected: %v, got: %v", c.expected, output)
@@ -65,6 +55,13 @@ func TestFormatStaticcheckLine(t *testing.T) {
 			continue
 		}
 
+		if c.expected == nil && output != nil {
+			t.Errorf("expected error, got: %v", output)
+		}
+
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
 		if output.File != c.expected.File || output.Line != c.expected.Line || output.Column != c.expected.Column || output.Message != c.expected.Message {
 			t.Errorf("expected: %v, got: %v", c.expected, output)
 		}
