@@ -96,6 +96,11 @@ type Agent struct {
 	PullRequestEvent github.PullRequestEvent
 	// PullRequestChangedFiles is the changed files of a pull request.
 	PullRequestChangedFiles []*github.CommitFile
+	OutputFilterChain       []OutputFilter
+}
+
+type OutputFilter interface {
+	Filter(o *LinterOutput) *LinterOutput
 }
 
 const CommentFooter = `
@@ -158,7 +163,7 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 	)
 
 	log.Infof("[%s] found total %d files with lint errors on repo %v", linterName, len(lintResults), orgRepo)
-	changedCodeLinterResults, err := filterLintErrs(lintResults, a.PullRequestChangedFiles)
+	changedCodeLinterResults, err := filterLintErrs(a, lintResults, a.PullRequestChangedFiles)
 	if err != nil {
 		log.Errorf("failed to filter lint errors: %v", err)
 		return err

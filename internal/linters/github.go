@@ -274,7 +274,7 @@ func filterLinterOutputs(outputs map[string][]LinterOutput, comments []*github.P
 	return toAdds, toDeletes
 }
 
-func filterLintErrs(outputs map[string][]LinterOutput, commitFiles []*github.CommitFile) (map[string][]LinterOutput, error) {
+func filterLintErrs(a Agent, outputs map[string][]LinterOutput, commitFiles []*github.CommitFile) (map[string][]LinterOutput, error) {
 	var result = make(map[string][]LinterOutput)
 	hunkChecker, err := NewGithubCommitFileHunkChecker(commitFiles)
 	if err != nil {
@@ -282,7 +282,14 @@ func filterLintErrs(outputs map[string][]LinterOutput, commitFiles []*github.Com
 	}
 
 	for file, lintFileErrs := range outputs {
+	output:
 		for _, lintErr := range lintFileErrs {
+			for _, filter := range a.OutputFilterChain {
+				if filter.Filter(&lintErr) == nil {
+					//log.Infof(lintErr.Message)
+					break output
+				}
+			}
 			if hunkChecker.InHunk(file, lintErr.Line) {
 				result[file] = append(result[file], lintErr)
 			}
