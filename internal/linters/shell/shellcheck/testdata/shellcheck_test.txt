@@ -1,0 +1,7 @@
+In lua-ut.sh line 22:
+for svc in ${svcs[@]}
+           ^--------^ SC2068 (error): Double quote array expansions to avoid re-splitting elements.
+
+In util.sh line 13:
+  echo -e "[$(date +'%Y-%m-%dT%H:%M:%S.%N%z')] WARN: $@" >&2
+                                                     ^-- SC2145 (error): Argument mixes string and array. Use * or separate argument.
