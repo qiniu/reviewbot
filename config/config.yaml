@@ -5,7 +5,7 @@
 # 3. Conducting specific gray testing for a particular feature.
 
 globalDefaultConfig: # global default settings, will be overridden by qbox org and repo specific settings if they exist
-  githubReportType: "github_pr_review" # github_pr_review, github_check_run
+  githubReportType: "github_check_run" # github_pr_review, github_check_run
 
 customConfig: # custom config for specific orgs or repos
   qbox: # github organization name
@@ -22,32 +22,3 @@ customConfig: # custom config for specific orgs or repos
     staticcheck:
       enable: true
       workDir: "src/qiniu.com/kodo" # only run in the src/qiniu.com/kodo directory since this is a monorepo
-
-  # NOTE: The following is primarily for the gray test github_check_run feature and will be removed in the future.
-  qbox/qhr:
-    golangci-lint:
-      enable: true
-      githubReportType: "github_check_run"
-      args: ["run", "-D", "staticcheck"]
-    staticcheck:
-      enable: true
-      githubReportType: "github_check_run"
-      args: ["-debug.no-compile-errors=true", "./..."]
-  qbox/net-gslb:
-    golangci-lint:
-      enable: true
-      githubReportType: "github_check_run"
-      args: ["run", "-D", "staticcheck"]
-    staticcheck:
-      enable: true
-      githubReportType: "github_check_run"
-      args: ["-debug.no-compile-errors=true", "./..."]
-  qbox/qtest:
-    golangci-lint:
-      enable: true
-      githubReportType: "github_check_run"
-      args: ["run", "-D", "staticcheck"]
-    staticcheck:
-      enable: true
-      githubReportType: "github_check_run"
-      args: ["-debug.no-compile-errors=true", "./..."]
