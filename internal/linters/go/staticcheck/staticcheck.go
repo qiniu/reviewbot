@@ -75,12 +75,12 @@ func staticcheckParse(log *xlog.Logger, output []byte) (map[string][]linters.Lin
 // isGoZeroCustomTag checks if the tag is a go-zero custom tag.
 // refer: https://go-zero.dev/en/docs/tutorials/go-zero/configuration/overview#tag-checksum-rule
 const (
-	defaultOption  = "default"
-	envOption      = "env"
-	inheritOption  = "inherit"
-	optionalOption = "optional"
-	optionsOption  = "options"
-	rangeOption    = "range"
+	goZeroDefaultOption  = "default"
+	goZeroEnvOption      = "env"
+	goZeroInheritOption  = "inherit"
+	goZeroOptionalOption = "optional"
+	goZeroOptionsOption  = "options"
+	goZeroRangeOption    = "range"
 )
 
 // FIXME(CarlJi): this function is a temporary solution for go-zero custom tag, see [#24](https://github.com/qiniu/reviewbot/issues/24)
@@ -88,17 +88,17 @@ const (
 func isGoZeroCustomTag(jsonOption string) bool {
 	var found bool
 	switch {
-	case strings.HasPrefix(jsonOption, defaultOption):
+	case strings.HasPrefix(jsonOption, goZeroDefaultOption):
 		found = true
-	case strings.HasPrefix(jsonOption, envOption):
+	case strings.HasPrefix(jsonOption, goZeroEnvOption):
 		found = true
-	case strings.HasPrefix(jsonOption, inheritOption):
+	case strings.HasPrefix(jsonOption, goZeroInheritOption):
 		found = true
-	case strings.HasPrefix(jsonOption, optionalOption):
+	case strings.HasPrefix(jsonOption, goZeroOptionalOption):
 		found = true
-	case strings.HasPrefix(jsonOption, optionsOption):
+	case strings.HasPrefix(jsonOption, goZeroOptionsOption):
 		found = true
-	case strings.HasPrefix(jsonOption, rangeOption):
+	case strings.HasPrefix(jsonOption, goZeroRangeOption):
 		found = true
 	}
 
