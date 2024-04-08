@@ -132,7 +132,7 @@ func CreateGithubChecks(ctx context.Context, a Agent, lintErrs map[string][]Lint
 		headSha    = a.PullRequestEvent.GetPullRequest().GetHead().GetSHA()
 		owner      = a.PullRequestEvent.Repo.GetOwner().GetLogin()
 		repo       = a.PullRequestEvent.Repo.GetName()
-		startTime  = a.PullRequestEvent.GetPullRequest().GetCreatedAt()
+		startTime  = a.PullRequestEvent.GetPullRequest().GetUpdatedAt()
 		linterName = a.LinterConfig.Command
 	)
 
