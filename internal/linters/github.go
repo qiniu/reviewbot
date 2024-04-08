@@ -147,7 +147,7 @@ func CreateGithubChecks(ctx context.Context, a Agent, lintErrs map[string][]Lint
 			Time: time.Now(),
 		},
 		Output: &github.CheckRunOutput{
-			Title:       github.String(fmt.Sprintf("%s found %d issues related to your changes", linterName, len(lintErrs))),
+			Title:       github.String(fmt.Sprintf("%s found %d issues related to your changes", linterName, len(annotations))),
 			Summary:     github.String(Reference),
 			Annotations: annotations,
 		},
@@ -160,7 +160,7 @@ func CreateGithubChecks(ctx context.Context, a Agent, lintErrs map[string][]Lint
 	}
 
 	return RetryWithBackoff(ctx, func() error {
-		_, resp, err := a.GithubClient.Checks.CreateCheckRun(ctx, owner, repo, check)
+		ch, resp, err := a.GithubClient.Checks.CreateCheckRun(ctx, owner, repo, check)
 		if err != nil {
 			return err
 		}
@@ -168,6 +168,8 @@ func CreateGithubChecks(ctx context.Context, a Agent, lintErrs map[string][]Lint
 		if resp.StatusCode != http.StatusCreated {
 			return fmt.Errorf("create check run failed: %v", resp)
 		}
+
+		log.Debugf("create check run success, HTML_URL: %v", ch.GetHTMLURL())
 		return nil
 	})
 }
