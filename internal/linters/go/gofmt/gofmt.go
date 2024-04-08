@@ -15,6 +15,7 @@ var lintName = "gofmt"
 
 func init() {
 	linters.RegisterPullRequestHandler(lintName, gofmtHandler)
+	linters.RegisterLinterLanguages(lintName, []string{"go"})
 }
 
 func gofmtHandler(log *xlog.Logger, a linters.Agent) error {

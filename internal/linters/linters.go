@@ -35,6 +35,7 @@ import (
 
 var (
 	PullRequestHandlers = map[string]PullRequestHandlerFunc{}
+	LinterLanguages     = map[string][]string{}
 )
 
 // PullRequestHandlerFunc knows how to handle a pull request event.
@@ -43,6 +44,11 @@ type PullRequestHandlerFunc func(*xlog.Logger, Agent) error
 // RegisterPullRequestHandler registers a PullRequestHandlerFunc for the given linter name.
 func RegisterPullRequestHandler(name string, handler PullRequestHandlerFunc) {
 	PullRequestHandlers[name] = handler
+}
+
+// RegisterLinterLanguages registers the languages supported by the linter.
+func RegisterLinterLanguages(name string, languages []string) {
+	LinterLanguages[name] = languages
 }
 
 // PullRequestHandler returns a PullRequestHandlerFunc for the given linter name.

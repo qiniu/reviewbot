@@ -12,6 +12,7 @@ var linterName = "cppcheck"
 
 func init() {
 	linters.RegisterPullRequestHandler(linterName, cppcheckHandler)
+	linters.RegisterLinterLanguages(linterName, []string{"c", "cpp"})
 }
 
 func cppcheckHandler(log *xlog.Logger, a linters.Agent) error {

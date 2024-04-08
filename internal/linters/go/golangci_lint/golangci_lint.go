@@ -13,6 +13,7 @@ var lintName = "golangci-lint"
 
 func init() {
 	linters.RegisterPullRequestHandler(lintName, golangciLintHandler)
+	linters.RegisterLinterLanguages(lintName, []string{"go"})
 }
 
 func golangciLintHandler(log *xlog.Logger, a linters.Agent) error {
