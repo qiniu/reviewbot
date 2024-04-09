@@ -187,10 +187,12 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 
 	switch a.LinterConfig.ReportFormat {
 	case config.GithubCheckRuns:
-		if err := CreateGithubChecks(context.Background(), a, lintResults); err != nil {
+		ch, err := CreateGithubChecks(context.Background(), a, lintResults)
+		if err != nil {
 			log.Errorf("failed to create github checks: %v", err)
 			return err
 		}
+		log.Infof("[%s] create check run success, HTML_URL: %v", linterName, ch.GetHTMLURL())
 	case config.GithubPRReview:
 		// List existing comments
 		existedComments, err := ListPullRequestsComments(context.Background(), a.GithubClient, org, repo, num)
@@ -322,7 +324,6 @@ func IsEmpty(args ...string) bool {
 			return false
 		}
 	}
-
 	return true
 }
 

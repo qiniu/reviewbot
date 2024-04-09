@@ -127,7 +127,7 @@ func DeletePullReviewComments(ctx context.Context, gc *github.Client, owner, rep
 }
 
 // CreateGithubChecks creates github checks for the specified pull request.
-func CreateGithubChecks(ctx context.Context, a Agent, lintErrs map[string][]LinterOutput) error {
+func CreateGithubChecks(ctx context.Context, a Agent, lintErrs map[string][]LinterOutput) (*github.CheckRun, error) {
 	var (
 		headSha    = a.PullRequestEvent.GetPullRequest().GetHead().GetSHA()
 		owner      = a.PullRequestEvent.Repo.GetOwner().GetLogin()
@@ -159,8 +159,9 @@ func CreateGithubChecks(ctx context.Context, a Agent, lintErrs map[string][]Lint
 		check.Conclusion = github.String("success")
 	}
 
-	return RetryWithBackoff(ctx, func() error {
-		ch, resp, err := a.GithubClient.Checks.CreateCheckRun(ctx, owner, repo, check)
+	var ch *github.CheckRun
+	err := RetryWithBackoff(ctx, func() error {
+		checkRun, resp, err := a.GithubClient.Checks.CreateCheckRun(ctx, owner, repo, check)
 		if err != nil {
 			return err
 		}
@@ -169,9 +170,11 @@ func CreateGithubChecks(ctx context.Context, a Agent, lintErrs map[string][]Lint
 			return fmt.Errorf("create check run failed: %v", resp)
 		}
 
-		log.Debugf("[%s] create check run success, HTML_URL: %v", linterName, ch.GetHTMLURL())
+		ch = checkRun
 		return nil
 	})
+
+	return ch, err
 }
 
 // RetryWithBackoff retries the function with backoff.
