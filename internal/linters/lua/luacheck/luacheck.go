@@ -12,7 +12,7 @@ const linterName = "luacheck"
 
 func init() {
 	linters.RegisterPullRequestHandler(linterName, luacheckHandler)
-	linters.RegisterLinterLanguages(linterName, []string{"lua"})
+	linters.RegisterLinterLanguages(linterName, []string{".lua"})
 }
 
 func luacheckHandler(log *xlog.Logger, a linters.Agent) error {

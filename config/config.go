@@ -34,8 +34,6 @@ type Linter struct {
 	Command string `json:"command,omitempty"`
 	// Args is the arguments of the command.
 	Args []string `json:"args,omitempty"`
-	// Languages is the languages that the linter supports.
-	Languages []string `json:"languages,omitempty"`
 
 	// ReportFormat is the format of the report, if empty, use globalDefaultConfig.
 	// For more details, see:

@@ -169,7 +169,7 @@ func CreateGithubChecks(ctx context.Context, a Agent, lintErrs map[string][]Lint
 			return fmt.Errorf("create check run failed: %v", resp)
 		}
 
-		log.Debugf("create check run success, HTML_URL: %v", ch.GetHTMLURL())
+		log.Debugf("[%s] create check run success, HTML_URL: %v", linterName, ch.GetHTMLURL())
 		return nil
 	})
 }
@@ -274,24 +274,6 @@ func filterLinterOutputs(outputs map[string][]LinterOutput, comments []*github.P
 		}
 	}
 	return toAdds, toDeletes
-}
-
-func filterLintErrs(outputs map[string][]LinterOutput, commitFiles []*github.CommitFile) (map[string][]LinterOutput, error) {
-	var result = make(map[string][]LinterOutput)
-	hunkChecker, err := NewGithubCommitFileHunkChecker(commitFiles)
-	if err != nil {
-		return nil, err
-	}
-
-	for file, lintFileErrs := range outputs {
-		for _, lintErr := range lintFileErrs {
-			if hunkChecker.InHunk(file, lintErr.Line) {
-				result[file] = append(result[file], lintErr)
-			}
-		}
-	}
-
-	return result, nil
 }
 
 const Reference = "If you have any questions about this comment, feel free to [raise an issue here](https://github.com/qiniu/reviewbot)."

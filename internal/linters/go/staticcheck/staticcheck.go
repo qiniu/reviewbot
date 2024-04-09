@@ -30,7 +30,7 @@ const linterName = "staticcheck"
 
 func init() {
 	linters.RegisterPullRequestHandler(linterName, staticcheckHandler)
-	linters.RegisterLinterLanguages(linterName, []string{"go"})
+	linters.RegisterLinterLanguages(linterName, []string{".go"})
 }
 
 func staticcheckHandler(log *xlog.Logger, a linters.Agent) error {
