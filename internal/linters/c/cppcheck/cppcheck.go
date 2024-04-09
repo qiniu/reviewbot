@@ -12,10 +12,11 @@ var linterName = "cppcheck"
 
 func init() {
 	linters.RegisterPullRequestHandler(linterName, cppcheckHandler)
+	// see https://stackoverflow.com/a/3223792/5057547
+	linters.RegisterLinterLanguages(linterName, []string{".c", ".cpp", ".h", ".hpp", ".cc", ".cxx", ".hxx", ".c++"})
 }
 
 func cppcheckHandler(log *xlog.Logger, a linters.Agent) error {
-
 	if linters.IsEmpty(a.LinterConfig.Args...) {
 		a.LinterConfig.Args = append([]string{}, "--quiet", "--template='{file}:{line}:{column}: {message}'", ".")
 	}

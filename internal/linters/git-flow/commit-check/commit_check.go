@@ -34,6 +34,8 @@ const lintName = "commit-check"
 
 func init() {
 	linters.RegisterPullRequestHandler(lintName, commitMessageCheckHandler)
+	// support all languages
+	linters.RegisterLinterLanguages(lintName, []string{"*"})
 }
 
 func commitMessageCheckHandler(log *xlog.Logger, a linters.Agent) error {
