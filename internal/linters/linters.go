@@ -169,14 +169,14 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 		linterName = a.LinterConfig.Command
 	)
 
-	log.Infof("[%s] found total %d files with lint errors on repo %v", linterName, len(lintResults), orgRepo)
+	log.Infof("[%s] found total %d files with %d lint errors on repo %v", linterName, len(lintResults), countLinterErrors(lintResults), orgRepo)
 	lintResults, err := Filters(log, a, lintResults)
 	if err != nil {
 		log.Errorf("failed to filter lint errors: %v", err)
 		return err
 	}
 
-	log.Infof("[%s] found valid %d linter errors related to this PR %d (%s) \n", linterName, len(lintResults), num, orgRepo)
+	log.Infof("[%s] found %d files with valid %d linter errors related to this PR %d (%s) \n", linterName, len(lintResults), countLinterErrors(lintResults), num, orgRepo)
 
 	// only not report when there is no lint errors and the linter is not related to the PR
 	// see https://github.com/qiniu/reviewbot/issues/108#issuecomment-2042217108
@@ -346,4 +346,12 @@ func languageRelated(linterName string, exts map[string]bool) bool {
 		}
 	}
 	return false
+}
+
+func countLinterErrors(lintResults map[string][]LinterOutput) int {
+	var count int
+	for _, outputs := range lintResults {
+		count += len(outputs)
+	}
+	return count
 }
