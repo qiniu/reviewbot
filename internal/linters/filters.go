@@ -12,6 +12,7 @@ import (
 
 // Filters filters the lint errors.
 func Filters(log *xlog.Logger, a Agent, linterResults map[string][]LinterOutput) (map[string][]LinterOutput, error) {
+	linterResults = cleanLintResults(a.LinterConfig.WorkDir, linterResults)
 	results, err := filterByPRChanged(linterResults, a.PullRequestChangedFiles)
 	if err != nil {
 		return nil, err
@@ -25,6 +26,17 @@ func Filters(log *xlog.Logger, a Agent, linterResults map[string][]LinterOutput)
 	results = filterBySA5008(results)
 
 	return results, nil
+}
+
+// cleanLintResults cleans the file path in lint results.
+// It removes the workdir prefix from the file path.
+func cleanLintResults(workdir string, lintResults map[string][]LinterOutput) map[string][]LinterOutput {
+	cleanedResults := make(map[string][]LinterOutput)
+	for file, linters := range lintResults {
+		cleanedFile := strings.TrimPrefix(file, workdir)
+		cleanedResults[cleanedFile] = linters
+	}
+	return cleanedResults
 }
 
 // filterByPRChanged filters out the lint errors that are not related to the PR.
