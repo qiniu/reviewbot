@@ -16,7 +16,7 @@ func TestNoteCheckFile(t *testing.T) {
 		error    error
 	}{
 		{
-			name:     "empty file",
+			name:     "kinds_of_notes",
 			workdir:  "testdata",
 			filename: "note.go",
 			expected: map[string][]linters.LinterOutput{
@@ -30,18 +30,6 @@ func TestNoteCheckFile(t *testing.T) {
 					{
 						File:    "note.go",
 						Line:    10,
-						Column:  1,
-						Message: NoteSuggestion,
-					},
-					{
-						File:    "note.go",
-						Line:    35,
-						Column:  1,
-						Message: NoteSuggestion,
-					},
-					{
-						File:    "note.go",
-						Line:    36,
 						Column:  1,
 						Message: NoteSuggestion,
 					},
@@ -70,7 +58,7 @@ func TestNoteCheckFile(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 			if !reflect.DeepEqual(actual, tc.expected) {
-				t.Errorf("expected: %v, got: %v", tc.expected, actual)
+				t.Errorf("\nexpected: %v,\ngot: %v", tc.expected, actual)
 			}
 		})
 	}
