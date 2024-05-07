@@ -102,11 +102,11 @@ func noteCheckFile(workdir, filename string) (map[string][]linters.LinterOutput,
 }
 
 var (
-	standardNoteMarker    = `([A-Z][A-Z]+)\(([^)]+)\):?`                            // MARKER(uid), MARKER at least 2 chars, uid at least 1 char
+	standardNoteMarker    = `([A-Z][A-Z]+)\(([^)]+)\):.?`                           // MARKER(uid), MARKER at least 2 chars, uid at least 1 char
 	standardNoteMarkerRx  = regexp.MustCompile(`^[ \t]*` + standardNoteMarker)      // MARKER(uid) at text start
 	standardNoteCommentRx = regexp.MustCompile(`^/[/*][ \t]*` + standardNoteMarker) // MARKER(uid) at comment start
 
-	nonstandardNoteMarker    = `([A-Z][A-Z]+):?`                                          // General non-standard MARKER, MARKER at least 2 chars, plus colon
+	nonstandardNoteMarker    = `([A-Z][A-Z]+):.?`                                         // General non-standard MARKER, MARKER at least 2 chars, plus colon
 	nonstandardNoteMarkerRx  = regexp.MustCompile(`^[ \t]*` + nonstandardNoteMarker)      // MARKER: at text start
 	nonstandardNoteCommentRx = regexp.MustCompile(`^/[/*][ \t]*` + nonstandardNoteMarker) // MARKER: at comment start
 )
