@@ -6,9 +6,10 @@
 
 ## What is Reviewbot?
 
-`Reviewbot` helps build a powerful, comprehensive, and efficient code reviewer. It integrates various languages, static analysis tools, and best practices to continuously assist organizations in improving code quality with the implementation of a quality gate.
+`Reviewbot` 帮助构建一个强大、综合、高效的code reviewer. 它通过集成各种语言、各种静态分析工具、各种最佳实践，并以质量门禁的方式，持续的帮助组织提升代码质量。 
 
-`Reviewbot` seamlessly integrates with GitHub, providing precise feedback on code lines and limiting the feedback scope to the changed portions only. This allows developers to easily pinpoint specific issues.
+`Reviewbot` 当前无缝集成GitHub, 会提供精确到代码行的检查反馈，且反馈范围仅限在变动的部分，能让开发者非常方便的定位到具体问题。
+
 ## Components
 
 * go linters
