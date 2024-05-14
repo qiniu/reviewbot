@@ -3,7 +3,7 @@ slug: /
 sidebar_position: 1
 ---
 
-# Tutorial Intro
+## Why Reviewbot?
 
 Let's discover **Docusaurus in less than 5 minutes**.
 
