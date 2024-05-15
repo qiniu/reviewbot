@@ -1,7 +1,6 @@
 ---
-slug: /
-title: Why Reviewbot?
-sidebar_position: 1
+title: 参与开发
+sidebar_position: 2
 ---
 
 Let's discover **Docusaurus in less than 5 minutes**.

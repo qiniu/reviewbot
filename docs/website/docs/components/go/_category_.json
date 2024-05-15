@@ -1,0 +1,8 @@
+{
+  "label": "Go",
+  "position": 1,
+  "link": {
+    "type": "generated-index",
+    "description": "Go 语言相关的检查",
+  }
+}

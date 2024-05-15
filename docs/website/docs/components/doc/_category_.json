@@ -1,0 +1,8 @@
+{
+  "label": "Doc规范",
+  "position": 5,
+  "link": {
+    "type": "generated-index",
+    "description": "Doc规范 相关的检查",
+  }
+}
