@@ -1,0 +1,8 @@
+{
+  "label": "C/C++",
+  "position": 3,
+  "link": {
+    "type": "generated-index",
+    "description": "C/C++ 相关的检查",
+  }
+}

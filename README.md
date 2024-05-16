@@ -19,9 +19,9 @@
   * [cppcheck](/internal/linters/c/cppcheck/)
 * lua linters
   * [luacheck](/internal/linters/lua/luacheck/)
-* git flow 规范
+* git collaboration guidelines
   * [commit msg check](/internal/linters/git-flow/commit-check/)
-* doc 规范
+* doc guidelines
   * [note check](/internal/linters/doc/note-check/)
 
 ## Quickstart
