@@ -27,7 +27,8 @@
 
 ## Quickstart
 
-Please take a look at our getting started guide.
+Please take a look at our [getting started guide](https://reviewbot-x.netlify.app
+).
 
 ## Contributing
 
