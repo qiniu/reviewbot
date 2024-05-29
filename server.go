@@ -120,26 +120,20 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 	}
 	defer r.Clean()
 
-	customLinterConfigs := s.config.CustomLinterConfigs(org, repo)
-
 	for name, fn := range linters.TotalPullRequestHandlers() {
-		var lingerConfig config.Linter
-		if v, ok := customLinterConfigs[name]; ok {
-			lingerConfig = v
-		}
+		var lingerConfig = s.config.Get(org, repo, name)
 
+		// skip linter if it is disabled
 		if lingerConfig.Enable != nil && !*lingerConfig.Enable {
 			continue
 		}
 
+		// set workdir
 		if lingerConfig.WorkDir != "" {
-			// use the full work directory
 			lingerConfig.WorkDir = r.Directory() + "/" + lingerConfig.WorkDir
 		} else {
 			lingerConfig.WorkDir = r.Directory()
 		}
-
-		lingerConfig = s.config.FixLinterConfig(lingerConfig, name)
 
 		log.Infof("[%s] config on repo %v: %+v", name, orgRepo, lingerConfig)
 
