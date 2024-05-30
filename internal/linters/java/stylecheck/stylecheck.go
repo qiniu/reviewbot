@@ -73,7 +73,11 @@ func StyleReportLineParser(line string) (*linters.LinterOutput, error) {
 	log.Debugf("parse line: %s", line)
 
 	patternColum := `^(.*):(\d+):(\d+): (.*)$`
-	regexColum, err := regexp.Compile(patternColum)
+	regexColum, errColum := regexp.Compile(patternColum)
+	if errColum != nil {
+		log.Errorf("compile regex failed: %v", errColum)
+		return nil, errColum
+	}
 	pattern := `^(.*):(\d+): (.*)$`
 	regex, err := regexp.Compile(pattern)
 	if err != nil {
