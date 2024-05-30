@@ -40,9 +40,10 @@ func pmdcheckHandler(log *xlog.Logger, a linters.Agent) error {
 			args = append(args, "-f", "emacs")
 
 			args = append(args, javaFiles...)
-			args = append(args, "-R", "/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/bestpractices.xml")
+			args = append(args, "-R", "/usr/local/rulesets/bestpractices.xml")
 			//args = append(args, "-r", "pdm.txt")
 			a.LinterConfig.Args = args
+			a.LinterConfig.Command = "pmd"
 		}
 	}
 

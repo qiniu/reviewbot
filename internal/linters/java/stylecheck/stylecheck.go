@@ -37,10 +37,10 @@ func stylecheckHandler(log *xlog.Logger, a linters.Agent) error {
 		if linters.IsEmpty(a.LinterConfig.Args...) {
 			// use gcc format to make the output more readable
 			////args := append([]string{}, "java")
-			args := append([]string{}, "-jar", "/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/checkstyle-10.17.0-all.jar")
+			args := append([]string{}, "-jar", "/usr/local/checkstyle-10.17.0-all.jar")
 
 			args = append(args, javaFiles...)
-			args = append(args, "-c", "/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/suncheckstyle.xml")
+			args = append(args, "-c", "/usr/local/rulesets/sun_checks.xml")
 			//args = append(args, "-r", "pdm.txt")
 			a.LinterConfig.Args = args
 			a.LinterConfig.Command = "java"
