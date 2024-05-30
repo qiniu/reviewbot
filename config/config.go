@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/qiniu/x/log"
 	"sigs.k8s.io/yaml"
 )
 
@@ -60,74 +59,58 @@ func NewConfig(conf string) (Config, error) {
 		return c, err
 	}
 
-	c = fixGlobalConfig(c)
-	c = fixConfig(c)
+	// set default value
+	if c.GlobalDefaultConfig.GithubReportType == "" {
+		c.GlobalDefaultConfig.GithubReportType = GithubPRReview
+	}
 
 	return c, nil
 }
 
-// CustomLinterConfigs returns the custom linter configs of the org or repo.
-func (c Config) CustomLinterConfigs(org, repo string) map[string]Linter {
-	if repoConfig, ok := c.CustomConfig[org+"/"+repo]; ok {
-		return repoConfig
+func (c Config) Get(org, repo, ln string) Linter {
+	linter := Linter{
+		Enable:       boolPtr(true),
+		ReportFormat: c.GlobalDefaultConfig.GithubReportType,
+		Command:      ln,
 	}
 
 	if orgConfig, ok := c.CustomConfig[org]; ok {
-		return orgConfig
-	}
-
-	return nil
-}
-
-// FixLinterConfig fix the linter config if some fields are empty.
-func (c Config) FixLinterConfig(linterConfig Linter, linterName string) Linter {
-	// if linterConfig.Enable is nil, set it to true
-	if linterConfig.Enable == nil {
-		enable := true
-		linterConfig.Enable = &enable
-	}
-
-	// if linterConfig.ReportFormat is empty, set it to "github_checks"
-	if linterConfig.ReportFormat == "" {
-		linterConfig.ReportFormat = c.GlobalDefaultConfig.GithubReportType
-	}
-
-	// if linterConfig.Command is empty, set it to linterName
-	if linterConfig.Command == "" {
-		linterConfig.Command = linterName
-	}
-
-	return linterConfig
-}
-
-// fixConfig fix the config
-// 1. if linterConfig.Enable is nil, set it to true
-// 2. if linterConfig.ReportFormat is empty, use globalDefaultConfig
-// 3. if linterConfig.Command is empty, set it to linterName
-func fixConfig(c Config) Config {
-	for repo, repoConfig := range c.CustomConfig {
-		for linterName, linterConfig := range repoConfig {
-			c.CustomConfig[repo][linterName] = c.FixLinterConfig(linterConfig, linterName)
+		if l, ok := orgConfig[ln]; ok {
+			linter = applyCustomConfig(linter, l)
 		}
 	}
 
-	return c
-}
-
-// fixGlobalConfig fix the global config
-// 1. if globalDefaultConfig is empty, set it to "github_pr_review" by default
-func fixGlobalConfig(c Config) Config {
-	switch c.GlobalDefaultConfig.GithubReportType {
-	case GithubCheckRuns:
-		c.GlobalDefaultConfig.GithubReportType = GithubCheckRuns
-	case GithubPRReview:
-		c.GlobalDefaultConfig.GithubReportType = GithubPRReview
-	default:
-		log.Warnf("invalid globalDefaultConfig: %v, use %v by default", c.GlobalDefaultConfig.GithubReportType, GithubPRReview)
-		c.GlobalDefaultConfig.GithubReportType = GithubPRReview
+	if repoConfig, ok := c.CustomConfig[org+"/"+repo]; ok {
+		if l, ok := repoConfig[ln]; ok {
+			linter = applyCustomConfig(linter, l)
+		}
 	}
 
-	return c
+	return linter
+}
+
+func applyCustomConfig(legacy, custom Linter) Linter {
+	if custom.Enable != nil {
+		legacy.Enable = custom.Enable
+	}
+
+	if custom.WorkDir != "" {
+		legacy.WorkDir = custom.WorkDir
+	}
+
+	if custom.Command != "" {
+		legacy.Command = custom.Command
+	}
+
+	if len(custom.Args) != 0 {
+		legacy.Args = custom.Args
+	}
+
+	if custom.ReportFormat != "" {
+		legacy.ReportFormat = custom.ReportFormat
+	}
+
+	return legacy
 }
 
 // GithubReportType is the type of the report.
@@ -137,3 +120,7 @@ const (
 	GithubCheckRuns GithubReportType = "github_check_run"
 	GithubPRReview  GithubReportType = "github_pr_review"
 )
+
+func boolPtr(b bool) *bool {
+	return &b
+}
