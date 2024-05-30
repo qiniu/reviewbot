@@ -33,7 +33,8 @@ type Linter struct {
 	// If empty, use the linter name as the command.
 	Command string `json:"command,omitempty"`
 	// Args is the arguments of the command.
-	Args []string `json:"args,omitempty"`
+	Args       []string `json:"args,omitempty"`
+	LinterName string   `json:"linterName,omitempty"`
 
 	// ReportFormat is the format of the report, if empty, use globalDefaultConfig.
 	// For more details, see:
@@ -95,6 +96,9 @@ func (c Config) FixLinterConfig(linterConfig Linter, linterName string) Linter {
 	// if linterConfig.Command is empty, set it to linterName
 	if linterConfig.Command == "" {
 		linterConfig.Command = linterName
+	}
+	if linterConfig.LinterName == "" {
+		linterConfig.LinterName = linterName
 	}
 
 	return linterConfig
