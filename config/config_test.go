@@ -182,6 +182,36 @@ customConfig: # custom config for specific orgs or repos
 				Enable: boolPtr(true),
 			},
 		},
+		{
+			name:   "case6",
+			org:    "qbox",
+			repo:   "net-gslb",
+			linter: "golangci-lint",
+			want: Linter{
+				Enable: boolPtr(true),
+				Args:   []string{"run", "-D", "staticcheck"},
+			},
+		},
+		{
+			name:   "case7",
+			org:    "qiniu",
+			repo:   "net-gslb",
+			linter: "golangci-lint",
+			want: Linter{
+				Enable: boolPtr(true),
+				Args:   []string{},
+			},
+		},
+		{
+			name:   "case8",
+			org:    "qbox",
+			repo:   "kodo",
+			linter: "staticcheck",
+			want: Linter{
+				Enable:  boolPtr(true),
+				WorkDir: "src/qiniu.com/kodo",
+			},
+		},
 	}
 
 	for _, tc := range tcs {
