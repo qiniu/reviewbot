@@ -25,14 +25,13 @@ RUN apt-get update && apt-get install -y luarocks \
     && rm -rf /var/lib/apt/lists/*
 
 # install cppcheck lint tools
-#RUN apt-get update && apt-get install -y cppcheck \
-#    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y cppcheck \
+    && rm -rf /var/lib/apt/lists/*
 
 #install jdk
 #RUN apt-get update && apt-get install -y openjdk-8-jdk \
 #    && rm -rf /var/lib/apt/lists/*
-#https://objects.githubusercontent.com/github-production-release-asset-2e65be/12499251/73c53e5b-c212-48f2-9875-1af46bcb4819?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=releaseassetproduction%2F20240529%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20240529T094651Z&X-Amz-Expires=300&X-Amz-Signature=a4a55f3bbccf21ecbcd6f7d0538a0ac00b8ec1e4bc0b12d6891cb75362833f57&X-Amz-SignedHeaders=host&actor_id=8747934&key_id=0&repo_id=12499251&response-content-disposition=attachment%3B%20filename%3Dcheckstyle-10.17.0-all.jar&response-content-type=application%2Foctet-stream
-#https://objects.githubusercontent.com/github-production-release-asset-2e65be/4992906/527bf096-e0cf-4d68-a85f-48cee55f97d1?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAVCODYLSA53PQK4ZA%2F20240513%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20240513T020134Z&X-Amz-Expires=300&X-Amz-Signature=d8de2c11f83b63c891683a8e90c72aa4da19be2f41bb5a1a0d542e754bbaa786&X-Amz-SignedHeaders=host&actor_id=8747934&key_id=0&repo_id=4992906&response-content-disposition=attachment%3B%20filename%3Dpmd-dist-7.1.0-bin.zip&response-content-type=application%2Foctet-stream
+
 # install golang
 ENV GOLANG_DOWNLOAD_URL https://go.dev/dl/go1.21.5.linux-amd64.tar.gz
 ENV GOLANG_DOWNLOAD_SHA256 e2bc0b3e4b64111ec117295c088bde5f00eeed1567999ff77bc859d7df70078e
@@ -43,7 +42,7 @@ RUN curl -fsSL "$GOLANG_DOWNLOAD_URL" -o golang.tar.gz \
 
 ENV PATH /usr/local/go/bin:$PATH
 
-#install pmdhttps://github.com/pmd/pmd/releases/download/pmd_releases%2F7.1.0/pmd-dist-7.1.0-bin.zip
+#install pmd
 ENV PMD_DOWNLOAD_URL https://github.com/pmd/pmd/releases/download/pmd_releases%2F7.1.0/pmd-dist-7.1.0-bin.zip
 ENV PMD_DOWNLOAD_SHA256 0d31d257450f85d995cc87099f5866a7334f26d6599dacab285f2d761c049354
 RUN curl -fsSL "$PMD_DOWNLOAD_URL" -o pmd.zip \
@@ -89,6 +88,21 @@ RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/i
 # install shellcheck lint tools
 RUN apt-get update && apt-get install -y shellcheck \
     && rm -rf /var/lib/apt/lists/*  
+
+# install python flake8  lint tools
+RUN apt update && apt install -y  flake8 \
+    && rm -rf /var/lib/apt/lists/*
+
+#install eslint
+
+RUN apt update && apt install -y  nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN apt update && apt install -y  npm \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN  npm install -y  eslint \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /
 
