@@ -110,7 +110,6 @@ COPY --from=builder /reviewbot /reviewbot
 COPY --from=builder /go/bin/staticcheck /usr/local/bin/staticcheck
 
 
-
 # SSH config
 RUN mkdir -p /root/.ssh && chown -R root /root/.ssh/ &&  chgrp -R root /root/.ssh/
 COPY deploy/config /root/.ssh/config
