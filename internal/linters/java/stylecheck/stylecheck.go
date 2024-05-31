@@ -11,7 +11,7 @@ import (
 	"github.com/qiniu/x/xlog"
 )
 
-// refer to https://github.com/mpeterv/luacheck
+// refer to https://checkstyle.sourceforge.io/
 const linterName = "stylecheck"
 
 func init() {
@@ -20,9 +20,6 @@ func init() {
 }
 
 func stylecheckHandler(log *xlog.Logger, a linters.Agent) error {
-	//if linters.IsEmpty(a.LinterConfig.Args...) {
-	//	a.LinterConfig.Args = append([]string{}, ".")
-	//}
 	var javaFiles []string
 	for _, arg := range a.PullRequestChangedFiles {
 		if strings.HasSuffix(arg.GetFilename(), ".java") {
@@ -31,17 +28,10 @@ func stylecheckHandler(log *xlog.Logger, a linters.Agent) error {
 	}
 
 	if len(javaFiles) > 0 {
-		//cmd := a.LinterConfig.Command
-		// execute shellcheck with the following command
-		// shellcheck -f gcc xxx.sh...
 		if linters.IsEmpty(a.LinterConfig.Args...) {
-			// use gcc format to make the output more readable
-			////args := append([]string{}, "java")
 			args := append([]string{}, "-jar", "/usr/local/checkstyle-10.17.0-all.jar")
-
 			args = append(args, javaFiles...)
 			args = append(args, "-c", "/usr/local/rulesets/sun_checks.xml")
-			//args = append(args, "-r", "pdm.txt")
 			a.LinterConfig.Args = args
 			a.LinterConfig.Command = "java"
 		}
@@ -97,8 +87,6 @@ func StyleReportLineParser(line string) (*linters.LinterOutput, error) {
 		return nil, err
 	}
 
-	//columnNumber, err := strconv.ParseInt(matches[3], 10, 64)
-	//columnNumber := 4
 	if err != nil {
 		return nil, err
 	}
@@ -120,12 +108,9 @@ func StyleReportLineParser(line string) (*linters.LinterOutput, error) {
 	}, nil
 }
 func TrimReport(line string) string {
-	//fmt.Println(line)
 	re := regexp.MustCompile("(?m)^.*检查.*$[\r\n]")
 	reEnd := regexp.MustCompile("(?m)^.*错误结束.*$[\r\n]")
-	//re1 := regexp.MustCompile("(?m)^.*WARN.*")
 	line = re.ReplaceAllString(line, "")
 	line = reEnd.ReplaceAllString(line, "")
-	//fmt.Println(line)
 	return line
 }

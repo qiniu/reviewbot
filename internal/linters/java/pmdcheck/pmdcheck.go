@@ -11,7 +11,7 @@ import (
 	"github.com/qiniu/x/xlog"
 )
 
-// refer to https://github.com/mpeterv/luacheck
+// refer to https://pmd.github.io/
 const linterName = "pmdcheck"
 
 func init() {
@@ -20,9 +20,6 @@ func init() {
 }
 
 func pmdcheckHandler(log *xlog.Logger, a linters.Agent) error {
-	//if linters.IsEmpty(a.LinterConfig.Args...) {
-	//	a.LinterConfig.Args = append([]string{}, ".")
-	//}
 	var javaFiles []string
 	for _, arg := range a.PullRequestChangedFiles {
 		if strings.HasSuffix(arg.GetFilename(), ".java") {
@@ -31,17 +28,11 @@ func pmdcheckHandler(log *xlog.Logger, a linters.Agent) error {
 	}
 
 	if len(javaFiles) > 0 {
-		//cmd := a.LinterConfig.Command
-		// execute shellcheck with the following command
-		// shellcheck -f gcc xxx.sh...
 		if linters.IsEmpty(a.LinterConfig.Args...) {
-			// use gcc format to make the output more readable
 			args := append([]string{}, "check")
 			args = append(args, "-f", "emacs")
-
 			args = append(args, javaFiles...)
 			args = append(args, "-R", "/usr/local/rulesets/bestpractices.xml")
-			//args = append(args, "-r", "pdm.txt")
 			a.LinterConfig.Args = args
 			a.LinterConfig.Command = "pmd"
 		}
@@ -84,13 +75,6 @@ func PmdReportLineParser(line string) (*linters.LinterOutput, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	//columnNumber, err := strconv.ParseInt(matches[3], 10, 64)
-	//columnNumber := 4
-	if err != nil {
-		return nil, err
-	}
-
 	return &linters.LinterOutput{
 		File: matches[1],
 		Line: int(lineNumber),
@@ -99,10 +83,7 @@ func PmdReportLineParser(line string) (*linters.LinterOutput, error) {
 	}, nil
 }
 func TrimReport(line string) string {
-	//fmt.Println(line)
 	re := regexp.MustCompile("(?m)^.*WARN.*$[\r\n]")
-	//re1 := regexp.MustCompile("(?m)^.*WARN.*")
 	line = re.ReplaceAllString(line, "")
-	//fmt.Println(line)
 	return line
 }
