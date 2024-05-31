@@ -13,6 +13,6 @@ java -jar checkstyle-10.17.0-all.jar run -c sun_checks.xml xx1.java xx2.java
 ```
 
 :::info
-Checkstyle提供了需求的代码风格检查规则。
+Checkstyle提供了许多的代码风格检查规则。
 详情参见: https://checkstyle.org/checks.html
 :::
