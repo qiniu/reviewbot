@@ -5,7 +5,7 @@ import { themes as prismThemes } from 'prism-react-renderer';
 const config: Config = {
   title: 'Reviewbot',
   tagline: 'establish software engineering best practices and efficiently promote them within the organization',
-  favicon: 'img/favicon.ico',
+  favicon: 'img/q.png',
 
   // Set the production url of your site here
   url: 'https://reviewbot-x.netlify.app',
@@ -51,12 +51,12 @@ const config: Config = {
 
   themeConfig: {
     // Replace with your project's social card
-    image: 'img/docusaurus-social-card.jpg',
+    image: 'img/q.png',
     navbar: {
       title: 'Reviewbot',
       logo: {
-        alt: 'My Site Logo',
-        src: 'img/logo.svg',
+        alt: 'Reviewbot Logo',
+        src: 'img/q.png',
       },
       items: [
         {
