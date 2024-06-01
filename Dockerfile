@@ -1,4 +1,4 @@
-FROM aslan-spock-register.qiniu.io/library/golang:1.21.5 as builder
+FROM library/golang:1.22.3 as builder
 
 WORKDIR /app
 

@@ -20,11 +20,11 @@ customConfig: # custom config for specific orgs or repos
   qbox/net-cache:
     golangci-lint:
       enable: true
-      args: ["run", "--enable-all","-D", "staticcheck", "--timeout 5m0s"] # disable staticcheck globally since we have a separate linter for it      
+      args: ["run", "--enable-all","-D", "staticcheck", "--timeout","5m0s"] # disable staticcheck globally since we have a separate linter for it      
   qbox/net-gslb:
     golangci-lint:
       enable: true
-      args: ["run", "--enable-all","-D", "staticcheck","--timeout 5m0s"] # disable staticcheck globally since we have a separate linter for it      
+      args: ["run", "--enable-all","-D", "staticcheck","--timeout","5m0s"] # disable staticcheck globally since we have a separate linter for it      
 
   qbox/kodo:
     staticcheck:
