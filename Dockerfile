@@ -1,4 +1,4 @@
-FROM aslan-spock-register.qiniu.io/library/golang:1.21.5 as builder
+FROM library/golang:1.22.3 as builder
 
 WORKDIR /app
 
@@ -39,7 +39,7 @@ RUN curl -fsSL "$GOLANG_DOWNLOAD_URL" -o golang.tar.gz \
 
 ENV PATH /usr/local/go/bin:$PATH
 
-RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b /usr/local/go/bin v1.56.2
+RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b /usr/local/go/bin v1.59.0
 
 # install shellcheck lint tools
 RUN apt-get update && apt-get install -y shellcheck \
