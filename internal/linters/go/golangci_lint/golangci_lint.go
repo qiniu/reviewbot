@@ -18,7 +18,8 @@ func init() {
 
 func golangciLintHandler(log *xlog.Logger, a linters.Agent) error {
 	if linters.IsEmpty(a.LinterConfig.Args...) {
-		a.LinterConfig.Args = append([]string{}, "run")
+		// refer: https://github.com/qiniu/reviewbot/issues/146
+		a.LinterConfig.Args = append([]string{}, "run", "--timeout=5m0s", "--allow-parallel-runners=true")
 	}
 
 	return linters.GeneralHandler(log, a, golangciLintParse)
