@@ -13,10 +13,13 @@ import (
 
 // refer to https://pmd.github.io/
 const linterName = "pmdcheck"
+const pmdRule = "/usr/local/rulesets/bestpractices.xml"
+const resoucePmdkRule = "/resouces/rulesets/bestpractices.xml"
 
 func init() {
 	linters.RegisterPullRequestHandler(linterName, pmdcheckHandler)
 	linters.RegisterLinterLanguages(linterName, []string{".java"})
+	linters.RuleInit(resoucePmdkRule, pmdRule)
 }
 
 func pmdcheckHandler(log *xlog.Logger, a linters.Agent) error {
@@ -32,7 +35,7 @@ func pmdcheckHandler(log *xlog.Logger, a linters.Agent) error {
 			args := append([]string{}, "check")
 			args = append(args, "-f", "emacs")
 			args = append(args, javaFiles...)
-			args = append(args, "-R", "/usr/local/rulesets/bestpractices.xml")
+			args = append(args, "-R", pmdRule)
 			a.LinterConfig.Args = args
 			a.LinterConfig.Command = "pmd"
 		}

@@ -13,10 +13,13 @@ import (
 
 // refer to https://checkstyle.sourceforge.io/
 const linterName = "stylecheck"
+const stylechekRule = "/usr/local/rulesets/sun_checks.xml"
+const resouceStylechekRule = "/resouces/rulesets/sun_checks.xml"
 
 func init() {
 	linters.RegisterPullRequestHandler(linterName, stylecheckHandler)
 	linters.RegisterLinterLanguages(linterName, []string{".java"})
+	linters.RuleInit(resouceStylechekRule, stylechekRule)
 }
 
 func stylecheckHandler(log *xlog.Logger, a linters.Agent) error {
@@ -31,7 +34,7 @@ func stylecheckHandler(log *xlog.Logger, a linters.Agent) error {
 		if linters.IsEmpty(a.LinterConfig.Args...) {
 			args := append([]string{}, "-jar", "/usr/local/checkstyle-10.17.0-all.jar")
 			args = append(args, javaFiles...)
-			args = append(args, "-c", "/usr/local/rulesets/sun_checks.xml")
+			args = append(args, "-c", stylechekRule)
 			a.LinterConfig.Args = args
 			a.LinterConfig.Command = "java"
 		}

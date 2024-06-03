@@ -18,6 +18,7 @@ package linters
 
 import (
 	"context"
+	"embed"
 	"fmt"
 	"os"
 	"os/exec"
@@ -33,6 +34,8 @@ import (
 	gitv2 "k8s.io/test-infra/prow/git/v2"
 )
 
+//go:embed resouces/*
+var resources embed.FS
 var (
 	PullRequestHandlers = map[string]PullRequestHandlerFunc{}
 	LinterLanguages     = map[string][]string{}
@@ -352,4 +355,22 @@ func countLinterErrors(lintResults map[string][]LinterOutput) int {
 		count += len(outputs)
 	}
 	return count
+}
+func RuleInit(resouceName string, initRule string) {
+	file, err := os.Open(initRule)
+	if err == nil {
+		defer file.Close()
+	}
+	if os.IsNotExist(err) {
+		newfile, err := os.Create(initRule)
+		if err != nil {
+			log.Errorf("pmd rule create error: %v", err)
+		}
+		content, readerr := resources.ReadFile(resouceName)
+		if readerr != nil {
+			log.Errorf("pmd rule resource read  error: %v", readerr)
+		}
+		newfile.Write(content)
+		newfile.Close()
+	}
 }
