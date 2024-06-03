@@ -2,9 +2,7 @@ package stylecheck
 
 import (
 	"fmt"
-	"github.com/qiniu/x/log"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/qiniu/reviewbot/internal/linters"
@@ -49,7 +47,7 @@ func stylecheckHandler(log *xlog.Logger, a linters.Agent) error {
 }
 
 func stylecheckParser(line string) (*linters.LinterOutput, error) {
-	lineResult, err := StyleReportLineParser(line)
+	lineResult, err := linters.GeneralLineParser(line)
 	if err != nil {
 		return nil, err
 
@@ -62,54 +60,6 @@ func stylecheckParser(line string) (*linters.LinterOutput, error) {
 	}, nil
 }
 
-func StyleReportLineParser(line string) (*linters.LinterOutput, error) {
-	log.Debugf("parse line: %s", line)
-
-	patternColum := `^(.*):(\d+):(\d+): (.*)$`
-	regexColum, errColum := regexp.Compile(patternColum)
-	if errColum != nil {
-		log.Errorf("compile regex failed: %v", errColum)
-		return nil, errColum
-	}
-	pattern := `^(.*):(\d+): (.*)$`
-	regex, err := regexp.Compile(pattern)
-	if err != nil {
-		log.Errorf("compile regex failed: %v", err)
-		return nil, err
-	}
-	matches := regexColum.FindStringSubmatch(line)
-	if matches == nil {
-		matches = regex.FindStringSubmatch(line)
-	}
-	if len(matches) < 4 {
-		return nil, fmt.Errorf("unexpected format, original: %s", line)
-	}
-
-	lineNumber, err := strconv.ParseInt(matches[2], 10, 64)
-	if err != nil {
-		return nil, err
-	}
-
-	if err != nil {
-		return nil, err
-	}
-	var column int64
-	message := matches[3]
-	if len(matches) > 4 {
-		columnNumber, err := strconv.ParseInt(matches[3], 10, 64)
-		if err == nil {
-			column = columnNumber
-		}
-		message = matches[4]
-
-	}
-	return &linters.LinterOutput{
-		File:    matches[1],
-		Line:    int(lineNumber),
-		Column:  int(column),
-		Message: message,
-	}, nil
-}
 func TrimReport(line string) string {
 	re := regexp.MustCompile("(?m)^.*检查.*$[\r\n]")
 	reEnd := regexp.MustCompile("(?m)^.*错误结束.*$[\r\n]")

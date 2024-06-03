@@ -1,10 +1,7 @@
 package pmdcheck
 
 import (
-	"fmt"
-	"github.com/qiniu/x/log"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/qiniu/reviewbot/internal/linters"
@@ -48,7 +45,7 @@ func pmdcheckHandler(log *xlog.Logger, a linters.Agent) error {
 }
 
 func pmdcheckParser(line string) (*linters.LinterOutput, error) {
-	lineResult, err := PmdReportLineParser(line)
+	lineResult, err := linters.GeneralLineParser(line)
 	if err != nil {
 		return nil, err
 
@@ -61,30 +58,6 @@ func pmdcheckParser(line string) (*linters.LinterOutput, error) {
 	}, nil
 }
 
-func PmdReportLineParser(line string) (*linters.LinterOutput, error) {
-	log.Debugf("parse line: %s", line)
-	pattern := `^(.*):(\d+): (.*)$`
-	regex, err := regexp.Compile(pattern)
-	if err != nil {
-		log.Errorf("compile regex failed: %v", err)
-		return nil, err
-	}
-	matches := regex.FindStringSubmatch(line)
-	if len(matches) != 4 {
-		return nil, fmt.Errorf("unexpected format, original: %s", line)
-	}
-
-	lineNumber, err := strconv.ParseInt(matches[2], 10, 64)
-	if err != nil {
-		return nil, err
-	}
-	return &linters.LinterOutput{
-		File: matches[1],
-		Line: int(lineNumber),
-		//Column:  int(columnNumber),
-		Message: matches[3],
-	}, nil
-}
 func TrimReport(line string) string {
 	re := regexp.MustCompile("(?m)^.*WARN.*$[\r\n]")
 	line = re.ReplaceAllString(line, "")

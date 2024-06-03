@@ -278,16 +278,26 @@ func Parse(log *xlog.Logger, output []byte, lineParser LineParser) (map[string][
 }
 
 // common format LinterLine
+
 func GeneralLineParser(line string) (*LinterOutput, error) {
 	log.Debugf("parse line: %s", line)
-	pattern := `^(.*):(\d+):(\d+): (.*)$`
+	patternColum := `^(.*):(\d+):(\d+): (.*)$`
+	regexColum, errColum := regexp.Compile(patternColum)
+	if errColum != nil {
+		log.Errorf("compile regex failed: %v", errColum)
+		return nil, errColum
+	}
+	pattern := `^(.*):(\d+): (.*)$`
 	regex, err := regexp.Compile(pattern)
 	if err != nil {
 		log.Errorf("compile regex failed: %v", err)
 		return nil, err
 	}
-	matches := regex.FindStringSubmatch(line)
-	if len(matches) != 5 {
+	matches := regexColum.FindStringSubmatch(line)
+	if matches == nil {
+		matches = regex.FindStringSubmatch(line)
+	}
+	if len(matches) < 4 {
 		return nil, fmt.Errorf("unexpected format, original: %s", line)
 	}
 
@@ -296,16 +306,24 @@ func GeneralLineParser(line string) (*LinterOutput, error) {
 		return nil, err
 	}
 
-	columnNumber, err := strconv.ParseInt(matches[3], 10, 64)
 	if err != nil {
 		return nil, err
 	}
+	var column int64
+	message := matches[3]
+	if len(matches) > 4 {
+		columnNumber, err := strconv.ParseInt(matches[3], 10, 64)
+		if err == nil {
+			column = columnNumber
+		}
+		message = matches[4]
 
+	}
 	return &LinterOutput{
 		File:    matches[1],
 		Line:    int(lineNumber),
-		Column:  int(columnNumber),
-		Message: matches[4],
+		Column:  int(column),
+		Message: message,
 	}, nil
 }
 
