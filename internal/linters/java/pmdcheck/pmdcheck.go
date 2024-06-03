@@ -1,6 +1,9 @@
 package pmdcheck
 
 import (
+	"embed"
+	"github.com/qiniu/x/log"
+	"os"
 	"regexp"
 	"strings"
 
@@ -10,13 +13,19 @@ import (
 
 // refer to https://pmd.github.io/
 const linterName = "pmdcheck"
-const pmdRule = "/usr/local/rulesets/bestpractices.xml"
+
+// const pmdRule = "/usr/local/rulesets/bestpractices.xml"
 const resoucePmdkRule = "/resouces/rulesets/bestpractices.xml"
+
+var pmdRule, rulPath string
+
+//go:embed ruleset/*
+var resources embed.FS
 
 func init() {
 	linters.RegisterPullRequestHandler(linterName, pmdcheckHandler)
 	linters.RegisterLinterLanguages(linterName, []string{".java"})
-	linters.RuleInit(resoucePmdkRule, pmdRule)
+	pmdRule, rulPath = initPmdRule()
 }
 
 func pmdcheckHandler(log *xlog.Logger, a linters.Agent) error {
@@ -40,6 +49,7 @@ func pmdcheckHandler(log *xlog.Logger, a linters.Agent) error {
 
 	return linters.GeneralHandler(log, a, func(l *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, error) {
 		output = []byte(TrimReport(string(output)))
+		os.RemoveAll(rulPath)
 		return linters.Parse(log, output, pmdcheckParser)
 	})
 }
@@ -62,4 +72,22 @@ func TrimReport(line string) string {
 	re := regexp.MustCompile("(?m)^.*WARN.*$[\r\n]")
 	line = re.ReplaceAllString(line, "")
 	return line
+}
+func initPmdRule() (string, string) {
+	tempDir, temdirerr := os.CreateTemp("", "*bestpractices.xml")
+	if temdirerr != nil {
+		log.Errorf("pmd rule temp dir error: %v", temdirerr)
+	}
+	//rulePath := filepath.Join(tempDir.Name(), "bestpractices.xml")
+	//newfile, fileerr := os.Create(rulePath)
+	//if fileerr != nil {
+	//	log.Errorf("pmd rule file create error: %v", fileerr)
+	//}
+	content, readerr := resources.ReadFile("ruleset/bestpractices.xml")
+	if readerr != nil {
+		log.Errorf("pmd rule resource read  error: %v", readerr)
+	}
+	tempDir.Write(content)
+	tempDir.Close()
+	return tempDir.Name(), tempDir.Name()
 }

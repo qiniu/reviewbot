@@ -1,7 +1,9 @@
 package stylecheck
 
 import (
-	"fmt"
+	"embed"
+	"github.com/qiniu/x/log"
+	"os"
 	"regexp"
 	"strings"
 
@@ -9,15 +11,16 @@ import (
 	"github.com/qiniu/x/xlog"
 )
 
-// refer to https://checkstyle.sourceforge.io/
 const linterName = "stylecheck"
-const stylechekRule = "/usr/local/rulesets/sun_checks.xml"
-const resouceStylechekRule = "/resouces/rulesets/sun_checks.xml"
+
+//go:embed ruleset/*
+var resources embed.FS
+var rulePath, ruleDir string
 
 func init() {
 	linters.RegisterPullRequestHandler(linterName, stylecheckHandler)
 	linters.RegisterLinterLanguages(linterName, []string{".java"})
-	linters.RuleInit(resouceStylechekRule, stylechekRule)
+	rulePath, ruleDir = initCheckStyleRule()
 }
 
 func stylecheckHandler(log *xlog.Logger, a linters.Agent) error {
@@ -32,16 +35,15 @@ func stylecheckHandler(log *xlog.Logger, a linters.Agent) error {
 		if linters.IsEmpty(a.LinterConfig.Args...) {
 			args := append([]string{}, "-jar", "/usr/local/checkstyle-10.17.0-all.jar")
 			args = append(args, javaFiles...)
-			args = append(args, "-c", stylechekRule)
+			args = append(args, "-c", rulePath)
 			a.LinterConfig.Args = args
 			a.LinterConfig.Command = "java"
 		}
 	}
 
 	return linters.GeneralHandler(log, a, func(l *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, error) {
-
 		output = []byte(TrimReport(string(output)))
-		fmt.Println(string(output))
+		os.Remove(ruleDir)
 		return linters.Parse(log, output, stylecheckParser)
 	})
 }
@@ -66,4 +68,22 @@ func TrimReport(line string) string {
 	line = re.ReplaceAllString(line, "")
 	line = reEnd.ReplaceAllString(line, "")
 	return line
+}
+func initCheckStyleRule() (string, string) {
+	tempDir, temdirerr := os.CreateTemp("", "*sun_checks.xml")
+	if temdirerr != nil {
+		log.Errorf("pmd rule temp dir error: %v", temdirerr)
+	}
+	//rulePath := filepath.Join(tempDir.Name(), "bestpractices.xml")
+	//newfile, fileerr := os.Create(rulePath)
+	//if fileerr != nil {
+	//	log.Errorf("pmd rule file create error: %v", fileerr)
+	//}
+	content, readerr := resources.ReadFile("ruleset/sun_checks.xml")
+	if readerr != nil {
+		log.Errorf("pmd rule resource read  error: %v", readerr)
+	}
+	tempDir.Write(content)
+	tempDir.Close()
+	return tempDir.Name(), tempDir.Name()
 }

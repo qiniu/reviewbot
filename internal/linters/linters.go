@@ -374,21 +374,3 @@ func countLinterErrors(lintResults map[string][]LinterOutput) int {
 	}
 	return count
 }
-func RuleInit(resouceName string, initRule string) {
-	file, err := os.Open(initRule)
-	if err == nil {
-		defer file.Close()
-	}
-	if os.IsNotExist(err) {
-		newfile, err := os.Create(initRule)
-		if err != nil {
-			log.Errorf("pmd rule create error: %v", err)
-		}
-		content, readerr := resources.ReadFile(resouceName)
-		if readerr != nil {
-			log.Errorf("pmd rule resource read  error: %v", readerr)
-		}
-		newfile.Write(content)
-		newfile.Close()
-	}
-}
