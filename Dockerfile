@@ -69,41 +69,6 @@ RUN curl -fsSL "$JDK_DOWNLOAD_URL" -o jdk.tar.gz \
 
 ENV PATH /usr/local/jdk-18.0.2/bin:$PATH
 
-
-RUN mkdir /usr/local/rulesets
-#down pdm rules
-ENV PMDRule_DOWNLOAD_URL https://raw.githubusercontent.com/pmd/pmd/master/pmd-java/src/main/resources/category/java/bestpractices.xml
-ENV PMDRule_DOWNLOAD_SHA256 51a2bc383c2708afb8e41925947c3a6a5218e5bbdaf495142500a12aa29df314
-RUN curl -fsSL "$PMDRule_DOWNLOAD_URL" -o /usr/local/rulesets/bestpractices.xml \
-    && echo "$PMDRule_DOWNLOAD_SHA256  /usr/local/rulesets/bestpractices.xml" | sha256sum -c
-    #down checkstyle rules
-ENV StyleCheckRule_DOWNLOAD_URL https://raw.githubusercontent.com/checkstyle/checkstyle/master/src/main/resources/sun_checks.xml
-ENV StyleCheckRule_DOWNLOAD_SHA256 c763b24a66cf51a392b13ba289d7c619d5bf4f7ae2ca5c2a324cfb57a6dd47a8
-RUN curl -fsSL "$StyleCheckRule_DOWNLOAD_URL" -o /usr/local/rulesets/sun_checks.xml \
-    && echo "$StyleCheckRule_DOWNLOAD_SHA256  /usr/local/rulesets/sun_checks.xml" | sha256sum -c
-
-
-RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b /usr/local/go/bin v1.56.2
-
-# install shellcheck lint tools
-RUN apt-get update && apt-get install -y shellcheck \
-    && rm -rf /var/lib/apt/lists/*  
-
-# install python flake8  lint tools
-RUN apt update && apt install -y  flake8 \
-    && rm -rf /var/lib/apt/lists/*
-
-#install eslint
-
-RUN apt update && apt install -y  nodejs \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN apt update && apt install -y  npm \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN  npm install -y  eslint \
-    && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /
 
 COPY --from=builder /reviewbot /reviewbot
