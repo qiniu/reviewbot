@@ -146,6 +146,7 @@ func ExecRun(workDir, command string, args ...string) ([]byte, error) {
 		return nil, err
 	}
 
+	log.Infof("exec command: %v %v", g, args)
 	c := exec.Command(g, args...)
 	c.Dir = workDir
 
@@ -247,7 +248,7 @@ func Parse(log *xlog.Logger, output []byte, lineParser LineParser) (map[string][
 		}
 		output, err := lineParser(line)
 		if err != nil {
-			log.Warnf("unexpected linter check output: %v", line)
+			log.Debugf("unexpected linter check output: %v", line)
 			continue
 		}
 

@@ -22,6 +22,10 @@ func golangciLintHandler(log *xlog.Logger, a linters.Agent) error {
 		a.LinterConfig.Args = append([]string{}, "run", "--timeout=5m0s", "--allow-parallel-runners=true")
 	}
 
+	if a.LinterConfig.ConfigPath != "" {
+		a.LinterConfig.Args = append(a.LinterConfig.Args, "--config", a.LinterConfig.ConfigPath)
+	}
+
 	return linters.GeneralHandler(log, a, golangciLintParse)
 }
 

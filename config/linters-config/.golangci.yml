@@ -1,0 +1,30 @@
+# 这是我们当前内部使用的配置文件，会基于实际的变化和我们的认知而迭代，仅供参考
+
+linters-settings:
+  paralleltest:
+    # Ignore missing calls to `t.Parallel()` and only report incorrect uses of it.
+    # Default: false
+    # see: https://github.com/qiniu/reviewbot/issues/149
+    ignore-missing: true
+    # Ignore missing calls to `t.Parallel()` in subtests. Top-level tests are
+    # still required to have `t.Parallel`, but subtests are allowed to skip it.
+    # Default: false
+    ignore-missing-subtests: true
+
+linters:
+  # Enable all available linters.
+  enable-all: true
+  # Disable specific linter
+  disable:
+    - nlreturn # see https://github.com/qiniu/reviewbot/issues/148
+    - deadcode # Deprecated
+    - exhaustivestruct # Deprecated
+    - golint # Deprecated
+    - ifshort # Deprecated
+    - interfacer # Deprecated
+    - maligned # Deprecated
+    - gomnd # Deprecated
+    - nosnakecase # Deprecated
+    - scopelint # Deprecated
+    - structcheck # Deprecated
+    - varcheck # Deprecated
