@@ -54,7 +54,9 @@ type Linter struct {
 }
 
 func (l Linter) String() string {
-	return fmt.Sprintf("Linter{Enable: %v, WorkDir: %v, Command: %v, Args: %v, ReportFormat: %v}", *l.Enable, l.WorkDir, l.Command, l.Args, l.ReportFormat)
+	return fmt.Sprintf(
+		"Linter{Enable: %v, WorkDir: %v, Command: %v, Args: %v, ReportFormat: %v, ConfigPath: %v}",
+		*l.Enable, l.WorkDir, l.Command, l.Args, l.ReportFormat, l.ConfigPath)
 }
 
 // NewConfig returns a new Config.
