@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"sigs.k8s.io/yaml"
 )
@@ -21,6 +22,11 @@ type GlobalConfig struct {
 	// GithubReportType is the format of the report, will be used if linterConfig.ReportFormat is empty.
 	// e.g. "github_checks", "github_pr_review"
 	GithubReportType GithubReportType `json:"githubReportType,omitempty"`
+
+	// GolangciLintConfig is the path of golangci-lint config file to run golangci-lint globally.
+	// if not empty, use the config to run golangci-lint.
+	// it can be overridden by linter.ConfigPath.
+	GolangCiLintConfig string `json:"golangciLintConfig,omitempty"`
 }
 
 type Linter struct {
@@ -41,6 +47,10 @@ type Linter struct {
 	// Note:
 	// * github_check_run only support on Github Apps, not support on Github OAuth Apps or authenticated users.
 	ReportFormat GithubReportType `json:"githubReportType,omitempty"`
+
+	// ConfigPath is the path of the linter config file.
+	// If not empty, use the config to run the linter.
+	ConfigPath string `json:"configPath,omitempty"`
 }
 
 func (l Linter) String() string {
@@ -64,6 +74,18 @@ func NewConfig(conf string) (Config, error) {
 		c.GlobalDefaultConfig.GithubReportType = GithubPRReview
 	}
 
+	// check golangci-lint config path
+	if c.GlobalDefaultConfig.GolangCiLintConfig != "" {
+		absPath, err := os.Getwd()
+		if err != nil {
+			return c, err
+		}
+		c.GlobalDefaultConfig.GolangCiLintConfig = filepath.Join(absPath, c.GlobalDefaultConfig.GolangCiLintConfig)
+		if _, err := os.Stat(c.GlobalDefaultConfig.GolangCiLintConfig); err != nil {
+			return c, fmt.Errorf("golangci-lint config file not found: %v", c.GlobalDefaultConfig.GolangCiLintConfig)
+		}
+	}
+
 	return c, nil
 }
 
@@ -72,6 +94,11 @@ func (c Config) Get(org, repo, ln string) Linter {
 		Enable:       boolPtr(true),
 		ReportFormat: c.GlobalDefaultConfig.GithubReportType,
 		Command:      ln,
+	}
+
+	// set golangci-lint config path if exists
+	if c.GlobalDefaultConfig.GolangCiLintConfig != "" && ln == "golangci-lint" {
+		linter.ConfigPath = c.GlobalDefaultConfig.GolangCiLintConfig
 	}
 
 	if orgConfig, ok := c.CustomConfig[org]; ok {
@@ -102,12 +129,16 @@ func applyCustomConfig(legacy, custom Linter) Linter {
 		legacy.Command = custom.Command
 	}
 
-	if len(custom.Args) != 0 {
+	if custom.Args != nil {
 		legacy.Args = custom.Args
 	}
 
 	if custom.ReportFormat != "" {
 		legacy.ReportFormat = custom.ReportFormat
+	}
+
+	if custom.ConfigPath != "" {
+		legacy.ConfigPath = custom.ConfigPath
 	}
 
 	return legacy
