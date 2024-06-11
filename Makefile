@@ -28,7 +28,7 @@ build:
 	go build .
 
 docker-build:
-	docker builder build -t $(DOCKER_IMAGE):$(VERSION) --target runner .
+	docker builder build --push -t $(DOCKER_IMAGE):$(VERSION) --target runner .
 
 docker-deploy: docker-build
 	kubectl apply -k .
