@@ -38,5 +38,10 @@ build: check-go
 docker-build: check-docker
 	docker builder build --push -t $(DOCKER_IMAGE):$(VERSION) --target runner .
 
+
+docker-dev: check-docker
+	docker builder build -t $(DOCKER_IMAGE):dev --target runner .
+
+
 docker-deploy: check-kubectl docker-build
 	kubectl apply -k .
