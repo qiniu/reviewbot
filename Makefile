@@ -1,34 +1,42 @@
-ifeq (, $(shell which staticcheck))
-$(error "No staticcheck in $(PATH), consider doing: go get -u honnef.co/go/tools/cmd/staticcheck")
-endif
-
-ifeq (, $(shell which docker))
-$(error "No docker in $(PATH))
-endif
-
-ifeq (, $(shell which kubectl))
-$(error "No kubectl in $(PATH))
-endif
-
 DOCKER_IMAGE ?= aslan-spock-register.qiniu.io/qa/reviewbot
 VERSION ?= latest
 
-default: all
+define check_command
+	@if [ -z "$$(which $(1))" ]; then \
+		echo "No $(1) in $(PATH), consider installing it."; \
+		exit 1; \
+	fi
+endef
 
-all: fmt vet build test
+all: fmt vet staticcheck build test
 
-test:
+check-go:
+	$(call check_command,go)
+
+check-docker:
+	$(call check_command,docker)
+
+check-kubectl:
+	$(call check_command,kubectl)
+
+check-staticcheck:
+	$(call check_command,staticcheck)
+
+test: check-go
 	go test -v ./...
-fmt:
+fmt: check-go
 	go fmt ./...
-vet:
+vet: check-go
 	go vet ./...		
 
-build:
+staticcheck: check-staticcheck
+	staticcheck ./...
+
+build: check-go
 	go build .
 
-docker-build:
+docker-build: check-docker
 	docker builder build --push -t $(DOCKER_IMAGE):$(VERSION) --target runner .
 
-docker-deploy: docker-build
+docker-deploy: check-kubectl docker-build
 	kubectl apply -k .
