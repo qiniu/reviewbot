@@ -1,5 +1,7 @@
 DOCKER_IMAGE ?= aslan-spock-register.qiniu.io/qa/reviewbot
 VERSION ?= latest
+TAG?=$(shell git describe --tag --always)
+LDFLAGS=-X 'github.com/qiniu/reviewbot/internal/version.version=$(TAG)'
 
 define check_command
 	@if [ -z "$$(which $(1))" ]; then \
@@ -33,7 +35,7 @@ staticcheck: check-staticcheck
 	staticcheck ./...
 
 build: check-go
-	go build .
+	CGO_ENABLED=0 go build -v -trimpath -ldflags "$(LDFLAGS)" -o ./reviewbot .
 
 docker-build: check-docker
 	docker builder build --push -t $(DOCKER_IMAGE):$(VERSION) --target runner .

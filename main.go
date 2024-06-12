@@ -24,12 +24,11 @@ import (
 	"os"
 
 	"github.com/google/go-github/v57/github"
-	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/x/log"
 	"github.com/sirupsen/logrus"
 	gitv2 "k8s.io/test-infra/prow/git/v2"
 
-	// linters import
+	"github.com/qiniu/reviewbot/config"
 	_ "github.com/qiniu/reviewbot/internal/linters/c/cppcheck"
 	_ "github.com/qiniu/reviewbot/internal/linters/doc/note-check"
 	_ "github.com/qiniu/reviewbot/internal/linters/git-flow/commit-check"
@@ -38,6 +37,7 @@ import (
 	_ "github.com/qiniu/reviewbot/internal/linters/go/staticcheck"
 	_ "github.com/qiniu/reviewbot/internal/linters/lua/luacheck"
 	_ "github.com/qiniu/reviewbot/internal/linters/shell/shellcheck"
+	"github.com/qiniu/reviewbot/internal/version"
 )
 
 type options struct {
@@ -89,6 +89,10 @@ func gatherOptions() options {
 }
 
 func main() {
+	if len(os.Args) >= 2 && (os.Args[1] == "version" || os.Args[1] == "-v" || os.Args[1] == "--version") {
+		fmt.Println(version.Version())
+		return
+	}
 	o := gatherOptions()
 	if err := o.Validate(); err != nil {
 		log.Fatalf("invalid options: %v", err)
