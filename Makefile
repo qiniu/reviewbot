@@ -1,5 +1,6 @@
 DOCKER_IMAGE ?= aslan-spock-register.qiniu.io/qa/reviewbot
-VERSION ?= latest
+TAG?=$(shell git describe --tag --always)
+
 
 define check_command
 	@if [ -z "$$(which $(1))" ]; then \
@@ -36,11 +37,11 @@ build: check-go
 	go build .
 
 docker-build: check-docker
-	docker builder build --push -t $(DOCKER_IMAGE):$(VERSION) --target runner .
+	docker builder build --push -t $(DOCKER_IMAGE):$(TAG) -t $(DOCKER_IMAGE):latest --target runner .
 
 
 docker-dev: check-docker
-	docker builder build -t $(DOCKER_IMAGE):dev --target runner .
+	docker builder build -t $(DOCKER_IMAGE):$(TAG) --target runner .
 
 
 docker-deploy: check-kubectl docker-build
