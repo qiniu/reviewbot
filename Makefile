@@ -33,7 +33,7 @@ staticcheck: check-staticcheck
 	staticcheck ./...
 
 build: check-go
-	go build .
+	CGO_ENABLED=0 go build -v -trimpath -o /reviewbot .
 
 docker-build: check-docker
 	docker builder build --push -t $(DOCKER_IMAGE):$(VERSION) --target runner .
