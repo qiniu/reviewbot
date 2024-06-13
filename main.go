@@ -24,6 +24,7 @@ import (
 	"os"
 
 	"github.com/google/go-github/v57/github"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/qiniu/x/log"
 	"github.com/sirupsen/logrus"
 	gitv2 "k8s.io/test-infra/prow/git/v2"
