@@ -1,5 +1,4 @@
 DOCKER_IMAGE ?= aslan-spock-register.qiniu.io/qa/reviewbot
-VERSION ?= latest
 TAG?=$(shell git describe --tag --always)
 LDFLAGS=-X 'github.com/qiniu/reviewbot/internal/version.version=$(TAG)'
 define check_command

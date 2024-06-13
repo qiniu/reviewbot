@@ -31,6 +31,7 @@ import (
 	"github.com/sirupsen/logrus"
 	gitv2 "k8s.io/test-infra/prow/git/v2"
 
+	// linters import
 	_ "github.com/qiniu/reviewbot/internal/linters/c/cppcheck"
 	_ "github.com/qiniu/reviewbot/internal/linters/doc/note-check"
 	_ "github.com/qiniu/reviewbot/internal/linters/git-flow/commit-check"
