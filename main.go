@@ -38,7 +38,6 @@ import (
 	_ "github.com/qiniu/reviewbot/internal/linters/go/golangci_lint"
 	_ "github.com/qiniu/reviewbot/internal/linters/lua/luacheck"
 	_ "github.com/qiniu/reviewbot/internal/linters/shell/shellcheck"
-	"github.com/qiniu/reviewbot/internal/version"
 )
 
 type options struct {
