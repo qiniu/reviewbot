@@ -25,11 +25,12 @@ import (
 
 	"github.com/google/go-github/v57/github"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/qiniu/reviewbot/config"
+	"github.com/qiniu/reviewbot/internal/version"
 	"github.com/qiniu/x/log"
 	"github.com/sirupsen/logrus"
 	gitv2 "k8s.io/test-infra/prow/git/v2"
 
-	"github.com/qiniu/reviewbot/config"
 	_ "github.com/qiniu/reviewbot/internal/linters/c/cppcheck"
 	_ "github.com/qiniu/reviewbot/internal/linters/doc/note-check"
 	_ "github.com/qiniu/reviewbot/internal/linters/git-flow/commit-check"
