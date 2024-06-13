@@ -5,8 +5,7 @@ WORKDIR /app
 COPY . ./
 
 RUN CGO_ENABLED=0 GOOS=linux go build -v -trimpath -o /reviewbot . \ 
-    && GOPATH=/go go install honnef.co/go/tools/cmd/staticcheck@2023.1.6 \
-    && GOPATH=/go go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.50.1
+    && GOPATH=/go go install -ldflags="-extldflags=-static" github.com/golangci/golangci-lint/cmd/golangci-lint@v1.50.1
 
 FROM alpine:3.20 as runner
 
@@ -18,7 +17,7 @@ RUN set -eux  \
 WORKDIR /
 
 COPY --from=builder /reviewbot /reviewbot
-COPY --from=builder /go/bin/staticcheck /go/bin/golangci-lint /usr/local/bin/
+COPY --from=builder /usr/local/go/bin/gofmt /go/bin/golangci-lint /usr/local/bin/
 
 # SSH config
 RUN mkdir -p /root/.ssh && chown -R root /root/.ssh/ &&  chgrp -R root /root/.ssh/ \
