@@ -107,16 +107,8 @@ func TestConstructMKAlertMessage(t *testing.T) {
 						Message: "assignment to err",
 					},
 				},
-				"provider_manager.go": {
-					{
-						File:    "provider_manager/provider_manager.go",
-						Line:    207,
-						Column:  31,
-						Message: "should use make([]float64, len(result.CDNLog.Points)) instead (S1019)",
-					},
-				},
 			},
-			expected: `{"msgtype":"text","text":{"content":"Linter: golangci-lint \nPR:    \nLink:  \nDetails:\ncdn-admin.v2/client/dns/dnsapi.go:59:3: assignment to err\nprovider_manager.go:207:31: should use make([]float64, len(result.CDNLog.Points)) instead (S1019)\n\n"}}`,
+			expected: `{"msgtype":"text","text":{"content":"Linter: golangci-lint \nPR:    \nLink:  \nDetails:\ncdn-admin.v2/client/dns/dnsapi.go:59:3: assignment to err\n\n"}}`,
 		},
 		{
 			Linter:        "golangci-lint",

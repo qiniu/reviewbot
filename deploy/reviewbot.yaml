@@ -60,6 +60,10 @@ spec:
               subPath: github_app_key
               name: github-app-secret
               readOnly: true
+            - mountPath: /config/linters-config/.golangci.yml # use your own linters config file
+              subPath: .golangci.yml
+              name: golangci-config
+              readOnly: true
       volumes:
         - configMap:
             defaultMode: 420
@@ -79,6 +83,10 @@ spec:
             items:
               - key: github-app-secret
                 path: github_app_key
+        - configMap:
+            defaultMode: 420
+            name: golangci-config
+          name: golangci-config
 ---
 apiVersion: v1
 kind: Service

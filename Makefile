@@ -36,13 +36,11 @@ staticcheck: check-staticcheck
 build: check-go
 	go build .
 
-docker-build: check-docker
-	docker builder build --push -t $(DOCKER_IMAGE):$(TAG) -t $(DOCKER_IMAGE):latest --target runner .
-
+docker-build-latest: check-docker
+	docker builder build --push -t $(DOCKER_IMAGE):latest --target runner .
 
 docker-dev: check-docker
 	docker builder build -t $(DOCKER_IMAGE):$(TAG) --target runner .
 
-
-docker-deploy: check-kubectl docker-build
+kubernetes-deploy: check-kubectl
 	kubectl apply -k .

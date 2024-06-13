@@ -10,7 +10,7 @@ sidebar_position: 1
 默认情况下, **Reviewbot** 使用以下命令来检查 go 代码:
 
 ```bash
-golangci-lint run -D staticcheck --timeout=5m0s --allow-parallel-runners=true
+golangci-lint run --timeout=5m0s --allow-parallel-runners=true
 ```
 
 :::info

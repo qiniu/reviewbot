@@ -14,6 +14,7 @@
  limitations under the License.
 */
 
+// Deprecated. use golangci-lint instead
 package staticcheck
 
 import (
