@@ -1,0 +1,41 @@
+on:
+  push:
+    tags:
+      - v*
+
+jobs:
+  releases-matrix:
+    name: release reviewbot
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      max-parallel: 1
+      matrix:
+        include:
+          - goarch: amd64
+            goos: darwin
+          - goarch: arm64
+            goos: darwin
+          - goarch: amd64
+            goos: linux
+          - goarch: arm64
+            goos: linux
+
+    steps:
+      - name: Show environment
+        run: export
+      - uses: actions/checkout@v3
+      - uses: ncipollo/release-action@v1
+        with:
+          allowUpdates: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: wangyoucao577/go-release-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          goos: ${{ matrix.goos }}
+          goarch: ${{ matrix.goarch }}
+          build_command: "make build"
+          binary_name: "reviewbot"
+          extra_files: reviewbot
+
