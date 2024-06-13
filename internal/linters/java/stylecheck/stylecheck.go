@@ -70,6 +70,7 @@ func TrimReport(line string) string {
 	return line
 }
 func initCheckStyleRule() (string, string) {
+
 	tempDir, temdirerr := os.CreateTemp("", "*sun_checks.xml")
 	if temdirerr != nil {
 		log.Errorf("pmd rule temp dir error: %v", temdirerr)
@@ -81,9 +82,15 @@ func initCheckStyleRule() (string, string) {
 	//}
 	content, readerr := resources.ReadFile("ruleset/sun_checks.xml")
 	if readerr != nil {
-		log.Errorf("pmd rule resource read  error: %v", readerr)
+		log.Errorf("style rule resource read  error: %v", readerr)
 	}
-	tempDir.Write(content)
-	tempDir.Close()
+	_, err := tempDir.Write(content)
+	if err != nil {
+		log.Errorf("style rule resource write error: %v", err)
+	}
+	closeErr := tempDir.Close()
+	if closeErr != nil {
+		log.Errorf("style rule resource close error: %v", closeErr)
+	}
 	return tempDir.Name(), tempDir.Name()
 }

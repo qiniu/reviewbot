@@ -14,9 +14,6 @@ import (
 // refer to https://pmd.github.io/
 const linterName = "pmdcheck"
 
-// const pmdRule = "/usr/local/rulesets/bestpractices.xml"
-const resoucePmdkRule = "/resouces/rulesets/bestpractices.xml"
-
 var pmdRule, rulPath string
 
 //go:embed ruleset/*
@@ -87,7 +84,13 @@ func initPmdRule() (string, string) {
 	if readerr != nil {
 		log.Errorf("pmd rule resource read  error: %v", readerr)
 	}
-	tempDir.Write(content)
-	tempDir.Close()
+	_, err := tempDir.Write(content)
+	if err != nil {
+		log.Errorf("pmd rule resource write  error: %v", err)
+	}
+	closeErr := tempDir.Close()
+	if closeErr != nil {
+		log.Errorf("pmd rule resource ckose  error: %v", closeErr)
+	}
 	return tempDir.Name(), tempDir.Name()
 }
