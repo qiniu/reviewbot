@@ -85,3 +85,52 @@ func TestIsEmpty(t *testing.T) {
 		}
 	}
 }
+
+func TestConstructMKAlertMessage(t *testing.T) {
+	tcs := []struct {
+		Linter        string
+		PR            string
+		Link          string
+		linterResults map[string][]LinterOutput
+		expected      string
+	}{
+		{
+			Linter: "golangci-lint",
+			PR:     "",
+			Link:   "",
+			linterResults: map[string][]LinterOutput{
+				"cdn-admin.v2/client/dns/dnsapi.go": {
+					{
+						File:    "cdn-admin.v2/client/dns/dnsapi.go",
+						Line:    59,
+						Column:  3,
+						Message: "assignment to err",
+					},
+				},
+				"provider_manager.go": {
+					{
+						File:    "provider_manager/provider_manager.go",
+						Line:    207,
+						Column:  31,
+						Message: "should use make([]float64, len(result.CDNLog.Points)) instead (S1019)",
+					},
+				},
+			},
+			expected: `{"msgtype":"text","text":{"content":"Linter: golangci-lint \nPR:    \nLink:  \nDetails:\ncdn-admin.v2/client/dns/dnsapi.go:59:3: assignment to err\nprovider_manager.go:207:31: should use make([]float64, len(result.CDNLog.Points)) instead (S1019)\n\n"}}`,
+		},
+		{
+			Linter:        "golangci-lint",
+			PR:            "",
+			Link:          "",
+			linterResults: map[string][]LinterOutput{},
+			expected:      "",
+		},
+	}
+
+	for _, tc := range tcs {
+		actual := constructMKAlertMessage(tc.Linter, tc.PR, tc.Link, tc.linterResults)
+		if actual != tc.expected {
+			t.Errorf("expected: %v, got: %v", tc.expected, actual)
+		}
+	}
+}

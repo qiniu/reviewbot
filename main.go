@@ -24,6 +24,7 @@ import (
 	"os"
 
 	"github.com/google/go-github/v57/github"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/x/log"
 	"github.com/sirupsen/logrus"
@@ -134,8 +135,9 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.Handle("/", s)
+	mux.Handle("/metrics", promhttp.Handler())
 	log.Infof("listening on port %d", o.port)
 
-	// TODO: graceful shutdown
+	// TODO(CarlJi): graceful shutdown
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", o.port), mux))
 }
