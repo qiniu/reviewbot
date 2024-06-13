@@ -17,63 +17,76 @@ spec:
         app: reviewbot
     spec:
       containers:
-      - command:
-        - /reviewbot
-        args:
-        - -log-level=1
-        - -webhook-secret=$(GITHUB_WEBHOOK_SECRET)
-        - -config=/etc/config/config.yaml
-        - -app-id=$(GITHUB_APP_ID)
-        - -app-private-key=/secrets/github_app_key
-        env:
-        - name: GITHUB_WEBHOOK_SECRET
-          valueFrom:
-            secretKeyRef:
-              key: webhook-secret
-              name: github  
-        - name: GITHUB_APP_ID
-          valueFrom:
-            secretKeyRef:
-              key: app-id
-              name: github-app                                
-        image: aslan-spock-register.qiniu.io/qa/reviewbot:latest # use your own built image instead
-        imagePullPolicy: Always
-        name: reviewbot
-        ports:
-        - containerPort: 8888
-          name: http
-          protocol: TCP
-        volumeMounts:
-        - mountPath: /etc/config
-          name: config
-          readOnly: true
-        - mountPath: /secrets/github_key
-          subPath: github_key
-          name: ssh-secret
-          readOnly: true 
-        - mountPath: /secrets/github_app_key
-          subPath: github_app_key
-          name: github-app-secret
-          readOnly: true                             
+        - command:
+            - /reviewbot
+          args:
+            - -log-level=1
+            - -webhook-secret=$(GITHUB_WEBHOOK_SECRET)
+            - -config=/etc/config/config.yaml
+            - -app-id=$(GITHUB_APP_ID)
+            - -app-private-key=/secrets/github_app_key
+          env:
+            - name: GITHUB_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  key: webhook-secret
+                  name: github
+            - name: GITHUB_APP_ID
+              valueFrom:
+                secretKeyRef:
+                  key: app-id
+                  name: github-app
+            - name: WEWORK_WEBHOOK # optional, if you want to use wework webhook
+              valueFrom:
+                secretKeyRef:
+                  key: webhook
+                  name: wework
+          image: aslan-spock-register.qiniu.io/qa/reviewbot:latest # use your own built image instead
+          imagePullPolicy: Always
+          name: reviewbot
+          ports:
+            - containerPort: 8888
+              name: http
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /etc/config
+              name: config
+              readOnly: true
+            - mountPath: /secrets/github_key
+              subPath: github_key
+              name: ssh-secret
+              readOnly: true
+            - mountPath: /secrets/github_app_key
+              subPath: github_app_key
+              name: github-app-secret
+              readOnly: true
+            - mountPath: /config/linters-config/.golangci.yml # use your own linters config file
+              subPath: .golangci.yml
+              name: golangci-config
+              readOnly: true
       volumes:
-      - configMap:
-          defaultMode: 420
+        - configMap:
+            defaultMode: 420
+            name: config
           name: config
-        name: config
-      - name: ssh-secret
-        secret:
-          defaultMode: 256
-          secretName: ssh-secret
-          items:
-          - key: ssh-secret
-            path: github_key
-      - name: github-app-secret
-        secret:
-          defaultMode: 256
-          secretName: github-app-secret
-          items:
-          - key: github-app-secret
-            path: github_app_key            
+        - name: ssh-secret
+          secret:
+            defaultMode: 256
+            secretName: ssh-secret
+            items:
+              - key: ssh-secret
+                path: github_key
+        - name: github-app-secret
+          secret:
+            defaultMode: 256
+            secretName: github-app-secret
+            items:
+              - key: github-app-secret
+                path: github_app_key
+        - configMap:
+            defaultMode: 420
+            name: golangci-config
+          name: golangci-config
 ---
 apiVersion: v1
 kind: Service
@@ -84,13 +97,13 @@ metadata:
   namespace: reviewbot
 spec:
   ports:
-  - name: http
-    port: 8888
-    protocol: TCP
-    targetPort: 8888
+    - name: http
+      port: 8888
+      protocol: TCP
+      targetPort: 8888
   selector:
     app: reviewbot
-  type: ClusterIP 
+  type: ClusterIP
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -103,24 +116,25 @@ metadata:
   namespace: reviewbot
 spec:
   rules:
-  - host: cr-bot.qiniu.io
-    http:
-      paths:
-      - backend:
-          service:
-            name: reviewbot
-            port:
-              number: 8888
-        path: /
-        pathType: Prefix
-  - host: cr-bot.qiniu.io
-    http:
-      paths:
-      - backend:
-          service:
-            name: reviewbot
-            port:
-              number: 8888
-        path: /hook
-        pathType: Prefix   
+    - host: cr-bot.qiniu.io
+      http:
+        paths:
+          - backend:
+              service:
+                name: reviewbot
+                port:
+                  number: 8888
+            path: /
+            pathType: Prefix
+    - host: cr-bot.qiniu.io
+      http:
+        paths:
+          - backend:
+              service:
+                name: reviewbot
+                port:
+                  number: 8888
+            path: /hook
+            pathType: Prefix
 ---
+

@@ -18,6 +18,7 @@ package linters
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -28,6 +29,7 @@ import (
 
 	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/reviewbot/config"
+	"github.com/qiniu/reviewbot/internal/metric"
 	"github.com/qiniu/x/log"
 	"github.com/qiniu/x/xlog"
 	gitv2 "k8s.io/test-infra/prow/git/v2"
@@ -186,6 +188,10 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 		return nil
 	}
 
+	if len(lintResults) > 0 {
+		metric.IncIssueCounter(orgRepo, linterName, a.PullRequestEvent.PullRequest.GetHTMLURL(), a.PullRequestEvent.GetPullRequest().GetHead().GetSHA(), float64(countLinterErrors(lintResults)))
+	}
+
 	switch a.LinterConfig.ReportFormat {
 	case config.GithubCheckRuns:
 		ch, err := CreateGithubChecks(context.Background(), a, lintResults)
@@ -194,6 +200,10 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 			return err
 		}
 		log.Infof("[%s] create check run success, HTML_URL: %v", linterName, ch.GetHTMLURL())
+		if err := metric.SendAlertMessageIfNeeded(constructMKAlertMessage(linterName, a.PullRequestEvent.GetPullRequest().GetHTMLURL(), ch.GetHTMLURL(), lintResults)); err != nil {
+			log.Errorf("failed to send alert message: %v", err)
+			// just log the error, not return
+		}
 	case config.GithubPRReview:
 		// List existing comments
 		existedComments, err := ListPullRequestsComments(context.Background(), a.GithubClient, org, repo, num)
@@ -221,12 +231,16 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 
 		comments := constructPullRequestComments(toAdds, linterFlag, a.PullRequestEvent.GetPullRequest().GetHead().GetSHA())
 		// Add the comments
-		if err := CreatePullReviewComments(context.Background(), a.GithubClient, org, repo, num, comments); err != nil {
+		addedCmts, err := CreatePullReviewComments(context.Background(), a.GithubClient, org, repo, num, comments)
+		if err != nil {
 			log.Errorf("failed to post comments: %v", err)
 			return err
 		}
-		log.Infof("[%s] add %d comments for this PR %d (%s) \n", linterName, len(toAdds), num, orgRepo)
-
+		log.Infof("[%s] add %d comments for this PR %d (%s) \n", linterName, len(addedCmts), num, orgRepo)
+		if err := metric.SendAlertMessageIfNeeded(constructMKAlertMessage(linterName, a.PullRequestEvent.GetPullRequest().GetHTMLURL(), addedCmts[0].GetHTMLURL(), lintResults)); err != nil {
+			log.Errorf("failed to send alert message: %v", err)
+			// just log the error, not return
+		}
 	default:
 		log.Errorf("unsupported report format: %v", a.LinterConfig.ReportFormat)
 	}
@@ -355,4 +369,35 @@ func countLinterErrors(lintResults map[string][]LinterOutput) int {
 		count += len(outputs)
 	}
 	return count
+}
+
+func constructMKAlertMessage(linter, pr, link string, linterResults map[string][]LinterOutput) string {
+	if len(linterResults) == 0 {
+		return ""
+	}
+
+	var message string
+	for file, outputs := range linterResults {
+		for _, output := range outputs {
+			message += fmt.Sprintf("%s:%d:%d: %s\n", file, output.Line, output.Column, output.Message)
+		}
+	}
+
+	type mkMessage struct {
+		Msgtype string `json:"msgtype"`
+		Text    struct {
+			Content string `json:"content"`
+		} `json:"text"`
+	}
+
+	var m mkMessage
+	m.Msgtype = "text"
+	m.Text.Content = fmt.Sprintf("Linter: %v \nPR:   %v \nLink: %v \nDetails:\n%v\n", linter, pr, link, message)
+	b, err := json.Marshal(m)
+	if err != nil {
+		log.Errorf("failed to marshal message: %v", err)
+		return ""
+	}
+
+	return string(b)
 }

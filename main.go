@@ -34,7 +34,6 @@ import (
 	_ "github.com/qiniu/reviewbot/internal/linters/git-flow/commit-check"
 	_ "github.com/qiniu/reviewbot/internal/linters/go/gofmt"
 	_ "github.com/qiniu/reviewbot/internal/linters/go/golangci_lint"
-	_ "github.com/qiniu/reviewbot/internal/linters/go/staticcheck"
 	_ "github.com/qiniu/reviewbot/internal/linters/lua/luacheck"
 	_ "github.com/qiniu/reviewbot/internal/linters/shell/shellcheck"
 	"github.com/qiniu/reviewbot/internal/version"
@@ -138,8 +137,9 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.Handle("/", s)
+	mux.Handle("/metrics", promhttp.Handler())
 	log.Infof("listening on port %d", o.port)
 
-	// TODO: graceful shutdown
+	// TODO(CarlJi): graceful shutdown
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", o.port), mux))
 }
