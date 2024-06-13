@@ -77,28 +77,30 @@ func ListPullRequestsComments(ctx context.Context, gc *github.Client, owner stri
 }
 
 // CreatePullReviewComments creates the specified comments on the pull request.
-func CreatePullReviewComments(ctx context.Context, gc *github.Client, owner string, repo string, number int, comments []*github.PullRequestComment) error {
+func CreatePullReviewComments(ctx context.Context, gc *github.Client, owner string, repo string, number int, comments []*github.PullRequestComment) ([]*github.PullRequestComment, error) {
+	var addedComments []*github.PullRequestComment
 	for _, comment := range comments {
 		cmt := comment
 		err := RetryWithBackoff(ctx, func() error {
-			_, resp, err := gc.PullRequests.CreateComment(ctx, owner, repo, number, cmt)
+			cm, resp, err := gc.PullRequests.CreateComment(ctx, owner, repo, number, cmt)
 			if err != nil {
 				return err
 			}
 			if resp.StatusCode != 201 {
 				return fmt.Errorf("create comment failed: %v", resp)
 			}
+			addedComments = append(addedComments, cm)
 			return nil
 		})
 
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		log.Infof("create comment success: %v", comment)
 	}
 
-	return nil
+	return addedComments, nil
 }
 
 // DeletePullReviewComments deletes the specified comments on the pull request.
