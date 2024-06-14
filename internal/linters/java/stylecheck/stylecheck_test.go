@@ -17,20 +17,9 @@
 package stylecheck
 
 import (
-	"fmt"
 	"github.com/qiniu/reviewbot/internal/linters"
-	"regexp"
 	"testing"
 )
-
-func TestAbac(t *testing.T) {
-	regexpf := " test/qtest_access.lua:1220:1: inconsistent indentation (SPACE followed by TAB)"
-	pattern := `^(.*):(\d+):(\d+): (.*)$`
-	regexColum, err := regexp.Compile(pattern)
-	matches := regexColum.FindStringSubmatch(regexpf)
-	fmt.Println(matches)
-	fmt.Println(err)
-}
 
 func TestFormatStyleCheckLine(t *testing.T) {
 	tc := []struct {
