@@ -1,7 +1,6 @@
 package stylecheck
 
 import (
-	"embed"
 	"regexp"
 	"strings"
 
@@ -11,8 +10,6 @@ import (
 
 const linterName = "stylecheck"
 
-//go:embed ruleset/*
-var resources embed.FS
 var rulePath string
 
 func init() {
