@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/x/log"
 	"github.com/qiniu/x/xlog"
@@ -23,6 +24,10 @@ func gofmtHandler(log *xlog.Logger, a linters.Agent) error {
 	if linters.IsEmpty(a.LinterConfig.Args...) {
 		a.LinterConfig.Args = append([]string{}, "-d", "./")
 	}
+
+	// Since GitHub's check run feature does not have the suggestion functionality, GitHub PR review is fixed used to display gofmt reports.
+	// Details: https://github.com/qiniu/reviewbot/issues/166
+	a.LinterConfig.ReportFormat = config.GithubPRReview
 
 	executor, err := NewgofmtExecutor(a.LinterConfig.WorkDir)
 	if err != nil {
