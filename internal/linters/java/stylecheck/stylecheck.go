@@ -1,6 +1,7 @@
 package stylecheck
 
 import (
+	"github.com/qiniu/reviewbot/config"
 	"regexp"
 	"strings"
 
@@ -15,7 +16,8 @@ var rulePath string
 func init() {
 	linters.RegisterPullRequestHandler(linterName, stylecheckHandler)
 	linters.RegisterLinterLanguages(linterName, []string{".java"})
-	rulePath = "/config/linters-config/.java-sun-checks.xml"
+	var c config.GlobalConfig
+	rulePath = c.JavaStyleCheckRuleConfig
 }
 
 func stylecheckHandler(log *xlog.Logger, a linters.Agent) error {
@@ -37,7 +39,7 @@ func stylecheckHandler(log *xlog.Logger, a linters.Agent) error {
 	}
 
 	return linters.GeneralHandler(log, a, func(l *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, error) {
-		output = []byte(TrimReport(string(output)))
+		output = []byte(trimReport(string(output)))
 		return linters.Parse(log, output, stylecheckParser)
 	})
 }
@@ -56,7 +58,7 @@ func stylecheckParser(line string) (*linters.LinterOutput, error) {
 	}, nil
 }
 
-func TrimReport(line string) string {
+func trimReport(line string) string {
 	re := regexp.MustCompile("(?m)^.*检查.*$[\r\n]")
 	reEnd := regexp.MustCompile("(?m)^.*错误结束.*$[\r\n]")
 	line = re.ReplaceAllString(line, "")

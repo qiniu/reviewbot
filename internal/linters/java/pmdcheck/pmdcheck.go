@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/x/xlog"
 )
@@ -16,7 +17,9 @@ var rulePath string
 func init() {
 	linters.RegisterPullRequestHandler(linterName, pmdcheckHandler)
 	linters.RegisterLinterLanguages(linterName, []string{".java"})
-	rulePath = "/config/linters-config/.java-bestpractices.xml"
+	var c config.GlobalConfig
+	rulePath = c.JavaPmdCheckRuleConfig
+
 }
 
 func pmdcheckHandler(log *xlog.Logger, a linters.Agent) error {
@@ -39,7 +42,7 @@ func pmdcheckHandler(log *xlog.Logger, a linters.Agent) error {
 	}
 
 	return linters.GeneralHandler(log, a, func(l *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, error) {
-		output = []byte(TrimReport(string(output)))
+		output = []byte(trimReport(string(output)))
 		return linters.Parse(log, output, pmdcheckParser)
 	})
 }
@@ -58,7 +61,7 @@ func pmdcheckParser(line string) (*linters.LinterOutput, error) {
 	}, nil
 }
 
-func TrimReport(line string) string {
+func trimReport(line string) string {
 	re := regexp.MustCompile("(?m)^.*WARN.*$[\r\n]")
 	line = re.ReplaceAllString(line, "")
 	return line

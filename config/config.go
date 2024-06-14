@@ -27,6 +27,10 @@ type GlobalConfig struct {
 	// if not empty, use the config to run golangci-lint.
 	// it can be overridden by linter.ConfigPath.
 	GolangCiLintConfig string `json:"golangciLintConfig,omitempty"`
+
+	JavaPmdCheckRuleConfig string `json:"javapmdcheckruleConfig,omitempty"`
+
+	JavaStyleCheckRuleConfig string `json:"javastylecheckruleConfig,omitempty"`
 }
 
 type Linter struct {
