@@ -13,6 +13,6 @@ pmd check -f emacs -R bestpractices.xml  xx1.java xx2.java
 ```
 
 :::info
-PMD提供了许多其他的代码检查规则。
+PMD官方提供了许多其他的代码检查规则。
 详情参见: https://github.com/pmd/pmd/tree/master/pmd-java/src/main/java/net/sourceforge/pmd/lang/java/rule
 :::
