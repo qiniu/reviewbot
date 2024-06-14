@@ -230,6 +230,10 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 		log.Infof("%s delete %d comments for this PR %d (%s) \n", linterFlag, len(toDeletes), num, orgRepo)
 
 		comments := constructPullRequestComments(toAdds, linterFlag, a.PullRequestEvent.GetPullRequest().GetHead().GetSHA())
+		if len(comments) == 0 {
+			return nil
+		}
+
 		// Add the comments
 		addedCmts, err := CreatePullReviewComments(context.Background(), a.GithubClient, org, repo, num, comments)
 		if err != nil {
