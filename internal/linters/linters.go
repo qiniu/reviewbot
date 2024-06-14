@@ -294,22 +294,17 @@ func Parse(log *xlog.Logger, output []byte, lineParser LineParser) (map[string][
 // common format LinterLine
 func GeneralLineParser(line string) (*LinterOutput, error) {
 	log.Debugf("parse line: %s", line)
-	patternColum := `^(.*):(\d+):(\d+): (.*)$`
-	regexColum, errColum := regexp.Compile(patternColum)
-	if errColum != nil {
-		log.Errorf("compile regex failed: %v", errColum)
-		return nil, errColum
-	}
-	pattern := `^(.*):(\d+): (.*)$`
+	pattern := `^(.*?):(\d+):(\d+)?:? (.*)$`
 	regex, err := regexp.Compile(pattern)
 	if err != nil {
 		log.Errorf("compile regex failed: %v", err)
 		return nil, err
 	}
-	matches := regexColum.FindStringSubmatch(line)
-	if matches == nil {
-		matches = regex.FindStringSubmatch(line)
-	}
+	matches := regex.FindStringSubmatch(line)
+	matches = regex.FindStringSubmatch(line)
+	//if matches == nil {
+	//	matches = regex.FindStringSubmatch(line)
+	//}
 	if len(matches) < 4 {
 		return nil, fmt.Errorf("unexpected format, original: %s", line)
 	}
