@@ -43,6 +43,30 @@ func TestFormatStaticcheckLine(t *testing.T) {
 			Column:  3,
 			Message: "should replace loop with ret = append(ret, scope.EdgeNodes...) (S1011)",
 		}},
+		{"/Users/zhou/Documents/qproject/prow/cmd/phony/examples/test2.java:21:18: '{' 前应有空格。 [WhitespaceAround]", &LinterOutput{
+			File:    "/Users/zhou/Documents/qproject/prow/cmd/phony/examples/test2.java",
+			Line:    21,
+			Column:  18,
+			Message: "'{' 前应有空格。 [WhitespaceAround]",
+		}},
+		{"/Users/zhou/Documents/qproject/prow/cmd/phony/examples/test.java:1: 文件未以空行结尾。 [NewlineAtEndOfFile]", &LinterOutput{
+			File:    "/Users/zhou/Documents/qproject/prow/cmd/phony/examples/test.java",
+			Line:    1,
+			Column:  0,
+			Message: "文件未以空行结尾。 [NewlineAtEndOfFile]",
+		}},
+		{" /Users/zhou/Documents/qproject/prow/cmd/phony/examples/test.java:9: Avoid unused local variables such as 'test'.", &LinterOutput{
+			File:    "/Users/zhou/Documents/qproject/prow/cmd/phony/examples/test.java",
+			Line:    9,
+			Column:  0,
+			Message: "Avoid unused local variables such as 'test'.",
+		}},
+		{" /Users/zhou/Documents/qproject/prow/cmd/phony/examples/test.java:10: Usage of System.out/err", &LinterOutput{
+			File:    "/Users/zhou/Documents/qproject/prow/cmd/phony/examples/test.java",
+			Line:    10,
+			Column:  0,
+			Message: "Usage of System.out/err",
+		}},
 		{"cdn-admin.v2/api/api_line.go:342 should replace loop with ret = append(ret, scope.EdgeNodes...)", nil},
 	}
 
