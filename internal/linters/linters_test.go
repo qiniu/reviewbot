@@ -55,13 +55,13 @@ func TestFormatStaticcheckLine(t *testing.T) {
 			Column:  0,
 			Message: "文件未以空行结尾。 [NewlineAtEndOfFile]",
 		}},
-		{" /Users/zhou/Documents/qproject/prow/cmd/phony/examples/test.java:9: Avoid unused local variables such as 'test'.", &LinterOutput{
+		{"/Users/zhou/Documents/qproject/prow/cmd/phony/examples/test.java:9: Avoid unused local variables such as 'test'.", &LinterOutput{
 			File:    "/Users/zhou/Documents/qproject/prow/cmd/phony/examples/test.java",
 			Line:    9,
 			Column:  0,
 			Message: "Avoid unused local variables such as 'test'.",
 		}},
-		{" /Users/zhou/Documents/qproject/prow/cmd/phony/examples/test.java:10: Usage of System.out/err", &LinterOutput{
+		{"/Users/zhou/Documents/qproject/prow/cmd/phony/examples/test.java:10: Usage of System.out/err", &LinterOutput{
 			File:    "/Users/zhou/Documents/qproject/prow/cmd/phony/examples/test.java",
 			Line:    10,
 			Column:  0,
