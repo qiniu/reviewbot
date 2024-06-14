@@ -26,6 +26,7 @@ import (
 	"github.com/google/go-github/v57/github"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/qiniu/reviewbot/config"
+	"github.com/qiniu/reviewbot/internal/version"
 	"github.com/qiniu/x/log"
 	"github.com/sirupsen/logrus"
 	gitv2 "k8s.io/test-infra/prow/git/v2"
@@ -89,6 +90,10 @@ func gatherOptions() options {
 }
 
 func main() {
+	if len(os.Args) >= 2 && (os.Args[1] == "version" || os.Args[1] == "-v" || os.Args[1] == "--version") {
+		fmt.Println(version.Version())
+		return
+	}
 	o := gatherOptions()
 	if err := o.Validate(); err != nil {
 		log.Fatalf("invalid options: %v", err)
