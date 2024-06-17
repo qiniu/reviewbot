@@ -1,11 +1,11 @@
-FROM library/golang:1.22.3 as builder
+FROM library/golang:1.22.4 as builder
 
 WORKDIR /app
 
 COPY . ./
 
 RUN CGO_ENABLED=0 GOOS=linux go build -v -trimpath -o /reviewbot . \ 
-    && GOPATH=/go go install -ldflags="-extldflags=-static" github.com/golangci/golangci-lint/cmd/golangci-lint@v1.50.1
+    && GOPATH=/go go install -ldflags="-extldflags=-static" github.com/golangci/golangci-lint/cmd/golangci-lint@v1.59.1
 
 FROM alpine:3.20 as runner
 
