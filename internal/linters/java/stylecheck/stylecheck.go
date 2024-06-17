@@ -2,6 +2,7 @@ package stylecheck
 
 import (
 	"github.com/qiniu/reviewbot/config"
+	"github.com/qiniu/x/log"
 	"regexp"
 	"strings"
 
@@ -32,7 +33,7 @@ func stylecheckHandler(log *xlog.Logger, a linters.Agent) error {
 		if linters.IsEmpty(a.LinterConfig.Args...) {
 			args := append([]string{}, "-jar", "/usr/local/checkstyle-10.17.0-all.jar")
 			args = append(args, javaFiles...)
-			args = append(args, "-c", rulePath)
+			args = append(args, "-c", a.LinterConfig.ConfigPath)
 			a.LinterConfig.Args = args
 			a.LinterConfig.Command = "java"
 		}
@@ -59,9 +60,19 @@ func stylecheckParser(line string) (*linters.LinterOutput, error) {
 }
 
 func trimReport(line string) string {
-	re := regexp.MustCompile("(?m)^.*检查.*$[\r\n]")
-	reEnd := regexp.MustCompile("(?m)^.*错误结束.*$[\r\n]")
-	line = re.ReplaceAllString(line, "")
-	line = reEnd.ReplaceAllString(line, "")
-	return line
+	pattern := `(.*?)开始检查……\n([\d\D]*)\n检查完成([\d\D]*)?`
+	//pattern := `^(.*?)Running([\d\D ]*)27([\d\D]*)?$`
+	regex, err := regexp.Compile(pattern)
+	if err != nil {
+		log.Errorf("compile regex failed: %v", err)
+		return ""
+	}
+
+	matches := regex.FindStringSubmatch(line)
+	if len(matches) > 3 || matches != nil {
+		return matches[2]
+	} else {
+		return ""
+	}
+
 }

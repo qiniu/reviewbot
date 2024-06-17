@@ -21,6 +21,25 @@ import (
 	"testing"
 )
 
+func TestTrimReport(t *testing.T) {
+	tc := []struct {
+		input    string
+		expected string
+	}{
+		{"6月 14, 2024 7:19:02 下午 com.puppycrawl.tools.checkstyle.Main runCli\n详细: Checkstyle debug logging enabled\n6月 14, 2024 7:19:02 下午 com.puppycrawl.tools.checkstyle.Main runCli\n详细: Running Checkstyle with version: 10.17.0\n开始检查……\n[ERROR] /Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java:1: 文件未以空行结尾。 [NewlineAtEndOfFile]\n[ERROR] /Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java:1: 缺少 package-info.java 文件。 [JavadocPackage]\n[ERROR] /Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java:2: Line has trailing spaces. [RegexpSingleline]\n[ERROR] /Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java:4:5: 缺少 Javadoc 。 [JavadocVariable]\n[ERROR] /Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java:4:12: 变量 'name' 应定义为 private 的，并为其创建访问方法。 [VisibilityModifier]\n[ERROR] /Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java:5:5: 缺少 Javadoc 。 [JavadocVariable]\n检查完成。\nCheckstyle以 27 个错误结束。", "[ERROR] /Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java:1: 文件未以空行结尾。 [NewlineAtEndOfFile]\n[ERROR] /Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java:1: 缺少 package-info.java 文件。 [JavadocPackage]\n[ERROR] /Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java:2: Line has trailing spaces. [RegexpSingleline]\n[ERROR] /Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java:4:5: 缺少 Javadoc 。 [JavadocVariable]\n[ERROR] /Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java:4:12: 变量 'name' 应定义为 private 的，并为其创建访问方法。 [VisibilityModifier]\n[ERROR] /Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java:5:5: 缺少 Javadoc 。 [JavadocVariable]"},
+		{"开始检查……\n\t检查完成。", ""},
+	}
+
+	for _, c := range tc {
+		output := trimReport(c.input)
+		//if output != "" {
+		if output != c.expected {
+			t.Errorf("expected: %v, got: %v", c.expected, output)
+		}
+		continue
+	}
+
+}
 func TestFormatStyleCheckLine(t *testing.T) {
 	tc := []struct {
 		input    string
