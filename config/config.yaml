@@ -28,6 +28,7 @@ customConfig: # custom config for specific orgs or repos
       args: ["run", "--enable-all", "--timeout=5m0s", "--allow-parallel-runners=true"] # disable staticcheck globally since we have a separate linter for it      
 
   qbox/kodo:
-    staticcheck:
+    golangci-lint:
       enable: true
-      workDir: "src/qiniu.com/kodo" # only run in the src/qiniu.com/kodo directory since this is a monorepo
+      workDir: "src/qiniu.com/kodo"
+      args: ["run", "--enable-all", "--timeout=5m0s", "--allow-parallel-runners=true"] 
