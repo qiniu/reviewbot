@@ -93,7 +93,7 @@ func (g *Gofmt) Run(log *xlog.Logger, args ...string) ([]byte, error) {
 		if stderr != nil {
 			log.Errorf("gofmt run cause stderr: %s, mark and continue", stderr)
 		}
-		return stdoutput, err
+		return stdoutput, nil
 	} else {
 		log.Infof("gofmt running succeeded")
 	}
