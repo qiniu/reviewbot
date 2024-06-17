@@ -44,6 +44,7 @@ type Linter struct {
 	// Args is the arguments of the command.
 	Args []string `json:"args,omitempty"`
 
+	LinterName string `json:"linterName,omitempty"`
 	// ReportFormat is the format of the report, if empty, use globalDefaultConfig.
 	// For more details, see:
 	// github_check_run: https://developer.github.com/v3/checks/runs/#create-a-check-run
@@ -135,7 +136,7 @@ func (c Config) Get(org, repo, ln string) Linter {
 	// set javastylecheck-lint config path if exists
 	if c.GlobalDefaultConfig.JavaStyleCheckRuleConfig != "" && ln == "stylecheck" {
 		linter.ConfigPath = c.GlobalDefaultConfig.JavaStyleCheckRuleConfig
-	}
+	} //
 
 	if orgConfig, ok := c.CustomConfig[org]; ok {
 		if l, ok := orgConfig[ln]; ok {

@@ -25,17 +25,20 @@ func stylecheckHandler(log *xlog.Logger, a linters.Agent) error {
 	var javaFiles []string
 	for _, arg := range a.PullRequestChangedFiles {
 		if strings.HasSuffix(arg.GetFilename(), ".java") {
-			javaFiles = append(javaFiles, arg.GetFilename())
+			javaFiles = append(javaFiles, a.LinterConfig.WorkDir+"/"+arg.GetFilename())
 		}
 	}
 
 	if len(javaFiles) > 0 {
 		if linters.IsEmpty(a.LinterConfig.Args...) {
-			args := append([]string{}, "-jar", "/usr/local/checkstyle-10.17.0-all.jar")
+			//args := append([]string{}, "-jar", "/usr/local/checkstyle-10.17.0-all.jar")
+			args := append([]string{}, "-jar", "/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/checkstyle-10.17.0-all.jar")
 			args = append(args, javaFiles...)
 			args = append(args, "-c", a.LinterConfig.ConfigPath)
 			a.LinterConfig.Args = args
 			a.LinterConfig.Command = "java"
+			a.LinterConfig.LinterName = "stylecheck"
+
 		}
 	}
 
