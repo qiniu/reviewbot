@@ -4,7 +4,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/x/xlog"
 )
@@ -17,13 +16,12 @@ var rulePath string
 func init() {
 	linters.RegisterPullRequestHandler(linterName, pmdcheckHandler)
 	linters.RegisterLinterLanguages(linterName, []string{".java"})
-	var c config.GlobalConfig
-	rulePath = c.JavaPmdCheckRuleConfig
 
 }
 
 func pmdcheckHandler(log *xlog.Logger, a linters.Agent) error {
 	var javaFiles []string
+	rulePath = a.LinterConfig.ConfigPath
 	for _, arg := range a.PullRequestChangedFiles {
 		if strings.HasSuffix(arg.GetFilename(), ".java") {
 			javaFiles = append(javaFiles, arg.GetFilename())
@@ -35,7 +33,7 @@ func pmdcheckHandler(log *xlog.Logger, a linters.Agent) error {
 			args := append([]string{}, "check")
 			args = append(args, "-f", "emacs")
 			args = append(args, javaFiles...)
-			args = append(args, "-R", rulePath)
+			args = append(args, "-R", a.LinterConfig.ConfigPath)
 			a.LinterConfig.Args = args
 			a.LinterConfig.Command = "pmd"
 		}
