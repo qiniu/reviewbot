@@ -17,7 +17,9 @@ RUN set -eux  \
 WORKDIR /
 
 COPY --from=builder /reviewbot /reviewbot
-COPY --from=builder /usr/local/go/bin/gofmt /go/bin/golangci-lint /usr/local/bin/
+COPY --from=builder /go/bin/golangci-lint /usr/local/bin/
+# golangci-lint dependencies
+COPY --from=builder /usr/local/go/ /usr/local/go/ 
 
 # SSH config
 RUN mkdir -p /root/.ssh && chown -R root /root/.ssh/ &&  chgrp -R root /root/.ssh/ \
@@ -25,6 +27,8 @@ RUN mkdir -p /root/.ssh && chown -R root /root/.ssh/ &&  chgrp -R root /root/.ss
     && git config --global url."git://".insteadOf https://
 COPY deploy/config /root/.ssh/config
 COPY deploy/github-known-hosts /github_known_hosts
+
+ENV PATH="${PATH}:/usr/local/go/bin"
 
 EXPOSE 8888
 
