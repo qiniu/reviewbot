@@ -17,6 +17,7 @@ linters:
   # Disable specific linter
   disable:
     - nlreturn # see https://github.com/qiniu/reviewbot/issues/148
+    - warpcheck # see https://github.com/qiniu/reviewbot/issues/180
     - deadcode # Deprecated
     - exhaustivestruct # Deprecated
     - golint # Deprecated
