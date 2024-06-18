@@ -70,8 +70,6 @@ func (c *GithubCommitFileHunkChecker) InHunk(file string, line, startLine int) b
 			if startLine != 0 {
 				if startLine >= hunk.StartLine && line <= hunk.EndLine {
 					return true
-				} else {
-					return false
 				}
 			} else if line >= hunk.StartLine && line <= hunk.EndLine {
 				return true
