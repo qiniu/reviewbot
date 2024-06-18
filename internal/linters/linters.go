@@ -36,8 +36,8 @@ import (
 )
 
 var (
-	PullRequestHandlers = map[string]PullRequestHandlerFunc{}
-	LinterLanguages     = map[string][]string{}
+	pullRequestHandlers = map[string]PullRequestHandlerFunc{}
+	linterLanguages     = map[string][]string{}
 )
 
 // PullRequestHandlerFunc knows how to handle a pull request event.
@@ -45,17 +45,17 @@ type PullRequestHandlerFunc func(*xlog.Logger, Agent) error
 
 // RegisterPullRequestHandler registers a PullRequestHandlerFunc for the given linter name.
 func RegisterPullRequestHandler(name string, handler PullRequestHandlerFunc) {
-	PullRequestHandlers[name] = handler
+	pullRequestHandlers[name] = handler
 }
 
 // RegisterLinterLanguages registers the languages supported by the linter.
 func RegisterLinterLanguages(name string, languages []string) {
-	LinterLanguages[name] = languages
+	linterLanguages[name] = languages
 }
 
 // PullRequestHandler returns a PullRequestHandlerFunc for the given linter name.
 func PullRequestHandler(name string) PullRequestHandlerFunc {
-	if handler, ok := PullRequestHandlers[name]; ok {
+	if handler, ok := pullRequestHandlers[name]; ok {
 		return handler
 	}
 	return nil
@@ -63,8 +63,8 @@ func PullRequestHandler(name string) PullRequestHandlerFunc {
 
 // TotalPullRequestHandlers returns all registered PullRequestHandlerFunc.
 func TotalPullRequestHandlers() map[string]PullRequestHandlerFunc {
-	var handlers = make(map[string]PullRequestHandlerFunc, len(PullRequestHandlers))
-	for name, handler := range PullRequestHandlers {
+	var handlers = make(map[string]PullRequestHandlerFunc, len(pullRequestHandlers))
+	for name, handler := range pullRequestHandlers {
 		handlers[name] = handler
 	}
 
@@ -73,7 +73,7 @@ func TotalPullRequestHandlers() map[string]PullRequestHandlerFunc {
 
 // LinterLanguages returns the languages supported by the linter.
 func Languages(linterName string) []string {
-	return LinterLanguages[linterName]
+	return linterLanguages[linterName]
 }
 
 // Linter knows how to execute linters.
