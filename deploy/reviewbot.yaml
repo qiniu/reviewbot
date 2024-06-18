@@ -20,7 +20,7 @@ spec:
         - command:
             - /reviewbot
           args:
-            - -log-level=1
+            - -log-level=0
             - -webhook-secret=$(GITHUB_WEBHOOK_SECRET)
             - -config=/etc/config/config.yaml
             - -app-id=$(GITHUB_APP_ID)
@@ -43,6 +43,10 @@ spec:
                   name: wework
           image: aslan-spock-register.qiniu.io/qa/reviewbot:latest # use your own built image instead
           imagePullPolicy: Always
+          resources:
+            requests:
+              memory: "4Gi"
+              cpu: "4"
           name: reviewbot
           ports:
             - containerPort: 8888
