@@ -12,12 +12,8 @@ customConfig: # custom config for specific orgs or repos
   qbox: # github organization name
     golangci-lint:
       enable: true
-      args: ["run", "--allow-parallel-runners=true","--timeout=5m0s"] 
+      args: ["run", "--allow-parallel-runners=true","--timeout=5m0s"]
 
-  qbox/net-cache:
-    luacheck:
-      enable: true
-      workDir: "nginx" # only run in the nginx directory since there are .luacheckrc files in this directory
   qbox/net-cache:
     golangci-lint:
       enable: true
