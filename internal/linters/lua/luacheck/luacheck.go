@@ -19,7 +19,7 @@ func luacheckHandler(log *xlog.Logger, a linters.Agent) error {
 	if linters.IsEmpty(a.LinterConfig.Args...) {
 		// identify global variables for Redis and Nginx modules.
 		// disable the maximum line length check, which is no need.
-		a.LinterConfig.Args = append([]string{}, ".", "--globals ngx KEYS ARGV table redis", "--no-max-line-length")
+		a.LinterConfig.Args = append([]string{}, ".", "--globals='ngx KEYS ARGV table redis cjson'", "--no-max-line-length")
 	}
 
 	return linters.GeneralHandler(log, a, func(_ *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, error) {
