@@ -1,6 +1,7 @@
 package metric
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -27,22 +28,42 @@ func IncIssueCounter(repo, linter, pull_request, commit string, count float64) {
 	issueCounter.WithLabelValues(repo, linter, pull_request, commit).Add(count)
 }
 
-// SendAlertMessageIfNeeded sends alert message to wework group if needed
+type MessageBody struct {
+	MsgType  string     `json:"msgtype"`
+	Text     MsgContent `json:"text,omitempty"`
+	Markdown MsgContent `json:"markdown,omitempty"`
+}
+
+type MsgContent struct {
+	Content string `json:"content"`
+}
+
+// NotifyWebhook sends message to wework group
 // refer: https://developer.work.weixin.qq.com/document/path/91770
-// The mkMessage is the markdown format message
-func SendAlertMessageIfNeeded(message string) error {
-	if WEWORK_WEBHOOK == "" || message == "" {
+func NotifyWebhook(message MessageBody) error {
+	if WEWORK_WEBHOOK == "" {
 		return nil
 	}
 
-	resp, err := http.DefaultClient.Post(WEWORK_WEBHOOK, "application/json", strings.NewReader(message))
+	body, err := json.Marshal(message)
+	if err != nil {
+		return err
+	}
+
+	resp, err := http.DefaultClient.Post(WEWORK_WEBHOOK, "application/json", strings.NewReader(string(body)))
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("send alert message failed: %v", resp)
+		return fmt.Errorf("send message failed: %v", resp)
 	}
+
+	errCode := resp.Header.Get("Error-Code")
+	if errCode != "0" {
+		return fmt.Errorf("send message failed, errCode: %v, errMsg: %v", errCode, resp.Header.Get("Error-Msg"))
+	}
+
 	return nil
 }

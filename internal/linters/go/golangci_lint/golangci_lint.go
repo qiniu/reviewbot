@@ -20,6 +20,9 @@ func golangciLintHandler(log *xlog.Logger, a linters.Agent) error {
 	if linters.IsEmpty(a.LinterConfig.Args...) {
 		// refer: https://github.com/qiniu/reviewbot/issues/146
 		a.LinterConfig.Args = append([]string{}, "run", "--timeout=5m0s", "--allow-parallel-runners=true")
+		// recommend to use the line-number format and disable the issued lines
+		// since these are more friendly to the reviewbot
+		a.LinterConfig.Args = append(a.LinterConfig.Args, "--out-format=line-number", "--print-issued-lines=false")
 	}
 
 	if a.LinterConfig.ConfigPath != "" {

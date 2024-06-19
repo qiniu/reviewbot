@@ -18,7 +18,6 @@ package linters
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -200,7 +199,7 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 			return err
 		}
 		log.Infof("[%s] create check run success, HTML_URL: %v", linterName, ch.GetHTMLURL())
-		if err := metric.SendAlertMessageIfNeeded(constructMKAlertMessage(linterName, a.PullRequestEvent.GetPullRequest().GetHTMLURL(), ch.GetHTMLURL(), lintResults)); err != nil {
+		if err := metric.NotifyWebhook(constructMessage(linterName, a.PullRequestEvent.GetPullRequest().GetHTMLURL(), ch.GetHTMLURL(), lintResults)); err != nil {
 			log.Errorf("failed to send alert message: %v", err)
 			// just log the error, not return
 		}
@@ -241,7 +240,7 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 			return err
 		}
 		log.Infof("[%s] add %d comments for this PR %d (%s) \n", linterName, len(addedCmts), num, orgRepo)
-		if err := metric.SendAlertMessageIfNeeded(constructMKAlertMessage(linterName, a.PullRequestEvent.GetPullRequest().GetHTMLURL(), addedCmts[0].GetHTMLURL(), lintResults)); err != nil {
+		if err := metric.NotifyWebhook(constructMessage(linterName, a.PullRequestEvent.GetPullRequest().GetHTMLURL(), addedCmts[0].GetHTMLURL(), lintResults)); err != nil {
 			log.Errorf("failed to send alert message: %v", err)
 			// just log the error, not return
 		}
@@ -259,6 +258,7 @@ type LineParser func(line string) (*LinterOutput, error)
 func Parse(log *xlog.Logger, output []byte, lineParser LineParser) (map[string][]LinterOutput, error) {
 	lines := strings.Split(string(output), "\n")
 
+	var unexpectedLines []string
 	var result = make(map[string][]LinterOutput)
 	for _, line := range lines {
 		if line == "" {
@@ -266,7 +266,7 @@ func Parse(log *xlog.Logger, output []byte, lineParser LineParser) (map[string][
 		}
 		output, err := lineParser(line)
 		if err != nil {
-			log.Warnf("unexpected linter output: %v", line)
+			unexpectedLines = append(unexpectedLines, line)
 			continue
 		}
 
@@ -291,6 +291,34 @@ func Parse(log *xlog.Logger, output []byte, lineParser LineParser) (map[string][
 			}
 		}
 	}
+
+	go func() {
+		var message string
+		for _, line := range unexpectedLines {
+			// trim the message to avoid too long
+			// wework webhook only support 4096 characters for markdown message
+			// see https://open.work.weixin.qq.com/api/doc/90000/90136/91770
+			if len(message) > 3000 {
+				message += "..."
+				break
+			}
+			message += line + "\n"
+		}
+
+		if message != "" {
+			message = fmt.Sprintf("unexpected lines:\n%v", message)
+			log.Warnf(message)
+			var msg metric.MessageBody
+			msg.MsgType = "markdown"
+			msg.Markdown.Content = fmt.Sprintf("<font color=\"warning\">[ATTENTION PLEASE]</font> %v", message)
+			// seed the alert message if the linter output is unexpected
+			// so that we can know the issue and fix it
+			if err := metric.NotifyWebhook(msg); err != nil {
+				log.Errorf("failed to send alert message: %v", err)
+				// just log the error, not return
+			}
+		}
+	}()
 
 	return result, nil
 }
@@ -373,9 +401,9 @@ func countLinterErrors(lintResults map[string][]LinterOutput) int {
 	return count
 }
 
-func constructMKAlertMessage(linter, pr, link string, linterResults map[string][]LinterOutput) string {
+func constructMessage(linter, pr, link string, linterResults map[string][]LinterOutput) (msg metric.MessageBody) {
 	if len(linterResults) == 0 {
-		return ""
+		return
 	}
 
 	var message string
@@ -385,21 +413,7 @@ func constructMKAlertMessage(linter, pr, link string, linterResults map[string][
 		}
 	}
 
-	type mkMessage struct {
-		Msgtype string `json:"msgtype"`
-		Text    struct {
-			Content string `json:"content"`
-		} `json:"text"`
-	}
-
-	var m mkMessage
-	m.Msgtype = "text"
-	m.Text.Content = fmt.Sprintf("Linter: %v \nPR:   %v \nLink: %v \nDetails:\n%v\n", linter, pr, link, message)
-	b, err := json.Marshal(m)
-	if err != nil {
-		log.Errorf("failed to marshal message: %v", err)
-		return ""
-	}
-
-	return string(b)
+	msg.MsgType = "text"
+	msg.Text.Content = fmt.Sprintf("Linter: %v \nPR:   %v \nLink: %v \nDetails:\n%v\n", linter, pr, link, message)
+	return
 }
