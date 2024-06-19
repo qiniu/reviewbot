@@ -30,12 +30,12 @@ func IncIssueCounter(repo, linter, pull_request, commit string, count float64) {
 // SendAlertMessageIfNeeded sends alert message to wework group if needed
 // refer: https://developer.work.weixin.qq.com/document/path/91770
 // The mkMessage is the markdown format message
-func SendAlertMessageIfNeeded(mkMessage string) error {
-	if WEWORK_WEBHOOK == "" || mkMessage == "" {
+func SendAlertMessageIfNeeded(message string) error {
+	if WEWORK_WEBHOOK == "" || message == "" {
 		return nil
 	}
 
-	resp, err := http.DefaultClient.Post(WEWORK_WEBHOOK, "application/json", strings.NewReader(mkMessage))
+	resp, err := http.DefaultClient.Post(WEWORK_WEBHOOK, "application/json", strings.NewReader(message))
 	if err != nil {
 		return err
 	}
