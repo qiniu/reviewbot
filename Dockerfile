@@ -2,10 +2,12 @@ FROM library/golang:1.22.4 as builder
 
 WORKDIR /app
 
+# keep this cache in a separate layer to speed up builds
+RUN GOPATH=/go go install -ldflags="-extldflags=-static" github.com/golangci/golangci-lint/cmd/golangci-lint@v1.59.1
+
 COPY . ./
 
-RUN CGO_ENABLED=0 GOOS=linux go build -v -trimpath -o /reviewbot . \ 
-    && GOPATH=/go go install -ldflags="-extldflags=-static" github.com/golangci/golangci-lint/cmd/golangci-lint@v1.59.1
+RUN CGO_ENABLED=0 GOOS=linux go build -v -trimpath -o /reviewbot .  
 
 FROM alpine:3.20 as runner
 
