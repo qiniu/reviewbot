@@ -11,8 +11,6 @@ import (
 // refer to https://pmd.github.io/
 const linterName = "pmdcheck"
 
-var rulePath string
-
 func init() {
 	linters.RegisterPullRequestHandler(linterName, pmdcheckHandler)
 	linters.RegisterLinterLanguages(linterName, []string{".java"})
@@ -21,23 +19,22 @@ func init() {
 
 func pmdcheckHandler(log *xlog.Logger, a linters.Agent) error {
 	var javaFiles []string
-	rulePath = a.LinterConfig.ConfigPath
+	rulePath := a.LinterConfig.ConfigPath
 	for _, arg := range a.PullRequestChangedFiles {
 		if strings.HasSuffix(arg.GetFilename(), ".java") {
 			javaFiles = append(javaFiles, a.LinterConfig.WorkDir+"/"+arg.GetFilename())
 		}
 	}
 
-	if len(javaFiles) > 0 {
-		if linters.IsEmpty(a.LinterConfig.Args...) {
-			args := append([]string{}, "check")
-			args = append(args, "-f", "emacs")
-			args = append(args, javaFiles...)
-			args = append(args, "-R", a.LinterConfig.ConfigPath)
-			a.LinterConfig.Args = args
-			a.LinterConfig.Command = "pmd"
-			a.LinterConfig.LinterName = linterName
-		}
+	if (len(javaFiles) > 0) && linters.IsExist(rulePath) && linters.IsEmpty(a.LinterConfig.Args...) {
+		args := append([]string{}, "check")
+		args = append(args, "-f", "emacs")
+		args = append(args, javaFiles...)
+		args = append(args, "-R", rulePath)
+		a.LinterConfig.Args = args
+		a.LinterConfig.Command = "pmd"
+		a.LinterConfig.LinterName = linterName
+
 	}
 
 	return linters.GeneralHandler(log, a, func(l *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, error) {

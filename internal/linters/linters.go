@@ -169,13 +169,7 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 		org        = a.PullRequestEvent.Repo.GetOwner().GetLogin()
 		repo       = a.PullRequestEvent.Repo.GetName()
 		orgRepo    = a.PullRequestEvent.Repo.GetFullName()
-		linterName = func(name string, command string) string {
-			if name != "" {
-				return name
-			} else {
-				return command
-			}
-		}(a.LinterConfig.LinterName, a.LinterConfig.Command)
+		linterName = If(a.LinterConfig.LinterName != "", a.LinterConfig.LinterName, a.LinterConfig.Command)
 	)
 
 	log.Infof("[%s] found total %d files with %d lint errors on repo %v", linterName, len(lintResults), countLinterErrors(lintResults), orgRepo)
@@ -359,7 +353,22 @@ func IsEmpty(args ...string) bool {
 	}
 	return true
 }
+func IsExist(path string) bool {
+	if _, err := os.Stat(path); err != nil {
+		fmt.Errorf("config path check failed,%v file not exit", path)
+		return false
+	} else {
+		return true
+	}
+}
+func If[T any](condition bool, trueVal, falseVal T) T {
+	if condition {
+		return trueVal
+	} else {
+		return falseVal
+	}
 
+}
 func exts(changes []*github.CommitFile) map[string]bool {
 	var exts = make(map[string]bool)
 	for _, change := range changes {
