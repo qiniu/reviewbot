@@ -49,7 +49,7 @@ func filterByPRChanged(outputs map[string][]LinterOutput, commitFiles []*github.
 
 	for file, lintFileErrs := range outputs {
 		for _, lintErr := range lintFileErrs {
-			if hunkChecker.InHunk(file, lintErr.Line) {
+			if hunkChecker.InHunk(file, lintErr.Line, lintErr.StartLine) {
 				result[file] = append(result[file], lintErr)
 			}
 		}

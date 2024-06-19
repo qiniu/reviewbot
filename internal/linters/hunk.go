@@ -64,10 +64,14 @@ func NewGithubCommitFileHunkChecker(commitFiles []*github.CommitFile) (*GithubCo
 	}, nil
 }
 
-func (c *GithubCommitFileHunkChecker) InHunk(file string, line int) bool {
+func (c *GithubCommitFileHunkChecker) InHunk(file string, line, startLine int) bool {
 	if hunks, ok := c.Hunks[file]; ok {
 		for _, hunk := range hunks {
-			if line >= hunk.StartLine && line <= hunk.EndLine {
+			if startLine != 0 {
+				if startLine >= hunk.StartLine && line <= hunk.EndLine {
+					return true
+				}
+			} else if line >= hunk.StartLine && line <= hunk.EndLine {
 				return true
 			}
 		}
