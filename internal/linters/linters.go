@@ -355,7 +355,7 @@ func IsEmpty(args ...string) bool {
 }
 func IsExist(path string) bool {
 	if _, err := os.Stat(path); err != nil {
-		fmt.Errorf("config path check failed,%v file not exit", path)
+		log.Errorf("config path check failed,%v file not exit", path)
 		return false
 	} else {
 		return true
