@@ -314,16 +314,18 @@ func GeneralLineParser(line string) (*LinterOutput, error) {
 		return nil, err
 	}
 
-	if err != nil {
-		return nil, err
-	}
 	var column int64
 	message := matches[3]
 	if len(matches) > 4 {
-		columnNumber, err := strconv.ParseInt(matches[3], 10, 64)
-		if err == nil {
+		if matches[3] != "" {
+			columnNumber, err := strconv.ParseInt(matches[3], 10, 64)
+			if err != nil {
+				log.Errorf("match  failed: %v", err)
+				return nil, err
+			}
 			column = columnNumber
 		}
+
 		message = matches[4]
 
 	}
