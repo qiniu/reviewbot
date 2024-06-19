@@ -32,7 +32,6 @@ func stylecheckHandler(log *xlog.Logger, a linters.Agent) error {
 	}
 	jarfile, err := stylecheckJar()
 	if (len(javaFiles) > 0) && linters.IsExist(rulePath) && linters.IsEmpty(a.LinterConfig.Args...) && err == nil {
-		//args := append([]string{}, "-jar", "/usr/local/checkstyle-10.17.0-all.jar")
 		args := append([]string{}, "-jar", jarfile)
 		args = append(args, javaFiles...)
 		args = append(args, "-c", rulePath)
