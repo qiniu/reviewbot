@@ -32,7 +32,6 @@ func stylecheckHandler(log *xlog.Logger, a linters.Agent) error {
 	}
 	jarfile, err := stylecheckJar()
 	if (len(javaFiles) > 0) && linters.IsExist(rulePath) && linters.IsEmpty(a.LinterConfig.Args...) && err == nil {
-		stylecheckJar()
 		//args := append([]string{}, "-jar", "/usr/local/checkstyle-10.17.0-all.jar")
 		args := append([]string{}, "-jar", jarfile)
 		args = append(args, javaFiles...)
@@ -74,9 +73,8 @@ func trimReport(line string) string {
 	matches := regex.FindStringSubmatch(line)
 	if len(matches) > 3 || matches != nil {
 		return matches[2]
-	} else {
-		return ""
 	}
+	return ""
 }
 
 func stylecheckJar() (string, error) {
@@ -100,20 +98,24 @@ func stylecheckJar() (string, error) {
 	if linters.IsExist(filename2) {
 		return filename2, nil
 	}
-	os.MkdirAll(filePath, 0755)
+	madirerr := os.MkdirAll(filePath, 0755)
+	if madirerr != nil {
+		return "", madirerr
+	}
 	f, err := os.Create(filename2)
 	if err != nil {
 		fmt.Println(f, err)
 		return "", fmt.Errorf("The file saving   encountered an error,Please check the directory: %v", err)
 	}
 	_, err = io.Copy(f, res.Body)
+	defer res.Body.Close()
+
 	if err != nil {
 		return "", fmt.Errorf("The file saving   encountered an error: %v", err)
 	}
 	if linters.IsExist(filename2) {
 		return filename2, nil
-	} else {
-		return "", fmt.Errorf("The style jar file download  encountered  an error")
 	}
+	return "", fmt.Errorf("The style jar file download  encountered  an error")
 
 }

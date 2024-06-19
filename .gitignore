@@ -1,3 +1,4 @@
 reviewbot
 .vscode
 .idea
+*.jar

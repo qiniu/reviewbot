@@ -46,7 +46,7 @@ type Linter struct {
 	Command string `json:"command,omitempty"`
 	// Args is the arguments of the command.
 	Args []string `json:"args,omitempty"`
-	//LinerName used in Linter report, is not required, if not set, the Command as the Lintername
+	// LinerName used in Linter report, is not required, if not set, the Command as the Lintername
 	LinterName string `json:"linterName,omitempty"`
 	// ReportFormat is the format of the report, if empty, use globalDefaultConfig.
 	// For more details, see:

@@ -37,10 +37,9 @@ func TestTrimReport(t *testing.T) {
 				t.Errorf("expected: %v, got: %v", c.expected, output)
 			}
 			continue
-		} else {
-			t.Errorf("expected: %v, got: %v", c.expected, output)
 		}
-
+		t.Errorf("expected: %v, got: %v", c.expected, output)
+		
 	}
 
 }
