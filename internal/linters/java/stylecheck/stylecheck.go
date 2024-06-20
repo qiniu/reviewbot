@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/qiniu/reviewbot/internal/linters"
@@ -62,18 +61,14 @@ func stylecheckParser(line string) (*linters.LinterOutput, error) {
 }
 
 func trimReport(line string) string {
-	pattern := `(.*?)开始检查……\n([\d\D]*)\n检查完成([\d\D]*)?`
-	//pattern := `^(.*?)Running([\d\D ]*)27([\d\D]*)?$`
-	regex, err := regexp.Compile(pattern)
-	if err != nil {
-		log.Errorf("compile regex failed: %v", err)
+	line1st := strings.ReplaceAll(line, "开始检查……\n", "&stylecheck&")
+	line2nd := strings.ReplaceAll(line1st, "\n检查完成", "&stylecheck&")
+	lineresult := strings.Split(line2nd, "&stylecheck&")
+	if len(lineresult) < 3 {
 		return ""
 	}
-	matches := regex.FindStringSubmatch(line)
-	if len(matches) > 3 || matches != nil {
-		return matches[2]
-	}
-	return ""
+	return lineresult[1]
+
 }
 
 func stylecheckJar() (string, error) {
