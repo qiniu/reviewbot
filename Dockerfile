@@ -39,7 +39,7 @@ RUN curl -fsSL "$StyleCheck_DOWNLOAD_URL" -o /usr/local/checkstyle-10.17.0-all.j
 #    && echo "$JDK_DOWNLOAD_SHA256  jdk.tar.gz" | sha256sum -c - \
 #    && tar -C /usr/local -xzf jdk.tar.gz \
 #    && rm jdk.tar.gz
-ENV JAVA_HOME=/usr/lib/jvm/java-1.8-openjdk
+ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk
 ENV PATH JAVA_HOME/bin:$PATH
 WORKDIR /
 
