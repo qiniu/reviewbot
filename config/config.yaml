@@ -14,7 +14,13 @@ customConfig: # custom config for specific orgs or repos
   qbox: # github organization name
     golangci-lint:
       enable: true
-      args: ["run", "--allow-parallel-runners=true","--timeout=5m0s"] 
+      args: ["run", "--allow-parallel-runners=true","--timeout=5m0s"]
+    stylecheck:
+      enable: true
+      command: "java"
+    pmdcheck:
+      enable: true
+      command: "pmd"
 
   qbox/net-cache:
     luacheck:
