@@ -9,11 +9,6 @@ globalDefaultConfig: # global default settings, will be overridden by qbox org a
   golangcilintConfig: "config/linters-config/.golangci.yml" # golangci-lint config file to use
 
 customConfig: # custom config for specific orgs or repos
-  qbox: # github organization name
-    golangci-lint:
-      enable: true
-      args: ["run", "--allow-parallel-runners=true","--timeout=5m0s"]
-
   qbox/net-cache:
     golangci-lint:
       enable: true

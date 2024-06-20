@@ -74,7 +74,7 @@ func noteCheckFile(workdir, filename string) (map[string][]linters.LinterOutput,
 					continue
 				}
 
-				log.Infof("non-standard note: %s, pos: %v", line, fset.Position(cmt.Pos()))
+				log.Debugf("non-standard note: %s, pos: %v", line, fset.Position(cmt.Pos()))
 
 				v, ok := output[filename]
 				if !ok {
