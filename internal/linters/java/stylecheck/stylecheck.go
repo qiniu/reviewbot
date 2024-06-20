@@ -33,11 +33,13 @@ func stylecheckHandler(log *xlog.Logger, a linters.Agent) error {
 	if err != nil {
 		log.Errorf("style jar check failed: %v", err)
 	}
-	if (len(javaFiles) > 0) && linters.IsExist(rulePath) && linters.IsExist(jarfile) && linters.IsEmpty(a.LinterConfig.Args...) && err == nil {
-		args := append([]string{}, "-jar", jarfile)
-		args = append(args, javaFiles...)
-		args = append(args, "-c", rulePath)
-		a.LinterConfig.Args = args
+	if (len(javaFiles) > 0) && linters.IsExist(rulePath) && linters.IsExist(jarfile) && err == nil {
+		if linters.IsEmpty(a.LinterConfig.Args...) {
+			args := append([]string{}, "-jar", jarfile)
+			args = append(args, javaFiles...)
+			args = append(args, "-c", rulePath)
+			a.LinterConfig.Args = args
+		}
 		if a.LinterConfig.Command == "" || a.LinterConfig.Command == linterName {
 			a.LinterConfig.Command = "java"
 		}
