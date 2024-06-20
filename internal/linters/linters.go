@@ -301,10 +301,7 @@ func GeneralLineParser(line string) (*LinterOutput, error) {
 		return nil, err
 	}
 	matches := regex.FindStringSubmatch(line)
-	matches = regex.FindStringSubmatch(line)
-	//if matches == nil {
-	//	matches = regex.FindStringSubmatch(line)
-	//}
+
 	if len(matches) < 4 {
 		return nil, fmt.Errorf("unexpected format, original: %s", line)
 	}
