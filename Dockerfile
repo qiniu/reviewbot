@@ -28,8 +28,8 @@ ENV PATH /usr/local/pmd-bin-7.1.0/bin:$PATH
 #install stylecheck
 ENV StyleCheck_DOWNLOAD_URL https://github.com/checkstyle/checkstyle/releases/download/checkstyle-10.17.0/checkstyle-10.17.0-all.jar
 ENV StyleCheck_DOWNLOAD_SHA256 51c34d738520c1389d71998a9ab0e6dabe0d7cf262149f3e01a7294496062e42
-RUN curl -fsSL "$StyleCheck_DOWNLOAD_URL" -o checkstyle-10.17.0-all.jar \
-    && echo "$StyleCheck_DOWNLOAD_SHA256  checkstyle-10.17.0-all.jar" | sha256sum -c -
+RUN curl -fsSL "$StyleCheck_DOWNLOAD_URL" -o /usr/local/checkstyle-10.17.0-all.jar \
+    && echo "$StyleCheck_DOWNLOAD_SHA256  /usr/local/checkstyle-10.17.0-all.jar" | sha256sum -c -
 
 #install open jdk
 
@@ -55,7 +55,7 @@ COPY deploy/config /root/.ssh/config
 COPY deploy/github-known-hosts /github_known_hosts
 
 RUN java -version
-RUN java -jar /checkstyle-10.17.0-all.jar --version
+RUN java -jar /usr/local/checkstyle-10.17.0-all.jar --version
 RUN pmd  --version
 EXPOSE 8888
 
