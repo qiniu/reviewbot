@@ -32,9 +32,12 @@ func pmdcheckHandler(log *xlog.Logger, a linters.Agent) error {
 		args = append(args, javaFiles...)
 		args = append(args, "-R", rulePath)
 		a.LinterConfig.Args = args
-		a.LinterConfig.Command = "pmd"
-		a.LinterConfig.LinterName = linterName
-
+		if a.LinterConfig.Command == "" || a.LinterConfig.Command == linterName {
+			a.LinterConfig.Command = "pmd"
+		}
+		if a.LinterConfig.LinterName == "" {
+			a.LinterConfig.LinterName = linterName
+		}
 	}
 
 	return linters.GeneralHandler(log, a, func(l *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, error) {

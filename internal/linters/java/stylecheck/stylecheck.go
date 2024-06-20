@@ -30,13 +30,20 @@ func stylecheckHandler(log *xlog.Logger, a linters.Agent) error {
 		}
 	}
 	jarfile, err := stylecheckJar()
-	if (len(javaFiles) > 0) && linters.IsExist(rulePath) && linters.IsEmpty(a.LinterConfig.Args...) && err == nil {
+	if err != nil {
+		log.Errorf("style jar check failed: %v", err)
+	}
+	if (len(javaFiles) > 0) && linters.IsExist(rulePath) && linters.IsExist(jarfile) && linters.IsEmpty(a.LinterConfig.Args...) && err == nil {
 		args := append([]string{}, "-jar", jarfile)
 		args = append(args, javaFiles...)
 		args = append(args, "-c", rulePath)
 		a.LinterConfig.Args = args
-		a.LinterConfig.Command = "java"
-		a.LinterConfig.LinterName = "stylecheck"
+		if a.LinterConfig.Command == "" || a.LinterConfig.Command == linterName {
+			a.LinterConfig.Command = "java"
+		}
+		if a.LinterConfig.LinterName == "" {
+			a.LinterConfig.LinterName = linterName
+		}
 
 	}
 
@@ -72,17 +79,13 @@ func trimReport(line string) string {
 }
 
 func stylecheckJar() (string, error) {
-	var stykejar = "/usr/local/checkstyle-10.17.0-all.jar"
-	if linters.IsExist(stykejar) {
-		return stykejar, nil
+	var stylejar = "/usr/local/checkstyle-10.17.0-all.jar"
+	if linters.IsExist(stylejar) {
+		return stylejar, nil
 
 	}
 	var stylejarurl = "https://github.com/checkstyle/checkstyle/releases/download/checkstyle-10.17.0/checkstyle-10.17.0-all.jar"
 	var stykejarfilename = "checkstyle-10.17.0-all.jar"
-	res, err := http.Get(stylejarurl)
-	if err != nil {
-		return "", fmt.Errorf("The file download  encountered  an error，Please check the file  download url: %v", err)
-	}
 	filePath, err := os.Getwd()
 	if err != nil {
 		log.Errorf("get work dir failed: %v", err)
@@ -92,6 +95,11 @@ func stylecheckJar() (string, error) {
 	if linters.IsExist(filename2) {
 		return filename2, nil
 	}
+	res, err := http.Get(stylejarurl)
+	if err != nil {
+		return "", fmt.Errorf("The file download  encountered  an error，Please check the file  download url: %v", err)
+	}
+
 	madirerr := os.MkdirAll(filePath, 0755)
 	if madirerr != nil {
 		return "", madirerr
