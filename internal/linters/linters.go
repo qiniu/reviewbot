@@ -332,13 +332,12 @@ func GeneralLineParser(line string) (*LinterOutput, error) {
 	}
 	matches := regex.FindStringSubmatch(line)
 
-	if len(matches) < 4 {
+	if len(matches) != 5 {
 		return nil, fmt.Errorf("unexpected format, original: %s", line)
 	}
 
 	lineNumber, err := strconv.ParseInt(matches[2], 10, 64)
 	if err != nil {
-
 		return nil, fmt.Errorf("unexpected line number: %s, err: %v, original line: %v", matches[2], err, line)
 	}
 
