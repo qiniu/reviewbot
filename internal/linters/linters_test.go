@@ -29,6 +29,19 @@ func TestFormatStaticcheckLine(t *testing.T) {
 		input    string
 		expected *LinterOutput
 	}{
+
+		{"cdn.v1/ratelimit/limiter/memory.go:134: 134-161 lines are duplicate of", &LinterOutput{
+			File:    "cdn.v1/ratelimit/limiter/memory.go",
+			Line:    134,
+			Column:  0,
+			Message: "134-161 lines are duplicate of",
+		}},
+		{"config/config_test.go:11: Function 'TestConfig' is too long (129 > 60) (funlen)", &LinterOutput{
+			File:    "config/config_test.go",
+			Line:    11,
+			Column:  0,
+			Message: "Function 'TestConfig' is too long (129 > 60) (funlen)",
+		}},
 		{"cdn-admin.v2/client/dns/dnsapi.go:59:3: assignment to err", &LinterOutput{
 			File:    "cdn-admin.v2/client/dns/dnsapi.go",
 			Line:    59,

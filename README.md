@@ -26,7 +26,7 @@ If you are facing similar challenges, we welcome you to try **Reviewbot**!
 
 - go linters
   - [golangci-lint](/internal/linters/go/golangci_lint/)
-  - [gofmt](/internal/linters/go/staticcheck/)
+  - [gofmt](/internal/linters/go/gofmt/)
 - c/c++ linters
   - [cppcheck](/internal/linters/c/cppcheck/)
 - lua linters
