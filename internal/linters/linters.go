@@ -342,25 +342,21 @@ func GeneralLineParser(line string) (*LinterOutput, error) {
 	}
 
 	var column int64
-	message := matches[3]
-	if len(matches) > 4 {
-		if matches[3] != "" {
-			columnNumber, err := strconv.ParseInt(matches[3], 10, 64)
-			if err != nil {
-				log.Errorf("match  failed: %v", err)
-				return nil, err
-			}
-			column = columnNumber
-		}
 
-		message = matches[4]
+	if matches[3] != "" {
+		columnNumber, err := strconv.ParseInt(matches[3], 10, 64)
+		if err != nil {
+			log.Errorf("match  failed: %v", err)
+			return nil, err
+		}
+		column = columnNumber
 
 	}
 	return &LinterOutput{
 		File:    matches[1],
 		Line:    int(lineNumber),
 		Column:  int(column),
-		Message: message,
+		Message: matches[4],
 	}, nil
 }
 
