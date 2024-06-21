@@ -328,8 +328,7 @@ func GeneralLineParser(line string) (*LinterOutput, error) {
 	pattern := `^(.*?):(\d+):(\d+)?:? (.*)$`
 	regex, err := regexp.Compile(pattern)
 	if err != nil {
-		log.Errorf("compile regex failed: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to compile regex: %v, err: %v", pattern, err)
 	}
 	matches := regex.FindStringSubmatch(line)
 
@@ -339,7 +338,8 @@ func GeneralLineParser(line string) (*LinterOutput, error) {
 
 	lineNumber, err := strconv.ParseInt(matches[2], 10, 64)
 	if err != nil {
-		return nil, err
+
+		return nil, fmt.Errorf("unexpected line number: %s, err: %v, original line: %v", matches[2], err, line)
 	}
 
 	var column int64
