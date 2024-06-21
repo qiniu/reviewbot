@@ -199,8 +199,9 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 			return err
 		}
 		log.Infof("[%s] create check run success, HTML_URL: %v", linterName, ch.GetHTMLURL())
-		if err := metric.NotifyWebhook(constructMessage(linterName, a.PullRequestEvent.GetPullRequest().GetHTMLURL(), ch.GetHTMLURL(), lintResults)); err != nil {
-			log.Errorf("failed to send alert message: %v", err)
+		var msg = constructMessage(linterName, a.PullRequestEvent.GetPullRequest().GetHTMLURL(), ch.GetHTMLURL(), lintResults)
+		if err := metric.NotifyWebhook(msg); err != nil {
+			log.Errorf("failed to send alert message, err: %v, msg: %v", err, msg)
 			// just log the error, not return
 		}
 	case config.GithubPRReview:
@@ -240,8 +241,9 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 			return err
 		}
 		log.Infof("[%s] add %d comments for this PR %d (%s) \n", linterName, len(addedCmts), num, orgRepo)
-		if err := metric.NotifyWebhook(constructMessage(linterName, a.PullRequestEvent.GetPullRequest().GetHTMLURL(), addedCmts[0].GetHTMLURL(), lintResults)); err != nil {
-			log.Errorf("failed to send alert message: %v", err)
+		var msg = constructMessage(linterName, a.PullRequestEvent.GetPullRequest().GetHTMLURL(), addedCmts[0].GetHTMLURL(), lintResults)
+		if err := metric.NotifyWebhook(msg); err != nil {
+			log.Errorf("failed to send alert message, err: %v, msg: %v", err, msg)
 			// just log the error, not return
 		}
 	default:
@@ -314,7 +316,7 @@ func Parse(log *xlog.Logger, output []byte, lineParser LineParser) (map[string][
 			// seed the alert message if the linter output is unexpected
 			// so that we can know the issue and fix it
 			if err := metric.NotifyWebhook(msg); err != nil {
-				log.Errorf("failed to send alert message: %v", err)
+				log.Errorf("failed to send alert message, err: %v, msg: %v", err, msg)
 				// just log the error, not return
 			}
 		}
