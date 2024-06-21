@@ -341,21 +341,21 @@ func GeneralLineParser(line string) (*LinterOutput, error) {
 		return nil, fmt.Errorf("unexpected line number: %s, err: %v, original line: %v", matches[2], err, line)
 	}
 
-	var column int64
+	var columnNumber int64
 
 	if matches[3] != "" {
-		columnNumber, err := strconv.ParseInt(matches[3], 10, 64)
+		column, err := strconv.ParseInt(matches[3], 10, 64)
 		if err != nil {
 			log.Errorf("match  failed: %v", err)
 			return nil, err
 		}
-		column = columnNumber
+		columnNumber = column
 
 	}
 	return &LinterOutput{
 		File:    matches[1],
 		Line:    int(lineNumber),
-		Column:  int(column),
+		Column:  int(columnNumber),
 		Message: matches[4],
 	}, nil
 }
