@@ -55,6 +55,12 @@ func TestFormatStaticcheckLine(t *testing.T) {
 			Column:  0,
 			Message: "文件未以空行结尾。 [NewlineAtEndOfFile]",
 		}},
+		{"dn_scheduler/scheduler/node_scheduler/consistent/consistent_test.go:275: 275-304 lines are duplicate of", &LinterOutput{
+			File:    "dn_scheduler/scheduler/node_scheduler/consistent/consistent_test.go",
+			Line:    275,
+			Column:  0,
+			Message: "275-304 lines are duplicate of",
+		}},
 		{"cdn-admin.v2/api/api_line.go:342 should replace loop with ret = append(ret, scope.EdgeNodes...)", nil},
 	}
 

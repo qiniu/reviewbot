@@ -7,7 +7,7 @@
 globalDefaultConfig: # global default settings, will be overridden by qbox org and repo specific settings if they exist
   githubReportType: "github_check_run" # github_pr_review, github_check_run
   golangcilintConfig: "config/linters-config/.golangci.yml" # golangci-lint config file to use
-  javapmdcheckruleConfig: "config/linters-config/.java-bestpractices.xml"
+  javapmdcheckruleConfig: "config/linters-config/.java-bestpractices.xml"   #cd
   javastylecheckruleConfig: "config/linters-config/.java-sun-checks.xml"
 
 customConfig: # custom config for specific orgs or repos
