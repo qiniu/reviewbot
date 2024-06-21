@@ -1,2 +1,5 @@
 reviewbot
 .vscode
+.idea
+.DS_Store
+*.jar
