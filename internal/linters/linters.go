@@ -346,8 +346,7 @@ func GeneralLineParser(line string) (*LinterOutput, error) {
 	if matches[3] != "" {
 		column, err := strconv.ParseInt(matches[3], 10, 64)
 		if err != nil {
-			log.Errorf("match  failed: %v", err)
-			return nil, err
+			return nil, fmt.Errorf("unexpected column number: %s, err: %v, original line: %v", matches[3], err, line)
 		}
 		columnNumber = column
 
