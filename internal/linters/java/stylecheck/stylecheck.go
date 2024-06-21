@@ -33,29 +33,33 @@ func stylecheckHandler(log *xlog.Logger, a linters.Agent) error {
 	if err != nil {
 		log.Errorf("style jar check failed: %v", err)
 	}
-	if (len(javaFiles) > 0) && linters.IsExist(rulePath) && linters.IsExist(jarfile) && err == nil {
-		if linters.IsEmpty(a.LinterConfig.Args...) {
-			args := append([]string{}, "-jar", jarfile)
-			args = append(args, javaFiles...)
-			args = append(args, "-c", rulePath)
-			a.LinterConfig.Args = args
-		}
-		if a.LinterConfig.Command == "" || a.LinterConfig.Command == linterName {
-			a.LinterConfig.Command = "java"
-		}
-		if a.LinterConfig.LinterName == "" {
-			a.LinterConfig.LinterName = linterName
-		}
+	if (len(javaFiles) <= 0) || !linters.IsExist(rulePath) || linters.IsExist(jarfile) && err != nil {
+		return nil
+	}
 
+	if linters.IsEmpty(a.LinterConfig.Args...) {
+		args := append([]string{}, "-jar", jarfile)
+		args = append(args, javaFiles...)
+		args = append(args, "-c", rulePath)
+		a.LinterConfig.Args = args
+	}
+	if a.LinterConfig.Command == "" || a.LinterConfig.Command == linterName {
+		a.LinterConfig.Command = "java"
+	}
+	if a.LinterConfig.LinterName == "" {
+		a.LinterConfig.LinterName = linterName
 	}
 
 	return linters.GeneralHandler(log, a, func(l *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, error) {
-		output = []byte(trimReport(string(output)))
+		//output = []byte(trimReport(string(output)))
 		return linters.Parse(log, output, stylecheckParser)
 	})
 }
 
 func stylecheckParser(line string) (*linters.LinterOutput, error) {
+	if strings.EqualFold(line, "checkstyle") {
+		return nil, nil
+	}
 	lineResult, err := linters.GeneralLineParser(line)
 	if err != nil {
 		return nil, err

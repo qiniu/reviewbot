@@ -1,7 +1,6 @@
 package pmdcheck
 
 import (
-	"regexp"
 	"strings"
 
 	"github.com/qiniu/reviewbot/internal/linters"
@@ -25,30 +24,32 @@ func pmdcheckHandler(log *xlog.Logger, a linters.Agent) error {
 			javaFiles = append(javaFiles, a.LinterConfig.WorkDir+"/"+arg.GetFilename())
 		}
 	}
-
-	if (len(javaFiles) > 0) && linters.IsExist(rulePath) {
-		if linters.IsEmpty(a.LinterConfig.Args...) {
-			args := append([]string{}, "check")
-			args = append(args, "-f", "emacs")
-			args = append(args, javaFiles...)
-			args = append(args, "-R", rulePath)
-			a.LinterConfig.Args = args
-		}
-		if a.LinterConfig.Command == "" || a.LinterConfig.Command == linterName {
-			a.LinterConfig.Command = "pmd"
-		}
-		if a.LinterConfig.LinterName == "" {
-			a.LinterConfig.LinterName = linterName
-		}
+	if (len(javaFiles) <= 0) || !linters.IsExist(rulePath) {
+		return nil
+	}
+	if linters.IsEmpty(a.LinterConfig.Args...) {
+		args := append([]string{}, "check")
+		args = append(args, "-f", "emacs")
+		args = append(args, javaFiles...)
+		args = append(args, "-R", rulePath)
+		a.LinterConfig.Args = args
+	}
+	if a.LinterConfig.Command == "" || a.LinterConfig.Command == linterName {
+		a.LinterConfig.Command = "pmd"
+	}
+	if a.LinterConfig.LinterName == "" {
+		a.LinterConfig.LinterName = linterName
 	}
 
 	return linters.GeneralHandler(log, a, func(l *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, error) {
-		output = []byte(trimReport(string(output)))
 		return linters.Parse(log, output, pmdcheckParser)
 	})
 }
 
 func pmdcheckParser(line string) (*linters.LinterOutput, error) {
+	if strings.Contains(line, "[WARN]") {
+		return nil, nil
+	}
 	lineResult, err := linters.GeneralLineParser(line)
 	if err != nil {
 		return nil, err
@@ -60,10 +61,4 @@ func pmdcheckParser(line string) (*linters.LinterOutput, error) {
 		Column:  lineResult.Column,
 		Message: strings.ReplaceAll(strings.ReplaceAll(lineResult.Message, "\x1b[0m\x1b[1m", ""), "\x1b[0m", ""),
 	}, nil
-}
-
-func trimReport(line string) string {
-	re := regexp.MustCompile("(?m)^.*WARN.*$[\r\n]")
-	line = re.ReplaceAllString(line, "")
-	return line
 }

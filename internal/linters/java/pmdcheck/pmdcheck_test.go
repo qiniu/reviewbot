@@ -22,27 +22,6 @@ import (
 	"github.com/qiniu/reviewbot/internal/linters"
 )
 
-func TestTrimReport(t *testing.T) {
-	tc := []struct {
-		input    string
-		expected string
-	}{
-		{"[WARN] Progressbar rendering conflicts with reporting to STDOUT. No progressbar will be shown. Try running with argument -r <file> to output the report to a file instead.\n[WARN] This analysis could be faster, please consider using Incremental Analysis: https://docs.pmd-code.org/pmd-doc-7.1.0/pmd_userdocs_incremental_analysis.html\n/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java:22: Avoid unused local variables such as 'ic'.", "/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java:22: Avoid unused local variables such as 'ic'."},
-	}
-
-	for _, c := range tc {
-		output := trimReport(c.input)
-		if output != "" {
-			if output != c.expected {
-				t.Errorf("expected: %v, got: %v", c.expected, output)
-			}
-			continue
-		}
-		t.Errorf("expected: %v, got: %v", c.expected, output)
-		
-	}
-
-}
 func TestFormatPmdCheckLine(t *testing.T) {
 	tc := []struct {
 		input    string
