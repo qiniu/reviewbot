@@ -169,8 +169,11 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 		org        = a.PullRequestEvent.Repo.GetOwner().GetLogin()
 		repo       = a.PullRequestEvent.Repo.GetName()
 		orgRepo    = a.PullRequestEvent.Repo.GetFullName()
-		linterName = If(a.LinterConfig.LinterName != "", a.LinterConfig.LinterName, a.LinterConfig.Command)
+		linterName = a.LinterConfig.LinterName
 	)
+	if a.LinterConfig.LinterName == "" {
+		linterName = a.LinterConfig.Command
+	}
 
 	log.Infof("[%s] found total %d files with %d lint errors on repo %v", linterName, len(lintResults), countLinterErrors(lintResults), orgRepo)
 	lintResults, err := Filters(log, a, lintResults)
