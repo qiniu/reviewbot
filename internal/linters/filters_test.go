@@ -197,3 +197,79 @@ func TestFilters(t *testing.T) {
 		})
 	}
 }
+
+func TestLinterRelated(t *testing.T) {
+	tcs := []struct {
+		name     string
+		linter   string
+		a        Agent
+		langs    []string
+		expected bool
+	}{
+		{
+			name:   "related",
+			linter: "golangci-lint",
+			a: Agent{
+				PullRequestChangedFiles: []*github.CommitFile{
+					{
+						Filename: github.String(".testdata/xxx_1.go"),
+					},
+				},
+			},
+			langs:    []string{".go"},
+			expected: true,
+		},
+		{
+			name:   "not related",
+			linter: "golangci-lint",
+			a: Agent{
+				PullRequestChangedFiles: []*github.CommitFile{
+					{
+						Filename: github.String("abc.sh"),
+					},
+				},
+			},
+			langs:    []string{".go"},
+			expected: false,
+		},
+		{
+			name:   "related",
+			linter: "git-flow",
+			a: Agent{
+				PullRequestChangedFiles: []*github.CommitFile{
+					{
+						Filename: github.String("abc.sh"),
+					},
+				},
+			},
+			langs:    []string{"*"},
+			expected: true,
+		},
+		{
+			name:   "related",
+			linter: "git-flow",
+			a: Agent{
+				PullRequestChangedFiles: []*github.CommitFile{
+					{
+						Filename: github.String("main.c"),
+					},
+					{
+						Filename: github.String("main.cpp"),
+					},
+				},
+			},
+			langs:    []string{".c", ".go"},
+			expected: true,
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			RegisterLinterLanguages(tc.linter, tc.langs)
+			actual := LinterRelated(tc.linter, tc.a)
+			if actual != tc.expected {
+				t.Errorf("expected %v, got %v, linter: %v, PR: %v", tc.expected, actual, tc.linter, tc.a.PullRequestChangedFiles)
+			}
+		})
+	}
+}

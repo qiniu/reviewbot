@@ -145,6 +145,11 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 			PullRequestChangedFiles: pullRequestAffectedFiles,
 		}
 
+		if !linters.LinterRelated(name, agent) {
+			log.Infof("[%s] linter is not related to the PR, skipping", name)
+			continue
+		}
+
 		if err := fn(log, agent); err != nil {
 			log.Errorf("failed to run linter: %v", err)
 			// continue to run other linters

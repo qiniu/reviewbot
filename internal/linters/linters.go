@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -179,13 +178,6 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 	}
 
 	log.Infof("[%s] found %d files with valid %d linter errors related to this PR %d (%s) \n", linterName, len(lintResults), countLinterErrors(lintResults), num, orgRepo)
-
-	// only not report when there is no lint errors and the linter is not related to the PR
-	// see https://github.com/qiniu/reviewbot/issues/108#issuecomment-2042217108
-	if len(lintResults) == 0 && !languageRelated(linterName, exts(a.PullRequestChangedFiles)) {
-		log.Debugf("[%s] no lint errors found and not languages related, skip report", linterName)
-		return nil
-	}
 
 	if len(lintResults) > 0 {
 		metric.IncIssueCounter(orgRepo, linterName, a.PullRequestEvent.PullRequest.GetHTMLURL(), a.PullRequestEvent.GetPullRequest().GetHead().GetSHA(), float64(countLinterErrors(lintResults)))
@@ -378,27 +370,6 @@ func IsEmpty(args ...string) bool {
 		}
 	}
 	return true
-}
-
-func exts(changes []*github.CommitFile) map[string]bool {
-	var exts = make(map[string]bool)
-	for _, change := range changes {
-		ext := filepath.Ext(change.GetFilename())
-		if ext == "" {
-			continue
-		}
-		exts[ext] = true
-	}
-	return exts
-}
-
-func languageRelated(linterName string, exts map[string]bool) bool {
-	for _, language := range Languages(linterName) {
-		if exts[language] {
-			return true
-		}
-	}
-	return false
 }
 
 func countLinterErrors(lintResults map[string][]LinterOutput) int {
