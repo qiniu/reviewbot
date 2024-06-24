@@ -41,7 +41,7 @@ type MsgContent struct {
 // NotifyWebhook sends message to wework group
 // refer: https://developer.work.weixin.qq.com/document/path/91770
 func NotifyWebhook(message MessageBody) error {
-	if WEWORK_WEBHOOK == "" {
+	if WEWORK_WEBHOOK == "" || (message.Text.Content == "" && message.Markdown.Content == "") {
 		return nil
 	}
 
