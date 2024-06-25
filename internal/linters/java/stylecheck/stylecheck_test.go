@@ -47,7 +47,7 @@ func TestCheckJar(t *testing.T) {
 	if err != nil {
 		t.Errorf("styleJarCheck(): %v, expected: %v", err, nil)
 	}
-	if path != "/usr/local/checkstyle-10.17.0-all.jar" {
+	if path != filename2 {
 		t.Errorf("styleJarCheck(): %v, expected: %v", path, filename2)
 	}
 
