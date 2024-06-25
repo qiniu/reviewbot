@@ -1,7 +1,6 @@
 package pmdcheck
 
 import (
-	"fmt"
 	"github.com/qiniu/x/log"
 	"io"
 	"net/http"
@@ -68,24 +67,27 @@ func pmdcheckParser(log *xlog.Logger, output []byte) (map[string][]linters.Linte
 	return linters.Parse(log, output, lineParse)
 }
 
-func getFileFromUrl(url string, filepath string) (string, error) {
+func getFileFromURl(url string, filepath string) (string, error) {
 	if linters.IsExist(filepath) {
 		return filepath, nil
 	}
 	res, err := http.Get(url)
 	if err != nil {
-		return "", fmt.Errorf("The file download  encountered  an error，Please check the file  download url: %v,the error is:%v", url, err)
+		log.Errorf("The file download  encountered  an error，Please check the file  download url: %v,the error is:%v", url, err)
+		return "", err
 	}
 
 	f, err := os.Create(filepath)
 	if err != nil {
-		return "", fmt.Errorf("The file saving   encountered an error,Please check the directory: %v", err)
+		log.Errorf("The file saving   encountered an error,Please check the directory: %v", err)
+		return "", err
 	}
 	_, err = io.Copy(f, res.Body)
 	defer res.Body.Close()
 
 	if err != nil {
-		return "", fmt.Errorf("The file saving   encountered an error: %v", err)
+		log.Errorf("The file saving   encountered an error: %v", err)
+		return "", err
 	}
 	if linters.IsExist(filepath) {
 		log.Infof("pmd  rule check succes,file path: %v", filepath)
@@ -106,14 +108,17 @@ func pmdRuleCheck(pmdConf string) (string, error) {
 	rulefilepath := filepath.Join(rulefiledirpath, ".bestpractices.xml")
 	madirerr := os.MkdirAll(rulefiledirpath, 0755)
 	if madirerr != nil {
-		return "", fmt.Errorf("dir make failed: %v", err)
+		log.Errorf("dir make failed: %v", err)
+		return "", err
 	}
 	if strings.HasPrefix(pmdConf, "http") {
-		downloadfilepath, err := getFileFromUrl(pmdConf, rulefilepath)
+		downloadfilepath, err := getFileFromURl(pmdConf, rulefilepath)
 		if err != nil {
-			return "", fmt.Errorf("the pmd rule file download faild: %v", err)
+			log.Errorf("the pmd rule file download faild: %v", err)
+			return "", err
 		}
 		return downloadfilepath, nil
 	}
-	return "", fmt.Errorf("the pmd rule file not exist: %v", err)
+	log.Errorf("the pmd rule file not exist: %v", err)
+	return "", err
 }
