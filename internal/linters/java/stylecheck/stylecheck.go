@@ -91,7 +91,8 @@ func stylecheckJar() (string, error) {
 	}
 	res, err := http.Get(stylejarurl)
 	if err != nil {
-		return "", fmt.Errorf("The file download  encountered  an error，Please check the file  download url: %v", err)
+		log.Errorf("The file download  encountered  an error，Please check the file  download url: %v", err)
+		return "", err
 	}
 	madirerr := os.MkdirAll(filePath, 0755)
 	if madirerr != nil {
@@ -99,42 +100,46 @@ func stylecheckJar() (string, error) {
 	}
 	f, err := os.Create(filename2)
 	if err != nil {
-		fmt.Println(f, err)
-		return "", fmt.Errorf("The file saving   encountered an error,Please check the directory: %v", err)
+		log.Errorf("The file saving   encountered an error,Please check the directory: %v", err)
+		return "", err
 	}
 	_, err = io.Copy(f, res.Body)
 	defer res.Body.Close()
 
 	if err != nil {
-		return "", fmt.Errorf("The file saving   encountered an error: %v", err)
+		log.Errorf("The file saving   encountered an error: %v", err)
+		return "", err
 	}
 	if linters.IsExist(filename2) {
 
-		fmt.Printf("style jar download success : %v", err)
+		log.Infof("style jar download success : %v", err)
 		return filename2, nil
 	}
-	return "", fmt.Errorf("The style jar file download  encountered  an error")
+	log.Errorf("The style jar file download  encountered  an error:%v", err)
+	return "", err
 
 }
-func getFileFromUrl(url string, filepath string) (string, error) {
+func getFileFromURl(url string, filepath string) (string, error) {
 	if linters.IsExist(filepath) {
 		return filepath, nil
 	}
 	res, err := http.Get(url)
 	if err != nil {
-		return "", fmt.Errorf("The file download  encountered  an error，Please check the file  download url: %v,the error is:%v", url, err)
+		log.Errorf("The file download  encountered  an error，Please check the file  download url: %v,the error is:%v", url, err)
+		return "", err
 	}
 
 	f, err := os.Create(filepath)
 	if err != nil {
-
-		return "", fmt.Errorf("The file saving   encountered an error,Please check the directory: %v", err)
+		log.Errorf("The file saving   encountered an error,Please check the directory: %v", err)
+		return "", err
 	}
 	_, err = io.Copy(f, res.Body)
 	defer res.Body.Close()
 
 	if err != nil {
-		return "", fmt.Errorf("The file saving   encountered an error: %v", err)
+		log.Errorf("The file saving   encountered an error: %v", err)
+		return "", err
 	}
 	if linters.IsExist(filepath) {
 		log.Infof("style  rule check succes,file path: %v", filepath)
@@ -158,11 +163,14 @@ func styleRuleCheck(styleConf string) (string, error) {
 		return "", fmt.Errorf("dir make failed: %v", err)
 	}
 	if strings.HasPrefix(styleConf, "http") {
-		downloadfilepath, err := getFileFromUrl(styleConf, rulefilepath)
+		downloadfilepath, err := getFileFromURl(styleConf, rulefilepath)
 		if err != nil {
-			return "", fmt.Errorf("the style rule file download faild: %v", err)
+			log.Errorf("the style rule file download faild: %v", err)
+
+			return "", err
 		}
 		return downloadfilepath, nil
 	}
-	return "", fmt.Errorf("the style rule file not exist: %v", err)
+	log.Errorf("the style rule file not exist: %v", err)
+	return "", err
 }
