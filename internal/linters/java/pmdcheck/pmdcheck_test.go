@@ -19,12 +19,27 @@ package pmdcheck
 import (
 	"github.com/qiniu/x/errors"
 	"github.com/qiniu/x/xlog"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
 	"github.com/qiniu/reviewbot/internal/linters"
 )
 
+func TestForConfig(t *testing.T) {
+	fileDir, err := os.Getwd()
+	rulefiledirpath := filepath.Join(fileDir, "config/linters-config")
+	rulefilepath := filepath.Join(rulefiledirpath, ".bestpractices.xml")
+	path, err := pmdRuleCheck("https://raw.githubusercontent.com/pmd/pmd/master/pmd-java/src/main/resources/category/java/bestpractices.xml")
+	if err != nil {
+		t.Errorf("pmdRuleCheck(): %v, expected: %v", err, nil)
+	}
+	if path != rulefilepath {
+		t.Errorf("pmdRuleCheck(): %v, expected: %v", path, rulefilepath)
+	}
+
+}
 func TestFormatPmdCheckLine(t *testing.T) {
 	tc := []struct {
 		input    []byte
@@ -67,4 +82,5 @@ func TestFormatPmdCheckLine(t *testing.T) {
 			t.Errorf("pmdcheckParser(): %v, expected: %v", got, c.expected)
 		}
 	}
+
 }

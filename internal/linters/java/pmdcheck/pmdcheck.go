@@ -33,7 +33,7 @@ func pmdcheckHandler(log *xlog.Logger, a linters.Agent) error {
 	if checkerr != nil {
 		log.Errorf("pmd rule file check failed: %v", checkerr)
 	}
-	log.Infof("sytle  rule check succes,file path: %v", checkrulePath)
+	log.Infof("pmd  rule check succes,file path: %v", checkrulePath)
 	if (len(javaFiles) <= 0) || !linters.IsExist(checkrulePath) || checkerr != nil {
 		return nil
 	}
