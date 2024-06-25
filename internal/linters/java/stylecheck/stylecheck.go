@@ -81,7 +81,6 @@ func stylecheckJar() (string, error) {
 	var stykejarfilename = "checkstyle-10.17.0-all.jar"
 	filePath, err := os.Getwd()
 	if err != nil {
-		log.Errorf("get work dir failed: %v", err)
 		return "", err
 	}
 	filename2 := filepath.Join(filePath, stykejarfilename)
@@ -91,7 +90,6 @@ func stylecheckJar() (string, error) {
 	}
 	res, err := http.Get(stylejarurl)
 	if err != nil {
-		log.Errorf("The file download  encountered  an error，Please check the file  download url: %v", err)
 		return "", err
 	}
 	madirerr := os.MkdirAll(filePath, 0755)
@@ -100,22 +98,17 @@ func stylecheckJar() (string, error) {
 	}
 	f, err := os.Create(filename2)
 	if err != nil {
-		log.Errorf("The file saving   encountered an error,Please check the directory: %v", err)
 		return "", err
 	}
 	_, err = io.Copy(f, res.Body)
 	defer res.Body.Close()
-
 	if err != nil {
-		log.Errorf("The file saving   encountered an error: %v", err)
 		return "", err
 	}
 	if linters.IsExist(filename2) {
-
 		log.Infof("style jar download success : %v", err)
 		return filename2, nil
 	}
-	log.Errorf("The style jar file download  encountered  an error:%v", err)
 	return "", err
 
 }
@@ -125,24 +118,20 @@ func getFileFromURL(url string, filepath string) (string, error) {
 	}
 	res, err := http.Get(url)
 	if err != nil {
-		log.Errorf("The file download  encountered  an error，Please check the file  download url: %v,the error is:%v", url, err)
 		return "", err
 	}
 
 	f, err := os.Create(filepath)
 	if err != nil {
-		log.Errorf("The file saving   encountered an error,Please check the directory: %v", err)
 		return "", err
 	}
 	_, err = io.Copy(f, res.Body)
 	defer res.Body.Close()
 
 	if err != nil {
-		log.Errorf("The file saving   encountered an error: %v", err)
 		return "", err
 	}
 	if linters.IsExist(filepath) {
-		log.Infof("style  rule check succes,file path: %v", filepath)
 		return filepath, nil
 	}
 	return "", err
@@ -165,12 +154,10 @@ func styleRuleCheck(styleConf string) (string, error) {
 	if strings.HasPrefix(styleConf, "http") {
 		downloadfilepath, err := getFileFromURL(styleConf, rulefilepath)
 		if err != nil {
-			log.Errorf("the style rule file download faild: %v", err)
 
 			return "", err
 		}
 		return downloadfilepath, nil
 	}
-	log.Errorf("the style rule file not exist: %v", err)
 	return "", err
 }
