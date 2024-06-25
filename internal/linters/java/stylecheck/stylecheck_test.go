@@ -39,6 +39,17 @@ func TestForConfig(t *testing.T) {
 	}
 
 }
+func TestCheckJar(t *testing.T) {
+
+	path, err := stylecheckJar()
+	if err != nil {
+		t.Errorf("styleJarCheck(): %v, expected: %v", err, nil)
+	}
+	if path != "/usr/local/checkstyle-10.17.0-all.jar" {
+		t.Errorf("styleJarCheck(): %v, expected: %v", path, "/usr/local/checkstyle-10.17.0-all.jar")
+	}
+
+}
 func TestFormatStyleCheckLine(t *testing.T) {
 	tc := []struct {
 		input    []byte

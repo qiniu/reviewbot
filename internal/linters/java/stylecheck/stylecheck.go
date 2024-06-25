@@ -119,7 +119,7 @@ func stylecheckJar() (string, error) {
 	return "", err
 
 }
-func getFileFromURl(url string, filepath string) (string, error) {
+func getFileFromURL(url string, filepath string) (string, error) {
 	if linters.IsExist(filepath) {
 		return filepath, nil
 	}
@@ -163,7 +163,7 @@ func styleRuleCheck(styleConf string) (string, error) {
 		return "", fmt.Errorf("dir make failed: %v", err)
 	}
 	if strings.HasPrefix(styleConf, "http") {
-		downloadfilepath, err := getFileFromURl(styleConf, rulefilepath)
+		downloadfilepath, err := getFileFromURL(styleConf, rulefilepath)
 		if err != nil {
 			log.Errorf("the style rule file download faild: %v", err)
 
