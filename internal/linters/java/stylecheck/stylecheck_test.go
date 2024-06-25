@@ -40,13 +40,15 @@ func TestForConfig(t *testing.T) {
 
 }
 func TestCheckJar(t *testing.T) {
-
+	var stykejarfilename = "checkstyle-10.17.0-all.jar"
+	filePath, err := os.Getwd()
+	filename2 := filepath.Join(filePath, stykejarfilename)
 	path, err := stylecheckJar()
 	if err != nil {
 		t.Errorf("styleJarCheck(): %v, expected: %v", err, nil)
 	}
 	if path != "/usr/local/checkstyle-10.17.0-all.jar" {
-		t.Errorf("styleJarCheck(): %v, expected: %v", path, "/usr/local/checkstyle-10.17.0-all.jar")
+		t.Errorf("styleJarCheck(): %v, expected: %v", path, filename2)
 	}
 
 }
