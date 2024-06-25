@@ -17,7 +17,11 @@
 package linters
 
 import (
+	"fmt"
+	"reflect"
 	"testing"
+
+	"github.com/qiniu/reviewbot/internal/metric"
 )
 
 func TestFormatStaticcheckLine(t *testing.T) {
@@ -25,6 +29,19 @@ func TestFormatStaticcheckLine(t *testing.T) {
 		input    string
 		expected *LinterOutput
 	}{
+
+		{"cdn.v1/ratelimit/limiter/memory.go:134: 134-161 lines are duplicate of", &LinterOutput{
+			File:    "cdn.v1/ratelimit/limiter/memory.go",
+			Line:    134,
+			Column:  0,
+			Message: "134-161 lines are duplicate of",
+		}},
+		{"config/config_test.go:11: Function 'TestConfig' is too long (129 > 60) (funlen)", &LinterOutput{
+			File:    "config/config_test.go",
+			Line:    11,
+			Column:  0,
+			Message: "Function 'TestConfig' is too long (129 > 60) (funlen)",
+		}},
 		{"cdn-admin.v2/client/dns/dnsapi.go:59:3: assignment to err", &LinterOutput{
 			File:    "cdn-admin.v2/client/dns/dnsapi.go",
 			Line:    59,
@@ -104,18 +121,18 @@ func TestIsEmpty(t *testing.T) {
 	}
 }
 
-func TestConstructMKAlertMessage(t *testing.T) {
+func TestConstructMessage(t *testing.T) {
 	tcs := []struct {
 		Linter        string
 		PR            string
 		Link          string
 		linterResults map[string][]LinterOutput
-		expected      string
+		expected      metric.MessageBody
 	}{
 		{
 			Linter: "golangci-lint",
-			PR:     "",
-			Link:   "",
+			PR:     "1",
+			Link:   "http://",
 			linterResults: map[string][]LinterOutput{
 				"cdn-admin.v2/client/dns/dnsapi.go": {
 					{
@@ -126,20 +143,25 @@ func TestConstructMKAlertMessage(t *testing.T) {
 					},
 				},
 			},
-			expected: `{"msgtype":"text","text":{"content":"Linter: golangci-lint \nPR:    \nLink:  \nDetails:\ncdn-admin.v2/client/dns/dnsapi.go:59:3: assignment to err\n\n"}}`,
+			expected: metric.MessageBody{
+				MsgType: "text",
+				Text: metric.MsgContent{
+					Content: fmt.Sprintf("Linter: %v \nPR:   %v \nLink: %v \nDetails:\n%v\n", "golangci-lint", "1", "http://", "cdn-admin.v2/client/dns/dnsapi.go:59:3: assignment to err\n"),
+				},
+			},
 		},
 		{
 			Linter:        "golangci-lint",
 			PR:            "",
 			Link:          "",
 			linterResults: map[string][]LinterOutput{},
-			expected:      "",
+			expected:      metric.MessageBody{},
 		},
 	}
 
 	for _, tc := range tcs {
-		actual := constructMKAlertMessage(tc.Linter, tc.PR, tc.Link, tc.linterResults)
-		if actual != tc.expected {
+		actual := constructMessage(tc.Linter, tc.PR, tc.Link, tc.linterResults)
+		if !reflect.DeepEqual(tc.expected, actual) {
 			t.Errorf("expected: %v, got: %v", tc.expected, actual)
 		}
 	}

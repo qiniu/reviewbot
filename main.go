@@ -18,9 +18,12 @@ package main
 
 import (
 	"errors"
+	"expvar"
 	"flag"
 	"fmt"
+	"net"
 	"net/http"
+	"net/http/pprof"
 	"os"
 
 	"github.com/google/go-github/v57/github"
@@ -144,6 +147,22 @@ func main() {
 	mux.Handle("/metrics", promhttp.Handler())
 	log.Infof("listening on port %d", o.port)
 
+	debugMux := http.NewServeMux()
+	debugMux.HandleFunc("/debug/pprof/", pprof.Index)
+	debugMux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	debugMux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	debugMux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	debugMux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	debugMux.Handle("/debug/vars", http.HandlerFunc(expvar.Handler().ServeHTTP))
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		log.Fatalf("failed to listen: %v\n", err)
+	}
+	defer listener.Close()
+	log.Infof("debug port running in: %s\n", listener.Addr().String())
+	go func() {
+		log.Fatal(http.Serve(listener, debugMux))
+	}()
 	// TODO(CarlJi): graceful shutdown
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", o.port), mux))
 }

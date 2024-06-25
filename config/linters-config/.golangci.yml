@@ -17,14 +17,14 @@ linters:
   # Disable specific linter
   disable:
     - nlreturn # see https://github.com/qiniu/reviewbot/issues/148
-    - deadcode # Deprecated
-    - exhaustivestruct # Deprecated
-    - golint # Deprecated
-    - ifshort # Deprecated
-    - interfacer # Deprecated
-    - maligned # Deprecated
-    - gomnd # Deprecated
-    - nosnakecase # Deprecated
-    - scopelint # Deprecated
-    - structcheck # Deprecated
-    - varcheck # Deprecated
+    - wrapcheck # see https://github.com/qiniu/reviewbot/issues/180
+    - gochecknoglobals # see https://github.com/qiniu/reviewbot/issues/182
+    - varnamelen # seems too arbitrary
+    - testpackage # seems too arbitrary
+    - depguard # seems too arbitrary
+    - cyclop # seems too arbitrary
+    - exhaustruct # seems too arbitrary
+    - execinquery # deprecated
+    - gomnd # deprecated
+    - funlen # seems too arbitrary
+

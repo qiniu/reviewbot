@@ -1,11 +1,13 @@
-FROM library/golang:1.22.3 as builder
+FROM library/golang:1.22.4 as builder
 
 WORKDIR /app
 
+# keep this cache in a separate layer to speed up builds
+RUN GOPATH=/go go install -ldflags="-extldflags=-static" github.com/golangci/golangci-lint/cmd/golangci-lint@v1.59.1
+
 COPY . ./
 
-RUN CGO_ENABLED=0 GOOS=linux go build -v -trimpath -o /reviewbot . \ 
-    && GOPATH=/go go install -ldflags="-extldflags=-static" github.com/golangci/golangci-lint/cmd/golangci-lint@v1.50.1
+RUN CGO_ENABLED=0 GOOS=linux go build -v -trimpath -o /reviewbot .  
 
 FROM alpine:3.20 as runner
 
@@ -43,7 +45,9 @@ RUN java -jar /usr/local/checkstyle-10.17.0-all.jar --version
 
 
 COPY --from=builder /reviewbot /reviewbot
-COPY --from=builder /usr/local/go/bin/gofmt /go/bin/golangci-lint /usr/local/bin/
+COPY --from=builder /go/bin/golangci-lint /usr/local/bin/
+# golangci-lint dependencies
+COPY --from=builder /usr/local/go/ /usr/local/go/ 
 
 # SSH config
 RUN mkdir -p /root/.ssh && chown -R root /root/.ssh/ &&  chgrp -R root /root/.ssh/ \
@@ -51,6 +55,8 @@ RUN mkdir -p /root/.ssh && chown -R root /root/.ssh/ &&  chgrp -R root /root/.ss
     && git config --global url."git://".insteadOf https://
 COPY deploy/config /root/.ssh/config
 COPY deploy/github-known-hosts /github_known_hosts
+
+ENV PATH="${PATH}:/usr/local/go/bin"
 
 EXPOSE 8888
 

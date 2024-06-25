@@ -1,8 +1,10 @@
-# reviewbot - establish software engineering best practices and efficiently promote them within the organization.
+# reviewbot - Comprehensive linters runner for code review scenarios
 
 [![Build Status](https://github.com/qiniu/reviewbot/actions/workflows/go.yml/badge.svg)](https://github.com/qiniu/reviewbot/actions/workflows/go.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/qiniu/reviewbot)](https://goreportcard.com/report/github.com/qiniu/reviewbot)
 [![GitHub release](https://img.shields.io/github/v/tag/qiniu/reviewbot.svg?label=release)](https://github.com/qiniu/reviewbot/releases)
+
+Its ultimate goal is to establish software engineering best practices and efficiently promote them within the organization.
 
 ## Why Reviewbot?
 
@@ -24,8 +26,7 @@ If you are facing similar challenges, we welcome you to try **Reviewbot**!
 
 - go linters
   - [golangci-lint](/internal/linters/go/golangci_lint/)
-  - [staticcheck](/internal/linters/go/staticcheck/)
-  - [gofmt](/internal/linters/go/staticcheck/)
+  - [gofmt](/internal/linters/go/gofmt/)
 - c/c++ linters
   - [cppcheck](/internal/linters/c/cppcheck/)
 - lua linters

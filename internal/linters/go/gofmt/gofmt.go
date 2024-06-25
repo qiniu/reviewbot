@@ -1,11 +1,14 @@
 package gofmt
 
 import (
+	"bytes"
+	"errors"
 	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
 
+	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/x/log"
 	"github.com/qiniu/x/xlog"
@@ -23,6 +26,10 @@ func gofmtHandler(log *xlog.Logger, a linters.Agent) error {
 	if linters.IsEmpty(a.LinterConfig.Args...) {
 		a.LinterConfig.Args = append([]string{}, "-d", "./")
 	}
+
+	// Since GitHub's check run feature does not have the suggestion functionality, GitHub PR review is fixed used to display gofmt reports.
+	// Details: https://github.com/qiniu/reviewbot/issues/166
+	a.LinterConfig.ReportFormat = config.GithubPRReview
 
 	executor, err := NewgofmtExecutor(a.LinterConfig.WorkDir)
 	if err != nil {
@@ -47,7 +54,7 @@ func gofmtHandler(log *xlog.Logger, a linters.Agent) error {
 type Gofmt struct {
 	dir     string
 	gofmt   string
-	execute func(dir, command string, args ...string) ([]byte, error)
+	execute func(dir, command string, args ...string) ([]byte, []byte, error)
 }
 
 func NewgofmtExecutor(dir string) (linters.Linter, error) {
@@ -59,24 +66,38 @@ func NewgofmtExecutor(dir string) (linters.Linter, error) {
 	return &Gofmt{
 		dir:   dir,
 		gofmt: g,
-		execute: func(dir, command string, args ...string) ([]byte, error) {
+		execute: func(dir, command string, args ...string) ([]byte, []byte, error) {
 			c := exec.Command(command, args...)
 			c.Dir = dir
 			log.Printf("final command:  %v \n", c)
-			return c.Output()
+			if c.Stdout != nil {
+				return nil, nil, errors.New("exec: Stdout already set")
+			}
+			if c.Stderr != nil {
+				return nil, nil, errors.New("exec: Stderr already set")
+			}
+			var stdoutBuffer bytes.Buffer
+			var stderrBuffer bytes.Buffer
+			c.Stdout = &stdoutBuffer
+			c.Stderr = &stderrBuffer
+			err := c.Run()
+			return stdoutBuffer.Bytes(), stderrBuffer.Bytes(), err
 		},
 	}, nil
 }
 
 func (g *Gofmt) Run(log *xlog.Logger, args ...string) ([]byte, error) {
-	b, err := g.execute(g.dir, g.gofmt, args...)
+	stdoutput, stderr, err := g.execute(g.dir, g.gofmt, args...)
 	if err != nil {
 		log.Errorf("gofmt run with status: %v, mark and continue", err)
-		return b, err
+		if stderr != nil {
+			log.Errorf("gofmt run cause stderr: %s, mark and continue", stderr)
+		}
+		return stdoutput, nil
 	} else {
 		log.Infof("gofmt running succeeded")
 	}
-	return b, nil
+	return stdoutput, nil
 }
 
 func (g *Gofmt) Parse(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, error) {

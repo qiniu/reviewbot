@@ -28,6 +28,14 @@ func Filters(log *xlog.Logger, a Agent, linterResults map[string][]LinterOutput)
 	return results, nil
 }
 
+// LinterRelated checks if the linter is related to the PR.
+// Each linter has a list of languages that it supports and the file extensions are used to determine
+// whether the linter is related to the PR.
+func LinterRelated(linterName string, a Agent) bool {
+	exts := exts(a.PullRequestChangedFiles)
+	return languageRelated(linterName, exts)
+}
+
 // cleanLintResults cleans the file path in lint results.
 // It removes the workdir prefix from the file path.
 func cleanLintResults(workdir string, lintResults map[string][]LinterOutput) map[string][]LinterOutput {
@@ -49,7 +57,7 @@ func filterByPRChanged(outputs map[string][]LinterOutput, commitFiles []*github.
 
 	for file, lintFileErrs := range outputs {
 		for _, lintErr := range lintFileErrs {
-			if hunkChecker.InHunk(file, lintErr.Line) {
+			if hunkChecker.InHunk(file, lintErr.Line, lintErr.StartLine) {
 				result[file] = append(result[file], lintErr)
 			}
 		}
@@ -142,4 +150,28 @@ func isGoZeroCustomTag(jsonOption string) bool {
 	}
 
 	return found
+}
+
+// exts returns the file extensions of the changes.
+// file extensions are used to determine whether the linter is related to the PR.
+func exts(changes []*github.CommitFile) map[string]bool {
+	var exts = make(map[string]bool)
+	for _, change := range changes {
+		ext := filepath.Ext(change.GetFilename())
+		if ext == "" {
+			continue
+		}
+		exts[ext] = true
+	}
+	return exts
+}
+
+func languageRelated(linterName string, exts map[string]bool) bool {
+	langs := Languages(linterName)
+	for _, language := range langs {
+		if language == "*" || exts[language] {
+			return true
+		}
+	}
+	return false
 }

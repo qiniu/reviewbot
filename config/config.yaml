@@ -11,21 +11,6 @@ globalDefaultConfig: # global default settings, will be overridden by qbox org a
   javastylecheckruleConfig: "config/linters-config/.java-sun-checks.xml"    #Required Path to a ruleset xml file.  The path may be a local file system path, or a URL.
 
 customConfig: # custom config for specific orgs or repos
-  qbox: # github organization name
-    golangci-lint:
-      enable: true
-      args: ["run", "--allow-parallel-runners=true","--timeout=5m0s"]
-    stylecheck:
-      enable: true
-      command: "java"
-    pmdcheck:
-      enable: true
-      command: "pmd"
-
-  qbox/net-cache:
-    luacheck:
-      enable: true
-      workDir: "nginx" # only run in the nginx directory since there are .luacheckrc files in this directory
   qbox/net-cache:
     golangci-lint:
       enable: true
@@ -36,6 +21,7 @@ customConfig: # custom config for specific orgs or repos
       args: ["run", "--enable-all", "--timeout=5m0s", "--allow-parallel-runners=true"] # disable staticcheck globally since we have a separate linter for it      
 
   qbox/kodo:
-    staticcheck:
+    golangci-lint:
       enable: true
-      workDir: "src/qiniu.com/kodo" # only run in the src/qiniu.com/kodo directory since this is a monorepo
+      workDir: "src/qiniu.com/kodo"
+      args: ["run", "--enable-all", "--timeout=5m0s", "--allow-parallel-runners=true"] 

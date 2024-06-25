@@ -18,11 +18,9 @@ package linters
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -36,8 +34,8 @@ import (
 )
 
 var (
-	PullRequestHandlers = map[string]PullRequestHandlerFunc{}
-	LinterLanguages     = map[string][]string{}
+	pullRequestHandlers = map[string]PullRequestHandlerFunc{}
+	linterLanguages     = map[string][]string{}
 )
 
 // PullRequestHandlerFunc knows how to handle a pull request event.
@@ -45,17 +43,17 @@ type PullRequestHandlerFunc func(*xlog.Logger, Agent) error
 
 // RegisterPullRequestHandler registers a PullRequestHandlerFunc for the given linter name.
 func RegisterPullRequestHandler(name string, handler PullRequestHandlerFunc) {
-	PullRequestHandlers[name] = handler
+	pullRequestHandlers[name] = handler
 }
 
 // RegisterLinterLanguages registers the languages supported by the linter.
 func RegisterLinterLanguages(name string, languages []string) {
-	LinterLanguages[name] = languages
+	linterLanguages[name] = languages
 }
 
 // PullRequestHandler returns a PullRequestHandlerFunc for the given linter name.
 func PullRequestHandler(name string) PullRequestHandlerFunc {
-	if handler, ok := PullRequestHandlers[name]; ok {
+	if handler, ok := pullRequestHandlers[name]; ok {
 		return handler
 	}
 	return nil
@@ -63,8 +61,8 @@ func PullRequestHandler(name string) PullRequestHandlerFunc {
 
 // TotalPullRequestHandlers returns all registered PullRequestHandlerFunc.
 func TotalPullRequestHandlers() map[string]PullRequestHandlerFunc {
-	var handlers = make(map[string]PullRequestHandlerFunc, len(PullRequestHandlers))
-	for name, handler := range PullRequestHandlers {
+	var handlers = make(map[string]PullRequestHandlerFunc, len(pullRequestHandlers))
+	for name, handler := range pullRequestHandlers {
 		handlers[name] = handler
 	}
 
@@ -73,7 +71,7 @@ func TotalPullRequestHandlers() map[string]PullRequestHandlerFunc {
 
 // LinterLanguages returns the languages supported by the linter.
 func Languages(linterName string) []string {
-	return LinterLanguages[linterName]
+	return linterLanguages[linterName]
 }
 
 // Linter knows how to execute linters.
@@ -184,13 +182,6 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 
 	log.Infof("[%s] found %d files with valid %d linter errors related to this PR %d (%s) \n", linterName, len(lintResults), countLinterErrors(lintResults), num, orgRepo)
 
-	// only not report when there is no lint errors and the linter is not related to the PR
-	// see https://github.com/qiniu/reviewbot/issues/108#issuecomment-2042217108
-	if len(lintResults) == 0 && !languageRelated(linterName, exts(a.PullRequestChangedFiles)) {
-		log.Debugf("[%s] no lint errors found and not languages related, skip report", linterName)
-		return nil
-	}
-
 	if len(lintResults) > 0 {
 		metric.IncIssueCounter(orgRepo, linterName, a.PullRequestEvent.PullRequest.GetHTMLURL(), a.PullRequestEvent.GetPullRequest().GetHead().GetSHA(), float64(countLinterErrors(lintResults)))
 	}
@@ -203,8 +194,9 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 			return err
 		}
 		log.Infof("[%s] create check run success, HTML_URL: %v", linterName, ch.GetHTMLURL())
-		if err := metric.SendAlertMessageIfNeeded(constructMKAlertMessage(linterName, a.PullRequestEvent.GetPullRequest().GetHTMLURL(), ch.GetHTMLURL(), lintResults)); err != nil {
-			log.Errorf("failed to send alert message: %v", err)
+		var msg = constructMessage(linterName, a.PullRequestEvent.GetPullRequest().GetHTMLURL(), ch.GetHTMLURL(), lintResults)
+		if err := metric.NotifyWebhook(msg); err != nil {
+			log.Errorf("failed to send alert message, err: %v, msg: %v", err, msg)
 			// just log the error, not return
 		}
 	case config.GithubPRReview:
@@ -233,6 +225,10 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 		log.Infof("%s delete %d comments for this PR %d (%s) \n", linterFlag, len(toDeletes), num, orgRepo)
 
 		comments := constructPullRequestComments(toAdds, linterFlag, a.PullRequestEvent.GetPullRequest().GetHead().GetSHA())
+		if len(comments) == 0 {
+			return nil
+		}
+
 		// Add the comments
 		addedCmts, err := CreatePullReviewComments(context.Background(), a.GithubClient, org, repo, num, comments)
 		if err != nil {
@@ -240,8 +236,9 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 			return err
 		}
 		log.Infof("[%s] add %d comments for this PR %d (%s) \n", linterName, len(addedCmts), num, orgRepo)
-		if err := metric.SendAlertMessageIfNeeded(constructMKAlertMessage(linterName, a.PullRequestEvent.GetPullRequest().GetHTMLURL(), addedCmts[0].GetHTMLURL(), lintResults)); err != nil {
-			log.Errorf("failed to send alert message: %v", err)
+		var msg = constructMessage(linterName, a.PullRequestEvent.GetPullRequest().GetHTMLURL(), addedCmts[0].GetHTMLURL(), lintResults)
+		if err := metric.NotifyWebhook(msg); err != nil {
+			log.Errorf("failed to send alert message, err: %v, msg: %v", err, msg)
 			// just log the error, not return
 		}
 	default:
@@ -258,6 +255,7 @@ type LineParser func(line string) (*LinterOutput, error)
 func Parse(log *xlog.Logger, output []byte, lineParser LineParser) (map[string][]LinterOutput, error) {
 	lines := strings.Split(string(output), "\n")
 
+	var unexpectedLines []string
 	var result = make(map[string][]LinterOutput)
 	for _, line := range lines {
 		if line == "" {
@@ -265,7 +263,7 @@ func Parse(log *xlog.Logger, output []byte, lineParser LineParser) (map[string][
 		}
 		output, err := lineParser(line)
 		if err != nil {
-			log.Debugf("unexpected linter check output: %v", line)
+			unexpectedLines = append(unexpectedLines, line)
 			continue
 		}
 
@@ -290,6 +288,34 @@ func Parse(log *xlog.Logger, output []byte, lineParser LineParser) (map[string][
 			}
 		}
 	}
+
+	go func() {
+		var message string
+		for _, line := range unexpectedLines {
+			// trim the message to avoid too long
+			// wework webhook only support 4096 characters for markdown message
+			// see https://open.work.weixin.qq.com/api/doc/90000/90136/91770
+			if len(message) > 3000 {
+				message += "..."
+				break
+			}
+			message += line + "\n"
+		}
+
+		if message != "" {
+			message = fmt.Sprintf("unexpected lines:\n%v", message)
+			log.Warnf(message)
+			var msg metric.MessageBody
+			msg.MsgType = "markdown"
+			msg.Markdown.Content = fmt.Sprintf("<font color=\"warning\">[ATTENTION PLEASE]</font> %v", message)
+			// seed the alert message if the linter output is unexpected
+			// so that we can know the issue and fix it
+			if err := metric.NotifyWebhook(msg); err != nil {
+				log.Errorf("failed to send alert message, err: %v, msg: %v", err, msg)
+				// just log the error, not return
+			}
+		}
+	}()
 
 	return result, nil
 }
@@ -357,27 +383,6 @@ func IsExist(path string) bool {
 	}
 }
 
-func exts(changes []*github.CommitFile) map[string]bool {
-	var exts = make(map[string]bool)
-	for _, change := range changes {
-		ext := filepath.Ext(change.GetFilename())
-		if ext == "" {
-			continue
-		}
-		exts[ext] = true
-	}
-	return exts
-}
-
-func languageRelated(linterName string, exts map[string]bool) bool {
-	for _, language := range Languages(linterName) {
-		if exts[language] {
-			return true
-		}
-	}
-	return false
-}
-
 func countLinterErrors(lintResults map[string][]LinterOutput) int {
 	var count int
 	for _, outputs := range lintResults {
@@ -386,9 +391,9 @@ func countLinterErrors(lintResults map[string][]LinterOutput) int {
 	return count
 }
 
-func constructMKAlertMessage(linter, pr, link string, linterResults map[string][]LinterOutput) string {
+func constructMessage(linter, pr, link string, linterResults map[string][]LinterOutput) (msg metric.MessageBody) {
 	if len(linterResults) == 0 {
-		return ""
+		return
 	}
 
 	var message string
@@ -398,21 +403,7 @@ func constructMKAlertMessage(linter, pr, link string, linterResults map[string][
 		}
 	}
 
-	type mkMessage struct {
-		Msgtype string `json:"msgtype"`
-		Text    struct {
-			Content string `json:"content"`
-		} `json:"text"`
-	}
-
-	var m mkMessage
-	m.Msgtype = "text"
-	m.Text.Content = fmt.Sprintf("Linter: %v \nPR:   %v \nLink: %v \nDetails:\n%v\n", linter, pr, link, message)
-	b, err := json.Marshal(m)
-	if err != nil {
-		log.Errorf("failed to marshal message: %v", err)
-		return ""
-	}
-
-	return string(b)
+	msg.MsgType = "text"
+	msg.Text.Content = fmt.Sprintf("Linter: %v \nPR:   %v \nLink: %v \nDetails:\n%v\n", linter, pr, link, message)
+	return
 }
