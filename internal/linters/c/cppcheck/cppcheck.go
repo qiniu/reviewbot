@@ -21,21 +21,27 @@ func cppcheckHandler(log *xlog.Logger, a linters.Agent) error {
 		a.LinterConfig.Args = append([]string{}, "--quiet", "--template='{file}:{line}:{column}: {message}'", ".")
 	}
 
-	return linters.GeneralHandler(log, a, func(l *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, error) {
-		return linters.Parse(log, output, cppcheckParser)
-	})
+	return linters.GeneralHandler(log, a, parser)
 }
 
-func cppcheckParser(line string) (*linters.LinterOutput, error) {
-	lineResult, err := linters.GeneralLineParser(line)
-	if err != nil {
-		return nil, err
+func parser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, error) {
+	var lineParser = func(line string) (*linters.LinterOutput, error) {
 
+		// skip the error output
+		// If there are no detectable files in the current directory,
+		// cppcheck will display the error message "cppcheck: error: could not find or open any of the paths given."
+		// the error message is no meaningful for the reviewbot scenario, so we need to skip it
+
+		if strings.Contains(line, "could not find or open any of the paths given") {
+			return nil, nil
+		}
+
+		// cppcheck output characters ' at the beginning or end of its output
+		if len(line) < 2 {
+			return nil, nil
+		}
+		return linters.GeneralLineParser(line[1 : len(line)-1])
 	}
-	return &linters.LinterOutput{
-		File:    strings.TrimLeft(lineResult.File, "'"),
-		Line:    lineResult.Line,
-		Column:  lineResult.Column,
-		Message: strings.TrimRight(lineResult.Message, "'"),
-	}, nil
+
+	return linters.Parse(log, output, lineParser)
 }
