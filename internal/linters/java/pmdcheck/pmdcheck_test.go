@@ -40,6 +40,19 @@ func TestForConfig(t *testing.T) {
 	}
 
 }
+func TestForConfigFail(t *testing.T) {
+	fileDir, err := os.Getwd()
+	rulefiledirpath := filepath.Join(fileDir, "config/linters-config")
+	rulefilepath := filepath.Join(rulefiledirpath, ".java-sun-checks.xml")
+	path, err := getFileFromURL("https://raw.githubusercontent.com/pmd/pmd/master/pmd-java/src/main/resources/category/java/bestpracxxxices.xml", "unknowpath/.java-bestpracxxxices.xml")
+	if err == nil {
+		t.Errorf("getFileFromURL(): %v, expected: %v", nil, err)
+	}
+	if path == rulefilepath {
+		t.Errorf("getFileFromURL(): %v, expected: %v", "", rulefilepath)
+	}
+
+}
 func TestFormatPmdCheckLine(t *testing.T) {
 	tc := []struct {
 		input    []byte
