@@ -29,7 +29,7 @@ import (
 func TestForConfig(t *testing.T) {
 	fileDir, err := os.Getwd()
 	rulefiledirpath := filepath.Join(fileDir, "config/linters-config")
-	rulefilepath := filepath.Join(rulefiledirpath, ".bestpractices.xml")
+	rulefilepath := filepath.Join(rulefiledirpath, ".sun_checks.xml")
 	path, err := styleRuleCheck("https://raw.githubusercontent.com/checkstyle/checkstyle/master/src/main/resources/sun_checks.xml")
 	if err != nil {
 		t.Errorf("styleRuleCheck(): %v, expected: %v", err, nil)
