@@ -17,6 +17,9 @@
 package pmdcheck
 
 import (
+	"github.com/qiniu/x/errors"
+	"github.com/qiniu/x/xlog"
+	"reflect"
 	"testing"
 
 	"github.com/qiniu/reviewbot/internal/linters"
@@ -24,42 +27,44 @@ import (
 
 func TestFormatPmdCheckLine(t *testing.T) {
 	tc := []struct {
-		input    string
-		expected *linters.LinterOutput
+		input    []byte
+		expected map[string][]linters.LinterOutput
+		err      error
 	}{
-		{" /Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java:9: Avoid unused local variables such as 'test'.", &linters.LinterOutput{
-			File:    "/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java",
-			Line:    9,
-			Column:  0,
-			Message: "Avoid unused local variables such as 'test'.",
-		}},
-		{" /Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java:10: Usage of System.out/err", &linters.LinterOutput{
-			File:    "/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java",
-			Line:    10,
-			Column:  0,
-			Message: "Usage of System.out/err",
-		}},
+		{
+			input: []byte(`/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java:10: Usage of System.out`),
+			expected: map[string][]linters.LinterOutput{
+				"/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java": {
+					{
+						File:    "/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java",
+						Line:    10,
+						Column:  0,
+						Message: "Usage of System.out",
+					},
+				},
+			},
+			err: nil,
+		},
+		{
+			input:    []byte(`[WARN] Progressbar rendering conflicts with reporting to STDOUT. No progressbar will be shown. Try running with argument -r <file> to output the report to a file instead.`),
+			expected: map[string][]linters.LinterOutput{},
+			err:      nil,
+		},
+		{
+			input:    []byte(``),
+			expected: map[string][]linters.LinterOutput{},
+			err:      nil,
+		},
 	}
 
 	for _, c := range tc {
-		output, err := pmdcheckParser(c.input)
-		if output == nil {
-			if c.expected != nil {
-				t.Errorf("expected: %v, got: %v", c.expected, output)
-			}
-			continue
+		got, err := pmdcheckParser(xlog.New("UnitJavaPmdCheckTest"), c.input)
+		if !errors.Is(err, c.err) {
+			t.Errorf("pmdcheckParser() error: %v, expected: %v", err, c.err)
+			return
 		}
-
-		if c.expected == nil && output != nil {
-			t.Errorf("expected error, got: %v", output)
-		}
-
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-
-		if output.File != c.expected.File || output.Line != c.expected.Line || output.Column != c.expected.Column || output.Message != c.expected.Message {
-			t.Errorf("expected: %v, got: %v", c.expected, output)
+		if !reflect.DeepEqual(got, c.expected) {
+			t.Errorf("pmdcheckParser(): %v, expected: %v", got, c.expected)
 		}
 	}
 }

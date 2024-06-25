@@ -33,14 +33,20 @@ func stylecheckHandler(log *xlog.Logger, a linters.Agent) error {
 	if err != nil {
 		log.Errorf("style jar check failed: %v", err)
 	}
-	if (len(javaFiles) <= 0) || !linters.IsExist(rulePath) || linters.IsExist(jarfile) && err != nil {
+	log.Infof("sytle jar check succes,file path: %v", jarfile)
+	checkrulePath, checkerr := styleRuleCheck(rulePath)
+	if checkerr != nil {
+		log.Errorf("style rule file check failed: %v", checkerr)
+	}
+	log.Infof("sytle  rule check succes,file path: %v", checkrulePath)
+
+	if (len(javaFiles) <= 0) || !linters.IsExist(checkrulePath) || linters.IsExist(jarfile) && err != nil || checkerr != nil {
 		return nil
 	}
-
 	if linters.IsEmpty(a.LinterConfig.Args...) {
 		args := append([]string{}, "-jar", jarfile)
 		args = append(args, javaFiles...)
-		args = append(args, "-c", rulePath)
+		args = append(args, "-c", checkrulePath)
 		a.LinterConfig.Args = args
 	}
 	if a.LinterConfig.Command == "" || a.LinterConfig.Command == linterName {
@@ -50,38 +56,23 @@ func stylecheckHandler(log *xlog.Logger, a linters.Agent) error {
 		a.LinterConfig.LinterName = linterName
 	}
 
-	return linters.GeneralHandler(log, a, func(l *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, error) {
-		//output = []byte(trimReport(string(output)))
-		return linters.Parse(log, output, stylecheckParser)
-	})
+	return linters.GeneralHandler(log, a, stylecheckParser)
 }
-
-func stylecheckParser(line string) (*linters.LinterOutput, error) {
-	if strings.EqualFold(line, "checkstyle") {
-		return nil, nil
+func stylecheckParser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, error) {
+	var lineParse = func(line string) (*linters.LinterOutput, error) {
+		// luacheck will output lines starting with 'Total ' or 'Checking '
+		// which are no meaningful for the reviewbot scenario, so we discard them
+		// such as:
+		// 1. Total: 0 warnings / 0 errors in 0 files
+		// 2. Checking cmd/jarviswsserver/etc/get_node_wsserver.lua 11 warnings
+		// 3. Empty lines
+		strings.ToLower(line)
+		if strings.Contains(strings.ToLower(line), "checkstyle") || strings.HasPrefix(line, "开始") || strings.HasPrefix(line, "检查") || line == "" {
+			return nil, nil
+		}
+		return linters.GeneralLineParser(strings.TrimLeft(line, " "))
 	}
-	lineResult, err := linters.GeneralLineParser(line)
-	if err != nil {
-		return nil, err
-
-	}
-	return &linters.LinterOutput{
-		File:    strings.TrimLeft(lineResult.File, " "),
-		Line:    lineResult.Line,
-		Column:  lineResult.Column,
-		Message: strings.ReplaceAll(strings.ReplaceAll(lineResult.Message, "\x1b[0m\x1b[1m", ""), "\x1b[0m", ""),
-	}, nil
-}
-
-func trimReport(line string) string {
-	line1st := strings.ReplaceAll(line, "开始检查……\n", "&stylecheck&")
-	line2nd := strings.ReplaceAll(line1st, "\n检查完成", "&stylecheck&")
-	lineresult := strings.Split(line2nd, "&stylecheck&")
-	if len(lineresult) < 3 {
-		return ""
-	}
-	return lineresult[1]
-
+	return linters.Parse(log, output, lineParse)
 }
 
 func stylecheckJar() (string, error) {
@@ -98,6 +89,7 @@ func stylecheckJar() (string, error) {
 		return "", err
 	}
 	filename2 := filepath.Join(filePath, stykejarfilename)
+	fmt.Println(filename2)
 	if linters.IsExist(filename2) {
 		return filename2, nil
 	}
@@ -105,7 +97,6 @@ func stylecheckJar() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("The file download  encountered  an error，Please check the file  download url: %v", err)
 	}
-
 	madirerr := os.MkdirAll(filePath, 0755)
 	if madirerr != nil {
 		return "", madirerr
@@ -122,8 +113,65 @@ func stylecheckJar() (string, error) {
 		return "", fmt.Errorf("The file saving   encountered an error: %v", err)
 	}
 	if linters.IsExist(filename2) {
+
+		fmt.Printf("style jar download success : %v", err)
 		return filename2, nil
 	}
 	return "", fmt.Errorf("The style jar file download  encountered  an error")
 
+}
+func getFileFromUrl(url string, filepath string) (string, error) {
+	if linters.IsExist(filepath) {
+		return filepath, nil
+	}
+	res, err := http.Get(url)
+	//filename := filepath[strings.LastIndex(filepath, "/")+1:]
+	if err != nil {
+		return "", fmt.Errorf("The file download  encountered  an error，Please check the file  download url: %v,the error is:%v", url, err)
+	}
+
+	//madirerr := os.MkdirAll(fileDir, 0755)
+	//if madirerr != nil {
+	//	return "", madirerr
+	//}
+	f, err := os.Create(filepath)
+	if err != nil {
+
+		return "", fmt.Errorf("The file saving   encountered an error,Please check the directory: %v", err)
+	}
+	_, err = io.Copy(f, res.Body)
+	defer res.Body.Close()
+
+	if err != nil {
+		return "", fmt.Errorf("The file saving   encountered an error: %v", err)
+	}
+	if linters.IsExist(filepath) {
+		log.Infof("style  rule check succes,file path: %v", filepath)
+		return filepath, nil
+	}
+	return "", err
+}
+func styleRuleCheck(styleConf string) (string, error) {
+	if linters.IsExist(styleConf) {
+		return styleConf, nil
+
+	}
+	if styleConf == "" {
+		styleConf = "https://raw.githubusercontent.com/checkstyle/checkstyle/master/src/main/resources/sun_checks.xml"
+	}
+	fileDir, err := os.Getwd()
+	rulefiledirpath := filepath.Join(fileDir, "config/linters-config")
+	rulefilepath := filepath.Join(rulefiledirpath, ".sun_checks.xml")
+	madirerr := os.MkdirAll(rulefiledirpath, 0755)
+	if madirerr != nil {
+		return "", fmt.Errorf("dir make failed: %v", err)
+	}
+	if strings.HasPrefix(styleConf, "http") {
+		downloadfilepath, err := getFileFromUrl(styleConf, rulefilepath)
+		if err != nil {
+			return "", fmt.Errorf("the style rule file download faild: %v", err)
+		}
+		return downloadfilepath, nil
+	}
+	return "", fmt.Errorf("the style rule file not exist: %v", err)
 }

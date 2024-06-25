@@ -18,47 +18,76 @@ package stylecheck
 
 import (
 	"github.com/qiniu/reviewbot/internal/linters"
+	"github.com/qiniu/x/errors"
+	"github.com/qiniu/x/xlog"
+	"reflect"
 	"testing"
 )
 
 func TestFormatStyleCheckLine(t *testing.T) {
 	tc := []struct {
-		input    string
-		expected *linters.LinterOutput
+		input    []byte
+		expected map[string][]linters.LinterOutput
+		err      error
 	}{
-		{"/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test2.java:21:18: '{' 前应有空格。 [WhitespaceAround]", &linters.LinterOutput{
-			File:    "/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test2.java",
-			Line:    21,
-			Column:  18,
-			Message: "'{' 前应有空格。 [WhitespaceAround]",
-		}},
-		{"/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java:1: 文件未以空行结尾。 [NewlineAtEndOfFile]", &linters.LinterOutput{
-			File:    "/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java",
-			Line:    1,
-			Column:  0,
-			Message: "文件未以空行结尾。 [NewlineAtEndOfFile]",
-		}},
+		{
+			input: []byte(`[ERROR]/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test2.java:21:18: '{' 前应有空格。 [WhitespaceAround]`),
+			expected: map[string][]linters.LinterOutput{
+				"[ERROR]/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test2.java": {
+					{
+						File:    "[ERROR]/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test2.java",
+						Line:    21,
+						Column:  18,
+						Message: "'{' 前应有空格。 [WhitespaceAround]",
+					},
+				},
+			},
+			err: nil,
+		},
+		{
+			input: []byte(`[ERROR]/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java:1: 文件未以空行结尾。 [NewlineAtEndOfFile]`),
+			expected: map[string][]linters.LinterOutput{
+				"[ERROR]/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java": {
+					{
+						File:    "[ERROR]/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java",
+						Line:    1,
+						Column:  0,
+						Message: "文件未以空行结尾。 [NewlineAtEndOfFile]",
+					},
+				},
+			},
+			err: nil,
+		},
+		{
+			input:    []byte(`6月 14, 2024 7:19:02 下午 com.puppycrawl.tools.checkstyle.Main runCli`),
+			expected: map[string][]linters.LinterOutput{},
+			err:      nil,
+		},
+		{
+			input:    []byte(`详细: Checkstyle debug logging enabled`),
+			expected: map[string][]linters.LinterOutput{},
+			err:      nil,
+		},
+		{
+			input:    []byte(`开始检查……`),
+			expected: map[string][]linters.LinterOutput{},
+			err:      nil,
+		},
+		{
+			input:    []byte(``),
+			expected: map[string][]linters.LinterOutput{},
+			err:      nil,
+		},
 	}
 
 	for _, c := range tc {
-		output, err := stylecheckParser(c.input)
-		if output == nil {
-			if c.expected != nil {
-				t.Errorf("expected: %v, got: %v", c.expected, output)
-			}
-			continue
+		got, err := stylecheckParser(xlog.New("UnitJavaStyleCheckTest"), c.input)
+		if !errors.Is(err, c.err) {
+			t.Errorf("stylecheckParser() error: %v, expected: %v", err, c.err)
+			return
 		}
-
-		if c.expected == nil && output != nil {
-			t.Errorf("expected error, got: %v", output)
-		}
-
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-
-		if output.File != c.expected.File || output.Line != c.expected.Line || output.Column != c.expected.Column || output.Message != c.expected.Message {
-			t.Errorf("expected: %v, got: %v", c.expected, output)
+		if !reflect.DeepEqual(got, c.expected) {
+			t.Errorf("stylecheckParser(): %v, expected: %v", got, c.expected)
 		}
 	}
 }

@@ -299,40 +299,34 @@ func GeneralLineParser(line string) (*LinterOutput, error) {
 	pattern := `^(.*?):(\d+):(\d+)?:? (.*)$`
 	regex, err := regexp.Compile(pattern)
 	if err != nil {
-		log.Errorf("compile regex failed: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to compile regex: %v, err: %v", pattern, err)
 	}
 	matches := regex.FindStringSubmatch(line)
 
-	if len(matches) < 4 {
+	if len(matches) != 5 {
 		return nil, fmt.Errorf("unexpected format, original: %s", line)
 	}
 
 	lineNumber, err := strconv.ParseInt(matches[2], 10, 64)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unexpected line number: %s, err: %v, original line: %v", matches[2], err, line)
 	}
 
-	var column int64
-	message := matches[3]
-	if len(matches) > 4 {
-		if matches[3] != "" {
-			columnNumber, err := strconv.ParseInt(matches[3], 10, 64)
-			if err != nil {
-				log.Errorf("match  failed: %v", err)
-				return nil, err
-			}
-			column = columnNumber
-		}
+	var columnNumber int64
 
-		message = matches[4]
+	if matches[3] != "" {
+		column, err := strconv.ParseInt(matches[3], 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("unexpected column number: %s, err: %v, original line: %v", matches[3], err, line)
+		}
+		columnNumber = column
 
 	}
 	return &LinterOutput{
 		File:    matches[1],
 		Line:    int(lineNumber),
-		Column:  int(column),
-		Message: message,
+		Column:  int(columnNumber),
+		Message: matches[4],
 	}, nil
 }
 
@@ -362,14 +356,7 @@ func IsExist(path string) bool {
 		return true
 	}
 }
-func If[T any](condition bool, trueVal, falseVal T) T {
-	if condition {
-		return trueVal
-	} else {
-		return falseVal
-	}
 
-}
 func exts(changes []*github.CommitFile) map[string]bool {
 	var exts = make(map[string]bool)
 	for _, change := range changes {
