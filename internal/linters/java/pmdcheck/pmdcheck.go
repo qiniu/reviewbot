@@ -34,7 +34,7 @@ func pmdcheckHandler(log *xlog.Logger, a linters.Agent) error {
 		log.Errorf("pmd rule file check failed: %v", checkerr)
 	}
 	log.Infof("pmd  rule check succes,file path: %v", checkrulePath)
-	if (len(javaFiles) <= 0) || !linters.IsExist(checkrulePath) || checkerr != nil {
+	if (len(javaFiles) == 0) || !linters.IsExist(checkrulePath) || checkerr != nil {
 		return nil
 	}
 	if linters.IsEmpty(a.LinterConfig.Args...) {
@@ -67,13 +67,14 @@ func pmdcheckParser(log *xlog.Logger, output []byte) (map[string][]linters.Linte
 	return linters.Parse(log, output, lineParse)
 }
 
-func getFileFromURl(url string, filepath string) (string, error) {
+func getFileFromURL(url string, filepath string) (string, error) {
 	if linters.IsExist(filepath) {
 		return filepath, nil
 	}
 	res, err := http.Get(url)
 	if err != nil {
-		log.Errorf("The file download  encountered  an error，Please check the file  download url: %v,the error is:%v", url, err)
+		log.Errorf("The file download  encountered  an error，"+
+			"Please check the file  download url: %v,the error is:%v", url, err)
 		return "", err
 	}
 
@@ -112,7 +113,7 @@ func pmdRuleCheck(pmdConf string) (string, error) {
 		return "", err
 	}
 	if strings.HasPrefix(pmdConf, "http") {
-		downloadfilepath, err := getFileFromURl(pmdConf, rulefilepath)
+		downloadfilepath, err := getFileFromURL(pmdConf, rulefilepath)
 		if err != nil {
 			log.Errorf("the pmd rule file download faild: %v", err)
 			return "", err
