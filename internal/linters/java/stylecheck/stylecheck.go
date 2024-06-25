@@ -157,7 +157,7 @@ func styleRuleCheck(styleConf string) (string, error) {
 	}
 	fileDir, err := os.Getwd()
 	rulefiledirpath := filepath.Join(fileDir, "config/linters-config")
-	rulefilepath := filepath.Join(rulefiledirpath, ".sun_checks.xml")
+	rulefilepath := filepath.Join(rulefiledirpath, ".java-sun-checks.xml")
 	madirerr := os.MkdirAll(rulefiledirpath, 0755)
 	if madirerr != nil {
 		return "", fmt.Errorf("dir make failed: %v", err)

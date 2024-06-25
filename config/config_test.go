@@ -128,8 +128,8 @@ customConfig: # custom config for specific orgs or repos
 				GlobalDefaultConfig: GlobalConfig{
 					GithubReportType:         GithubCheckRuns,
 					GolangCiLintConfig:       "linters-config/.golangci.yml",
-					JavaPmdCheckRuleConfig:   "linters-config/.bestpractices.xml",
-					JavaStyleCheckRuleConfig: "linters-config/.sun_checks.xml",
+					JavaPmdCheckRuleConfig:   "linters-config/.java-bestpractices.xml",
+					JavaStyleCheckRuleConfig: "linters-config/.java-sun-checks.xml",
 				},
 				CustomConfig: map[string]map[string]Linter{
 					"qbox": {

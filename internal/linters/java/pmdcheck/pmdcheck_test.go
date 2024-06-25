@@ -30,7 +30,7 @@ import (
 func TestForConfig(t *testing.T) {
 	fileDir, err := os.Getwd()
 	rulefiledirpath := filepath.Join(fileDir, "config/linters-config")
-	rulefilepath := filepath.Join(rulefiledirpath, ".bestpractices.xml")
+	rulefilepath := filepath.Join(rulefiledirpath, ".java-bestpractices.xml")
 	path, err := pmdRuleCheck("https://raw.githubusercontent.com/pmd/pmd/master/pmd-java/src/main/resources/category/java/bestpractices.xml")
 	if err != nil {
 		t.Errorf("pmdRuleCheck(): %v, expected: %v", err, nil)

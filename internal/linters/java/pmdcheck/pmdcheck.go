@@ -106,7 +106,7 @@ func pmdRuleCheck(pmdConf string) (string, error) {
 	}
 	fileDir, err := os.Getwd()
 	rulefiledirpath := filepath.Join(fileDir, "config/linters-config")
-	rulefilepath := filepath.Join(rulefiledirpath, ".bestpractices.xml")
+	rulefilepath := filepath.Join(rulefiledirpath, ".java-bestpractices.xml")
 	madirerr := os.MkdirAll(rulefiledirpath, 0755)
 	if madirerr != nil {
 		log.Errorf("dir make failed: %v", err)
