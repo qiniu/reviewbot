@@ -26,11 +26,24 @@ import (
 	"testing"
 )
 
-func TestForConfig(t *testing.T) {
+func TestForHttpConfig(t *testing.T) {
 	fileDir, err := os.Getwd()
 	rulefiledirpath := filepath.Join(fileDir, "config/linters-config")
 	rulefilepath := filepath.Join(rulefiledirpath, ".java-sun-checks.xml")
 	path, err := styleRuleCheck("https://raw.githubusercontent.com/checkstyle/checkstyle/master/src/main/resources/sun_checks.xml")
+	if err != nil {
+		t.Errorf("styleRuleCheck(): %v, expected: %v", err, nil)
+	}
+	if path != rulefilepath {
+		t.Errorf("styleRuleCheck(): %v, expected: %v", path, rulefilepath)
+	}
+
+}
+func TestForNotConfig(t *testing.T) {
+	fileDir, err := os.Getwd()
+	rulefiledirpath := filepath.Join(fileDir, "config/linters-config")
+	rulefilepath := filepath.Join(rulefiledirpath, ".java-sun-checks.xml")
+	path, err := styleRuleCheck("")
 	if err != nil {
 		t.Errorf("styleRuleCheck(): %v, expected: %v", err, nil)
 	}
