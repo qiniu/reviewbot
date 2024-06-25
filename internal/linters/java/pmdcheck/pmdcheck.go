@@ -68,23 +68,6 @@ func pmdcheckParser(log *xlog.Logger, output []byte) (map[string][]linters.Linte
 	return linters.Parse(log, output, lineParse)
 }
 
-func pmdcheckParser1(line string) (*linters.LinterOutput, error) {
-	if strings.Contains(line, "[WARN]") {
-		return nil, nil
-	}
-	lineResult, err := linters.GeneralLineParser(line)
-	if err != nil {
-		return nil, err
-
-	}
-	return &linters.LinterOutput{
-		File:    strings.TrimLeft(lineResult.File, " "),
-		Line:    lineResult.Line,
-		Column:  lineResult.Column,
-		Message: strings.ReplaceAll(strings.ReplaceAll(lineResult.Message, "\x1b[0m\x1b[1m", ""), "\x1b[0m", ""),
-	}, nil
-}
-
 func getFileFromUrl(url string, filepath string) (string, error) {
 	if linters.IsExist(filepath) {
 		return filepath, nil

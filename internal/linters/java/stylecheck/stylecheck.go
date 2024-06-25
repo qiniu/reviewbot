@@ -121,15 +121,10 @@ func getFileFromUrl(url string, filepath string) (string, error) {
 		return filepath, nil
 	}
 	res, err := http.Get(url)
-	//filename := filepath[strings.LastIndex(filepath, "/")+1:]
 	if err != nil {
 		return "", fmt.Errorf("The file download  encountered  an error，Please check the file  download url: %v,the error is:%v", url, err)
 	}
 
-	//madirerr := os.MkdirAll(fileDir, 0755)
-	//if madirerr != nil {
-	//	return "", madirerr
-	//}
 	f, err := os.Create(filepath)
 	if err != nil {
 
