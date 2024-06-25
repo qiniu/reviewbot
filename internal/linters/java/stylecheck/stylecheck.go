@@ -60,12 +60,8 @@ func stylecheckHandler(log *xlog.Logger, a linters.Agent) error {
 }
 func stylecheckParser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, error) {
 	var lineParse = func(line string) (*linters.LinterOutput, error) {
-		// luacheck will output lines starting with 'Total ' or 'Checking '
+		// stylecheck will output lines starting with ' 开始检查 ' or '检查结束 ' or 'stylecheck info'
 		// which are no meaningful for the reviewbot scenario, so we discard them
-		// such as:
-		// 1. Total: 0 warnings / 0 errors in 0 files
-		// 2. Checking cmd/jarviswsserver/etc/get_node_wsserver.lua 11 warnings
-		// 3. Empty lines
 		strings.ToLower(line)
 		if strings.Contains(strings.ToLower(line), "checkstyle") || strings.HasPrefix(line, "开始") || strings.HasPrefix(line, "检查") || line == "" {
 			return nil, nil

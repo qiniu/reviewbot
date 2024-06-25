@@ -56,12 +56,9 @@ func pmdcheckHandler(log *xlog.Logger, a linters.Agent) error {
 }
 func pmdcheckParser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, error) {
 	var lineParse = func(line string) (*linters.LinterOutput, error) {
-		// luacheck will output lines starting with 'Total ' or 'Checking '
+		// pmdcheck will output lines starting with ' [WARN]'  warring information
 		// which are no meaningful for the reviewbot scenario, so we discard them
-		// such as:
-		// 1. Total: 0 warnings / 0 errors in 0 files
-		// 2. Checking cmd/jarviswsserver/etc/get_node_wsserver.lua 11 warnings
-		// 3. Empty lines
+
 		strings.ToLower(line)
 		if strings.Contains(line, "[WARN]") || line == "" {
 			return nil, nil
