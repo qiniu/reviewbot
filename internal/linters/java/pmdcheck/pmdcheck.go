@@ -18,9 +18,7 @@ const linterName = "pmdcheck"
 func init() {
 	linters.RegisterPullRequestHandler(linterName, pmdcheckHandler)
 	linters.RegisterLinterLanguages(linterName, []string{".java"})
-
 }
-
 func pmdcheckHandler(log *xlog.Logger, a linters.Agent) error {
 	var javaFiles []string
 	rulePath := a.LinterConfig.ConfigPath
@@ -66,7 +64,6 @@ func pmdcheckParser(log *xlog.Logger, output []byte) (map[string][]linters.Linte
 	}
 	return linters.Parse(log, output, lineParse)
 }
-
 func getFileFromURL(url string, filepath string) (string, error) {
 	if linters.IsExist(filepath) {
 		return filepath, nil
@@ -77,7 +74,6 @@ func getFileFromURL(url string, filepath string) (string, error) {
 			"Please check the file  download url: %v,the error is:%v", url, err)
 		return "", err
 	}
-
 	f, err := os.Create(filepath)
 	if err != nil {
 		log.Errorf("The file saving   encountered an error,Please check the directory: %v", err)

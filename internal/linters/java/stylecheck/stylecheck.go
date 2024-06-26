@@ -43,9 +43,9 @@ func stylecheckHandler(log *xlog.Logger, a linters.Agent) error {
 	if checkerr != nil {
 		log.Errorf("style rule file check failed: %v", checkerr)
 	}
-	log.Infof("sytle  rule check succes,file path: %v", checkrulePath)
+	log.Infof("style  rule check succes,file path: %v", checkrulePath)
 
-	if (len(javaFiles) <= 0) || !linters.IsExist(checkrulePath) || linters.IsExist(jarfile) && err != nil || checkerr != nil {
+	if (len(javaFiles) == 0) || !linters.IsExist(checkrulePath) || linters.IsExist(jarfile) && err != nil || checkerr != nil {
 		return nil
 	}
 	if linters.IsEmpty(a.LinterConfig.Args...) {
@@ -67,7 +67,6 @@ func stylecheckParser(log *xlog.Logger, output []byte) (map[string][]linters.Lin
 	var lineParse = func(line string) (*linters.LinterOutput, error) {
 		// stylecheck will output lines starting with ' 开始检查 ' or '检查结束 ' or 'stylecheck info'
 		// which are no meaningful for the reviewbot scenario, so we discard them
-		strings.ToLower(line)
 		if strings.Contains(strings.ToLower(line), "checkstyle") || strings.HasPrefix(line, "开始") || strings.HasPrefix(line, "检查") || line == "" {
 			return nil, nil
 		}
@@ -156,7 +155,7 @@ func styleRuleCheck(styleConf string) (string, error) {
 	rulefilepath := filepath.Join(rulefiledirpath, ".java-sun-checks.xml")
 	madirerr := os.MkdirAll(rulefiledirpath, 0755)
 	if madirerr != nil {
-		return "", fmt.Errorf("dir make failed: %v", err)
+		return "", madirerr
 	}
 	if strings.HasPrefix(styleConf, "http") {
 		downloadfilepath, err := getFileFromURL(styleConf, rulefilepath)
