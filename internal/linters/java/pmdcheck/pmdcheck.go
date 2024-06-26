@@ -26,7 +26,7 @@ func pmdcheckHandler(log *xlog.Logger, a linters.Agent) error {
 	rulePath := a.LinterConfig.ConfigPath
 	for _, arg := range a.PullRequestChangedFiles {
 		if strings.HasSuffix(arg.GetFilename(), ".java") {
-			javaFiles = append(javaFiles, a.LinterConfig.WorkDir+"/"+arg.GetFilename())
+			javaFiles = append(javaFiles, arg.GetFilename())
 		}
 	}
 	checkrulePath, checkerr := pmdRuleCheck(rulePath)
