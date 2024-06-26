@@ -28,10 +28,6 @@ func pmdcheckHandler(log *xlog.Logger, a linters.Agent) error {
 		}
 	}
 	checkrulePath, checkerr := pmdRuleCheck(rulePath)
-	if checkerr != nil {
-		log.Errorf("pmd rule file check failed: %v", checkerr)
-	}
-	log.Infof("pmd  rule check succes,file path: %v", checkrulePath)
 	if (len(javaFiles) == 0) || !linters.IsExist(checkrulePath) || checkerr != nil {
 		return nil
 	}
@@ -55,8 +51,6 @@ func pmdcheckParser(log *xlog.Logger, output []byte) (map[string][]linters.Linte
 	var lineParse = func(line string) (*linters.LinterOutput, error) {
 		// pmdcheck will output lines starting with ' [WARN]'  warring information
 		// which are no meaningful for the reviewbot scenario, so we discard them
-
-		strings.ToLower(line)
 		if strings.Contains(line, "[WARN]") || line == "" {
 			return nil, nil
 		}
@@ -94,7 +88,6 @@ func getFileFromURL(url string, filepath string) (string, error) {
 func pmdRuleCheck(pmdConf string) (string, error) {
 	if linters.IsExist(pmdConf) {
 		return pmdConf, nil
-
 	}
 	if pmdConf == "" {
 		pmdConf = "https://raw.githubusercontent.com/pmd/pmd/master/pmd-java/src/main/resources/category/java/bestpractices.xml"
