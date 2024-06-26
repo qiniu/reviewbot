@@ -29,6 +29,9 @@ import (
 
 func TestForHttpConfig(t *testing.T) {
 	fileDir, err := os.Getwd()
+	if err != nil {
+		t.Errorf("test failed, work dir get error:%v", err)
+	}
 	rulefiledirpath := filepath.Join(fileDir, "config/linters-config")
 	rulefilepath := filepath.Join(rulefiledirpath, ".java-sun-checks.xml")
 	path, err := styleRuleCheck("https://raw.githubusercontent.com/checkstyle/checkstyle/master/src/main/resources/sun_checks.xml")
@@ -42,6 +45,9 @@ func TestForHttpConfig(t *testing.T) {
 }
 func TestForNotConfig(t *testing.T) {
 	fileDir, err := os.Getwd()
+	if err != nil {
+		t.Errorf("test failed, work dir get error:%v", err)
+	}
 	rulefiledirpath := filepath.Join(fileDir, "config/linters-config")
 	rulefilepath := filepath.Join(rulefiledirpath, ".java-sun-checks.xml")
 	path, err := styleRuleCheck("")
@@ -55,6 +61,9 @@ func TestForNotConfig(t *testing.T) {
 }
 func TestForConfigFail(t *testing.T) {
 	fileDir, err := os.Getwd()
+	if err != nil {
+		t.Errorf("test failed, work dir get error:%v", err)
+	}
 	rulefiledirpath := filepath.Join(fileDir, "config/linters-config")
 	rulefilepath := filepath.Join(rulefiledirpath, ".java-sun-checks.xml")
 	path, err := getFileFromURL("https://raw.githubusercontent.com/checkstyle/checkstyle/master/src/main/resources/sun_chdfdfdfecks.xml", "unknowpath/.java-sun_chdfdfdfecks.xml")
@@ -69,6 +78,9 @@ func TestForConfigFail(t *testing.T) {
 func TestCheckJar(t *testing.T) {
 	var stykejarfilename = "checkstyle-10.17.0-all.jar"
 	filePath, err := os.Getwd()
+	if err != nil {
+		t.Errorf("test failed, work dir get error:%v", err)
+	}
 	filename2 := filepath.Join(filePath, stykejarfilename)
 	path, err := stylecheckJar()
 	if err != nil {
