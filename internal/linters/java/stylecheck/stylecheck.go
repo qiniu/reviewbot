@@ -29,7 +29,6 @@ func stylecheckHandler(log *xlog.Logger, a linters.Agent) error {
 	linterWorkDir = a.LinterConfig.WorkDir
 	for _, arg := range a.PullRequestChangedFiles {
 		if strings.HasSuffix(arg.GetFilename(), ".java") {
-			//javaFiles = append(javaFiles, a.LinterConfig.WorkDir+"/"+arg.GetFilename())
 			javaFiles = append(javaFiles, arg.GetFilename())
 
 		}
@@ -40,6 +39,9 @@ func stylecheckHandler(log *xlog.Logger, a linters.Agent) error {
 	}
 	log.Infof("style jar check succes,file path: %v", jarfile)
 	checkrulePath, checkerr := styleRuleCheck(rulePath)
+	if checkerr != nil {
+		log.Errorf("style rule check failed: %v", checkerr)
+	}
 	if (len(javaFiles) == 0) || !linters.IsExist(checkrulePath) || linters.IsExist(jarfile) && err != nil || checkerr != nil {
 		return nil
 	}
@@ -76,7 +78,6 @@ func stylecheckJar() (string, error) {
 	var stylejar = "/usr/local/checkstyle-10.17.0-all.jar"
 	if linters.IsExist(stylejar) {
 		return stylejar, nil
-
 	}
 	var stylejarurl = "https://github.com/checkstyle/checkstyle/releases/download/checkstyle-10.17.0/checkstyle-10.17.0-all.jar"
 	var stykejarfilename = "checkstyle-10.17.0-all.jar"

@@ -28,6 +28,9 @@ func pmdcheckHandler(log *xlog.Logger, a linters.Agent) error {
 		}
 	}
 	checkrulePath, checkerr := pmdRuleCheck(rulePath)
+	if checkerr != nil {
+		log.Errorf("pmd rule check failed: %v", checkerr)
+	}
 	if (len(javaFiles) == 0) || !linters.IsExist(checkrulePath) || checkerr != nil {
 		return nil
 	}
