@@ -29,6 +29,9 @@ import (
 
 func TestForConfig(t *testing.T) {
 	fileDir, err := os.Getwd()
+	if err != nil {
+		t.Errorf("test failed, work dir get error:%v", err)
+	}
 	rulefiledirpath := filepath.Join(fileDir, "config/linters-config")
 	rulefilepath := filepath.Join(rulefiledirpath, ".java-bestpractices.xml")
 	path, err := pmdRuleCheck("https://raw.githubusercontent.com/pmd/pmd/master/pmd-java/src/main/resources/category/java/bestpractices.xml")
@@ -42,6 +45,9 @@ func TestForConfig(t *testing.T) {
 }
 func TestForConfigFail(t *testing.T) {
 	fileDir, err := os.Getwd()
+	if err != nil {
+		t.Errorf("test failed, work dir get error:%v", err)
+	}
 	rulefiledirpath := filepath.Join(fileDir, "config/linters-config")
 	rulefilepath := filepath.Join(rulefiledirpath, ".java-sun-checks.xml")
 	path, err := getFileFromURL("https://raw.githubusercontent.com/pmd/pmd/master/pmd-java/src/main/resources/category/java/bestpracxxxices.xml", "unknowpath/.java-bestpracxxxices.xml")

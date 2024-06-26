@@ -17,13 +17,14 @@
 package stylecheck
 
 import (
-	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/x/errors"
 	"github.com/qiniu/x/xlog"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/qiniu/reviewbot/internal/linters"
 )
 
 func TestForHttpConfig(t *testing.T) {
