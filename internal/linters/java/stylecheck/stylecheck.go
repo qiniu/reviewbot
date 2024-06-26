@@ -38,13 +38,8 @@ func stylecheckHandler(log *xlog.Logger, a linters.Agent) error {
 	if err != nil {
 		log.Errorf("style jar check failed: %v", err)
 	}
-	log.Infof("sytle jar check succes,file path: %v", jarfile)
+	log.Infof("style jar check succes,file path: %v", jarfile)
 	checkrulePath, checkerr := styleRuleCheck(rulePath)
-	if checkerr != nil {
-		log.Errorf("style rule file check failed: %v", checkerr)
-	}
-	log.Infof("style  rule check succes,file path: %v", checkrulePath)
-
 	if (len(javaFiles) == 0) || !linters.IsExist(checkrulePath) || linters.IsExist(jarfile) && err != nil || checkerr != nil {
 		return nil
 	}

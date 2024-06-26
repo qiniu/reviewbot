@@ -70,13 +70,12 @@ func getFileFromURL(url string, filepath string) (string, error) {
 	}
 	res, err := http.Get(url)
 	if err != nil {
-		log.Errorf("The file download  encountered  an error，"+
-			"Please check the file  download url: %v,the error is:%v", url, err)
+		log.Errorf("The file download encountered an error, Please check the file download url: %v, the error is:%v", url, err)
 		return "", err
 	}
 	f, err := os.Create(filepath)
 	if err != nil {
-		log.Errorf("The file saving   encountered an error,Please check the directory: %v", err)
+		log.Errorf("The file saving encountered an error, Please check the directory: %v", err)
 		return "", err
 	}
 	_, err = io.Copy(f, res.Body)
