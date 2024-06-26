@@ -107,6 +107,8 @@ type Agent struct {
 	PullRequestEvent github.PullRequestEvent
 	// PullRequestChangedFiles is the changed files of a pull request.
 	PullRequestChangedFiles []*github.CommitFile
+	// LinterName is the linter name.
+	LinterName string
 }
 
 const CommentFooter = `
@@ -121,10 +123,11 @@ If you have any questions about this comment, feel free to raise an issue here:
 // ------------------------ Linter ------------------------
 
 func GeneralHandler(log *xlog.Logger, a Agent, ParseFunc func(*xlog.Logger, []byte) (map[string][]LinterOutput, error)) error {
-	cmd := a.LinterConfig.Command
-	output, err := ExecRun(a.LinterConfig.WorkDir, cmd, a.LinterConfig.Args...)
+	linterName := a.LinterName
+	output, err := ExecRun(a.LinterConfig.WorkDir, a.LinterConfig.Command, a.LinterConfig.Args...)
 	if err != nil {
-		log.Errorf("%s run failed: %v, mark and continue", cmd, err)
+		// NOTE(CarlJi): the error is *ExitError, it seems to have little information and needs to be handled in a better way.
+		log.Warnf("%s run with exit code: %v, mark and continue", linterName, err)
 	}
 
 	// even if the output is empty, we still need to parse it
@@ -132,7 +135,7 @@ func GeneralHandler(log *xlog.Logger, a Agent, ParseFunc func(*xlog.Logger, []by
 
 	lintResults, err := ParseFunc(log, output)
 	if err != nil {
-		log.Errorf("failed to parse output failed: %v, cmd: %v", err, cmd)
+		log.Errorf("failed to parse output failed: %v, cmd: %v", err, linterName)
 		return err
 	}
 
@@ -140,16 +143,20 @@ func GeneralHandler(log *xlog.Logger, a Agent, ParseFunc func(*xlog.Logger, []by
 }
 
 // ExecRun executes a command.
-func ExecRun(workDir, command string, args ...string) ([]byte, error) {
-	g, err := exec.LookPath(command)
-	if err != nil {
-		return nil, err
+func ExecRun(workDir string, command []string, args ...string) ([]byte, error) {
+	executable := command[0]
+	var cmdArgs []string
+	if len(command) > 1 {
+		cmdArgs = command[1:]
 	}
 
-	log.Infof("exec command: %v %v", g, args)
-	c := exec.Command(g, args...)
-	c.Dir = workDir
+	if len(args) > 0 {
+		cmdArgs = append(cmdArgs, args...)
+	}
 
+	c := exec.Command(executable, cmdArgs...)
+	c.Dir = workDir
+	log.Infof("run command: %v", c)
 	return c.CombinedOutput()
 }
 
@@ -167,7 +174,7 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 		org        = a.PullRequestEvent.Repo.GetOwner().GetLogin()
 		repo       = a.PullRequestEvent.Repo.GetName()
 		orgRepo    = a.PullRequestEvent.Repo.GetFullName()
-		linterName = a.LinterConfig.Command
+		linterName = a.LinterName
 	)
 
 	log.Infof("[%s] found total %d files with %d lint errors on repo %v", linterName, len(lintResults), countLinterErrors(lintResults), orgRepo)
@@ -191,11 +198,8 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 			return err
 		}
 		log.Infof("[%s] create check run success, HTML_URL: %v", linterName, ch.GetHTMLURL())
-		var msg = constructMessage(linterName, a.PullRequestEvent.GetPullRequest().GetHTMLURL(), ch.GetHTMLURL(), lintResults)
-		if err := metric.NotifyWebhook(msg); err != nil {
-			log.Errorf("failed to send alert message, err: %v, msg: %v", err, msg)
-			// just log the error, not return
-		}
+
+		metric.NotifyWebhookByText(constructMessage(linterName, a.PullRequestEvent.GetPullRequest().GetHTMLURL(), ch.GetHTMLURL(), lintResults))
 	case config.GithubPRReview:
 		// List existing comments
 		existedComments, err := ListPullRequestsComments(context.Background(), a.GithubClient, org, repo, num)
@@ -233,11 +237,7 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 			return err
 		}
 		log.Infof("[%s] add %d comments for this PR %d (%s) \n", linterName, len(addedCmts), num, orgRepo)
-		var msg = constructMessage(linterName, a.PullRequestEvent.GetPullRequest().GetHTMLURL(), addedCmts[0].GetHTMLURL(), lintResults)
-		if err := metric.NotifyWebhook(msg); err != nil {
-			log.Errorf("failed to send alert message, err: %v, msg: %v", err, msg)
-			// just log the error, not return
-		}
+		metric.NotifyWebhookByText(constructMessage(linterName, a.PullRequestEvent.GetPullRequest().GetHTMLURL(), addedCmts[0].GetHTMLURL(), lintResults))
 	default:
 		log.Errorf("unsupported report format: %v", a.LinterConfig.ReportFormat)
 	}
@@ -302,15 +302,9 @@ func Parse(log *xlog.Logger, output []byte, lineParser LineParser) (map[string][
 		if message != "" {
 			message = fmt.Sprintf("unexpected lines:\n%v", message)
 			log.Warnf(message)
-			var msg metric.MessageBody
-			msg.MsgType = "markdown"
-			msg.Markdown.Content = fmt.Sprintf("<font color=\"warning\">[ATTENTION PLEASE]</font> %v", message)
 			// seed the alert message if the linter output is unexpected
-			// so that we can know the issue and fix it
-			if err := metric.NotifyWebhook(msg); err != nil {
-				log.Errorf("failed to send alert message, err: %v, msg: %v", err, msg)
-				// just log the error, not return
-			}
+			// so that we can know the issue and fix it in time
+			metric.NotifyWebhookByMarkdown(fmt.Sprintf("<font color=\"warning\">[ATTENTION PLEASE]</font> %v", message))
 		}
 	}()
 
@@ -380,9 +374,9 @@ func countLinterErrors(lintResults map[string][]LinterOutput) int {
 	return count
 }
 
-func constructMessage(linter, pr, link string, linterResults map[string][]LinterOutput) (msg metric.MessageBody) {
+func constructMessage(linter, pr, link string, linterResults map[string][]LinterOutput) string {
 	if len(linterResults) == 0 {
-		return
+		return ""
 	}
 
 	var message string
@@ -392,7 +386,5 @@ func constructMessage(linter, pr, link string, linterResults map[string][]Linter
 		}
 	}
 
-	msg.MsgType = "text"
-	msg.Text.Content = fmt.Sprintf("Linter: %v \nPR:   %v \nLink: %v \nDetails:\n%v\n", linter, pr, link, message)
-	return
+	return fmt.Sprintf("Linter: %v \nPR:   %v \nLink: %v \nDetails:\n%v\n", linter, pr, link, message)
 }

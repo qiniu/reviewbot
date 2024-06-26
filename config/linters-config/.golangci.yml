@@ -27,4 +27,5 @@ linters:
     - execinquery # deprecated
     - gomnd # deprecated
     - funlen # seems too arbitrary
+    - lll # seems too arbitrary
 
