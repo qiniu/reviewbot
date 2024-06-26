@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
-
-	"github.com/qiniu/reviewbot/internal/metric"
 )
 
 func TestFormatStaticcheckLine(t *testing.T) {
@@ -127,7 +125,7 @@ func TestConstructMessage(t *testing.T) {
 		PR            string
 		Link          string
 		linterResults map[string][]LinterOutput
-		expected      metric.MessageBody
+		expected      string
 	}{
 		{
 			Linter: "golangci-lint",
@@ -143,19 +141,14 @@ func TestConstructMessage(t *testing.T) {
 					},
 				},
 			},
-			expected: metric.MessageBody{
-				MsgType: "text",
-				Text: metric.MsgContent{
-					Content: fmt.Sprintf("Linter: %v \nPR:   %v \nLink: %v \nDetails:\n%v\n", "golangci-lint", "1", "http://", "cdn-admin.v2/client/dns/dnsapi.go:59:3: assignment to err\n"),
-				},
-			},
+			expected: fmt.Sprintf("Linter: %v \nPR:   %v \nLink: %v \nDetails:\n%v\n", "golangci-lint", "1", "http://", "cdn-admin.v2/client/dns/dnsapi.go:59:3: assignment to err\n"),
 		},
 		{
 			Linter:        "golangci-lint",
 			PR:            "",
 			Link:          "",
 			linterResults: map[string][]LinterOutput{},
-			expected:      metric.MessageBody{},
+			expected:      "",
 		},
 	}
 
