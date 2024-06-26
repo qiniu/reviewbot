@@ -60,6 +60,24 @@ func TestFormatStaticcheckLine(t *testing.T) {
 			Column:  3,
 			Message: "should replace loop with ret = append(ret, scope.EdgeNodes...) (S1011)",
 		}},
+		{"/Users/zhou/Documents/qproject/prow/cmd/phony/examples/test2.java:21:18: '{' 前应有空格。 [WhitespaceAround]", &LinterOutput{
+			File:    "/Users/zhou/Documents/qproject/prow/cmd/phony/examples/test2.java",
+			Line:    21,
+			Column:  18,
+			Message: "'{' 前应有空格。 [WhitespaceAround]",
+		}},
+		{"/Users/zhou/Documents/qproject/prow/cmd/phony/examples/test.java:1: 文件未以空行结尾。 [NewlineAtEndOfFile]", &LinterOutput{
+			File:    "/Users/zhou/Documents/qproject/prow/cmd/phony/examples/test.java",
+			Line:    1,
+			Column:  0,
+			Message: "文件未以空行结尾。 [NewlineAtEndOfFile]",
+		}},
+		{"dn_scheduler/scheduler/node_scheduler/consistent/consistent_test.go:275: 275-304 lines are duplicate of", &LinterOutput{
+			File:    "dn_scheduler/scheduler/node_scheduler/consistent/consistent_test.go",
+			Line:    275,
+			Column:  0,
+			Message: "275-304 lines are duplicate of",
+		}},
 		{"cdn-admin.v2/api/api_line.go:342 should replace loop with ret = append(ret, scope.EdgeNodes...)", nil},
 	}
 

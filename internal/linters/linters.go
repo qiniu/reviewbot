@@ -167,8 +167,11 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 		org        = a.PullRequestEvent.Repo.GetOwner().GetLogin()
 		repo       = a.PullRequestEvent.Repo.GetName()
 		orgRepo    = a.PullRequestEvent.Repo.GetFullName()
-		linterName = a.LinterConfig.Command
+		linterName = a.LinterConfig.LinterName
 	)
+	if a.LinterConfig.LinterName == "" {
+		linterName = a.LinterConfig.Command
+	}
 
 	log.Infof("[%s] found total %d files with %d lint errors on repo %v", linterName, len(lintResults), countLinterErrors(lintResults), orgRepo)
 	lintResults, err := Filters(log, a, lintResults)
@@ -370,6 +373,14 @@ func IsEmpty(args ...string) bool {
 		}
 	}
 	return true
+}
+func IsExist(path string) bool {
+	if _, err := os.Stat(path); err != nil {
+		log.Errorf("config path check failed,%v file not exit", path)
+		return false
+	} else {
+		return true
+	}
 }
 
 func countLinterErrors(lintResults map[string][]LinterOutput) int {
