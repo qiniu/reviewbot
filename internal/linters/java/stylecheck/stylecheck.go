@@ -15,6 +15,8 @@ import (
 
 const linterName = "stylecheck"
 
+var linterWorkDir = ""
+
 func init() {
 	linters.RegisterPullRequestHandler(linterName, stylecheckHandler)
 	linters.RegisterLinterLanguages(linterName, []string{".java"})
@@ -24,9 +26,12 @@ func init() {
 func stylecheckHandler(log *xlog.Logger, a linters.Agent) error {
 	var javaFiles []string
 	rulePath := a.LinterConfig.ConfigPath
+	linterWorkDir = a.LinterConfig.WorkDir
 	for _, arg := range a.PullRequestChangedFiles {
 		if strings.HasSuffix(arg.GetFilename(), ".java") {
-			javaFiles = append(javaFiles, a.LinterConfig.WorkDir+"/"+arg.GetFilename())
+			//javaFiles = append(javaFiles, a.LinterConfig.WorkDir+"/"+arg.GetFilename())
+			javaFiles = append(javaFiles, arg.GetFilename())
+
 		}
 	}
 	jarfile, err := stylecheckJar()
@@ -66,6 +71,8 @@ func stylecheckParser(log *xlog.Logger, output []byte) (map[string][]linters.Lin
 		if strings.Contains(strings.ToLower(line), "checkstyle") || strings.HasPrefix(line, "开始") || strings.HasPrefix(line, "检查") || line == "" {
 			return nil, nil
 		}
+		line = strings.ReplaceAll(line, "[ERROR]", "")
+		line = strings.ReplaceAll(line, "/private"+linterWorkDir+"/", "")
 		return linters.GeneralLineParser(strings.TrimLeft(line, " "))
 	}
 	return linters.Parse(log, output, lineParse)

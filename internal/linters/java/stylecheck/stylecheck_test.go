@@ -61,9 +61,9 @@ func TestFormatStyleCheckLine(t *testing.T) {
 		{
 			input: []byte(`[ERROR]/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test2.java:21:18: '{' 前应有空格。 [WhitespaceAround]`),
 			expected: map[string][]linters.LinterOutput{
-				"[ERROR]/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test2.java": {
+				"/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test2.java": {
 					{
-						File:    "[ERROR]/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test2.java",
+						File:    "/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test2.java",
 						Line:    21,
 						Column:  18,
 						Message: "'{' 前应有空格。 [WhitespaceAround]",
@@ -75,9 +75,9 @@ func TestFormatStyleCheckLine(t *testing.T) {
 		{
 			input: []byte(`[ERROR]/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java:1: 文件未以空行结尾。 [NewlineAtEndOfFile]`),
 			expected: map[string][]linters.LinterOutput{
-				"[ERROR]/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java": {
+				"/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java": {
 					{
-						File:    "[ERROR]/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java",
+						File:    "/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java",
 						Line:    1,
 						Column:  0,
 						Message: "文件未以空行结尾。 [NewlineAtEndOfFile]",
