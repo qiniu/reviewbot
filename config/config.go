@@ -36,7 +36,7 @@ type Linter struct {
 	WorkDir string `json:"workDir,omitempty"`
 	// Command is the command to run the linter. e.g. "golangci-lint", "staticcheck"
 	// If empty, use the linter name as the command.
-	Command string `json:"command,omitempty"`
+	Command []string `json:"command,omitempty"`
 	// Args is the arguments of the command.
 	Args []string `json:"args,omitempty"`
 
@@ -95,7 +95,6 @@ func (c Config) Get(org, repo, ln string) Linter {
 	linter := Linter{
 		Enable:       boolPtr(true),
 		ReportFormat: c.GlobalDefaultConfig.GithubReportType,
-		Command:      ln,
 	}
 
 	// set golangci-lint config path if exists
@@ -115,6 +114,10 @@ func (c Config) Get(org, repo, ln string) Linter {
 		}
 	}
 
+	if linter.Command == nil {
+		linter.Command = []string{ln}
+	}
+
 	return linter
 }
 
@@ -127,7 +130,7 @@ func applyCustomConfig(legacy, custom Linter) Linter {
 		legacy.WorkDir = custom.WorkDir
 	}
 
-	if custom.Command != "" {
+	if custom.Command != nil {
 		legacy.Command = custom.Command
 	}
 

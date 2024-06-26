@@ -52,7 +52,7 @@ func shellcheck(log *xlog.Logger, a linters.Agent) error {
 
 		output, err := linters.ExecRun(a.LinterConfig.WorkDir, a.LinterConfig.Command, a.LinterConfig.Args...)
 		if err != nil {
-			log.Errorf("%s run failed: %v, mark and continue", cmd, err)
+			log.Warnf("%s run with error: %v, mark and continue", cmd, err)
 		}
 
 		lintResults, err = linters.GeneralParse(log, output)

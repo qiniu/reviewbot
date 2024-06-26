@@ -9,6 +9,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/qiniu/x/log"
 )
 
 var (
@@ -38,9 +39,9 @@ type MsgContent struct {
 	Content string `json:"content"`
 }
 
-// NotifyWebhook sends message to wework group
+// notify sends message to wework group
 // refer: https://developer.work.weixin.qq.com/document/path/91770
-func NotifyWebhook(message MessageBody) error {
+func notify(message MessageBody) error {
 	if WEWORK_WEBHOOK == "" || (message.Text.Content == "" && message.Markdown.Content == "") {
 		return nil
 	}
@@ -66,4 +67,31 @@ func NotifyWebhook(message MessageBody) error {
 	}
 
 	return nil
+}
+
+// notifyAsync sends message to wework group asynchronously.
+func notifyAsync(message MessageBody) {
+	go func() {
+		if err := notify(message); err != nil {
+			log.Infof("send message failed, err: %v, message: %v\n", err, message)
+		}
+	}()
+}
+
+// NotifyWebhookByText sends text message to wework group.
+func NotifyWebhookByText(content string) {
+	notifyAsync(MessageBody{
+		MsgType: "text",
+		Text:    MsgContent{Content: content},
+	})
+}
+
+// NotifyWebhookByMarkdown sends markdown message to wework group.
+func NotifyWebhookByMarkdown(content string) {
+	notifyAsync(MessageBody{
+		MsgType: "markdown",
+		Markdown: MsgContent{
+			Content: content,
+		},
+	})
 }
