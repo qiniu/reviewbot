@@ -80,12 +80,12 @@ func stylecheckJar() (string, error) {
 		return stylejar, nil
 	}
 	var stylejarurl = "https://github.com/checkstyle/checkstyle/releases/download/checkstyle-10.17.0/checkstyle-10.17.0-all.jar"
-	var stykejarfilename = "checkstyle-10.17.0-all.jar"
-	filePath, err := os.Getwd()
+	var stylejarfilename = "checkstyle-10.17.0-all.jar"
+	filewdPath, err := os.Getwd()
 	if err != nil {
 		return "", err
 	}
-	filename2 := filepath.Join(filePath, stykejarfilename)
+	filename2 := filepath.Join(filewdPath, stylejarfilename)
 	fmt.Println(filename2)
 	if linters.IsExist(filename2) {
 		return filename2, nil
@@ -94,7 +94,7 @@ func stylecheckJar() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	madirerr := os.MkdirAll(filePath, 0755)
+	madirerr := os.MkdirAll(filewdPath, 0755)
 	if madirerr != nil {
 		return "", madirerr
 	}
@@ -133,10 +133,7 @@ func getFileFromURL(url string, filepath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if linters.IsExist(filepath) {
-		return filepath, nil
-	}
-	return "", err
+	return filepath, nil
 }
 func styleRuleCheck(styleConf string) (string, error) {
 	if linters.IsExist(styleConf) {

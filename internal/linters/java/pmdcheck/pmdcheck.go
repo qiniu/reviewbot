@@ -82,11 +82,7 @@ func getFileFromURL(url string, filepath string) (string, error) {
 		log.Errorf("The file saving   encountered an error: %v", err)
 		return "", err
 	}
-	if linters.IsExist(filepath) {
-		log.Infof("pmd  rule check succes,file path: %v", filepath)
-		return filepath, nil
-	}
-	return "", err
+	return filepath, nil
 }
 func pmdRuleCheck(pmdConf string) (string, error) {
 	if linters.IsExist(pmdConf) {

@@ -64,8 +64,8 @@ func TestForConfigFail(t *testing.T) {
 	if err != nil {
 		t.Errorf("test failed, work dir get error:%v", err)
 	}
-	rulefiledirpath := filepath.Join(fileDir, "config/linters-config")
-	rulefilepath := filepath.Join(rulefiledirpath, ".java-sun-checks.xml")
+	rulefilepath := filepath.Join(fileDir, "config/linters-config/.java-sun-checks.xml")
+	//rulefiledirpathrulefilepath := filepath.Join(rulefiledirpath, ".java-sun-checks.xml")
 	path, err := getFileFromURL("https://raw.githubusercontent.com/checkstyle/checkstyle/master/src/main/resources/sun_chdfdfdfecks.xml", "unknowpath/.java-sun_chdfdfdfecks.xml")
 	if err == nil {
 		t.Errorf("getFileFromURL(): %v, expected: %v", nil, err)
