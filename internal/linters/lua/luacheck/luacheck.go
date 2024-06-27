@@ -43,7 +43,7 @@ func luacheckHandler(log *xlog.Logger, a linters.Agent) error {
 	return linters.GeneralHandler(log, a, parser)
 }
 
-func parser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, error) {
+func parser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, []string) {
 	var lineParse = func(line string) (*linters.LinterOutput, error) {
 		// luacheck will output lines starting with 'Total ' or 'Checking '
 		// which are no meaningful for the reviewbot scenario, so we discard them

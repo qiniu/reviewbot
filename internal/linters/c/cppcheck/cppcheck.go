@@ -1,8 +1,6 @@
 package cppcheck
 
 import (
-	"strings"
-
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/x/xlog"
 )
@@ -21,21 +19,19 @@ func cppcheckHandler(log *xlog.Logger, a linters.Agent) error {
 		a.LinterConfig.Args = append([]string{}, "--quiet", "--template='{file}:{line}:{column}: {message}'", ".")
 	}
 
-	return linters.GeneralHandler(log, a, func(l *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, error) {
-		return linters.Parse(log, output, cppcheckParser)
-	})
+	return linters.GeneralHandler(log, a, parser)
 }
 
-func cppcheckParser(line string) (*linters.LinterOutput, error) {
-	lineResult, err := linters.GeneralLineParser(line)
-	if err != nil {
-		return nil, err
+func parser(log *xlog.Logger, input []byte) (map[string][]linters.LinterOutput, []string) {
+	var lineParser = func(line string) (*linters.LinterOutput, error) {
+		if len(line) <= 2 {
+			return nil, nil
+		}
 
+		// remove the first and last character of the line,
+		// which are the single quotes
+		line = line[1 : len(line)-1]
+		return linters.GeneralLineParser(line)
 	}
-	return &linters.LinterOutput{
-		File:    strings.TrimLeft(lineResult.File, "'"),
-		Line:    lineResult.Line,
-		Column:  lineResult.Column,
-		Message: strings.TrimRight(lineResult.Message, "'"),
-	}, nil
+	return linters.Parse(log, input, lineParser)
 }

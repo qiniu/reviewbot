@@ -17,7 +17,6 @@
 package luacheck
 
 import (
-	"errors"
 	"reflect"
 	"testing"
 
@@ -27,9 +26,9 @@ import (
 
 func TestParser(t *testing.T) {
 	tc := []struct {
-		input    []byte
-		expected map[string][]linters.LinterOutput
-		err      error
+		input      []byte
+		expected   map[string][]linters.LinterOutput
+		unexpected []string
 	}{
 		{
 			input: []byte(`
@@ -45,7 +44,7 @@ video/mp4/libs/mp4lib.lua:184:11: value assigned to variable mem_data is overwri
 					},
 				},
 			},
-			err: nil,
+			unexpected: nil,
 		},
 		{
 			input: []byte(`
@@ -61,37 +60,36 @@ utils/jsonschema.lua:723:121: line is too long (142 > 120)
 					},
 				},
 			},
-			err: nil,
+			unexpected: nil,
 		},
 		{
 			input: []byte(`
 Total: 0 warnings / 0 errors in 0 files
 `),
-			expected: map[string][]linters.LinterOutput{},
-			err:      nil,
+			expected:   map[string][]linters.LinterOutput{},
+			unexpected: nil,
 		},
 		{
 			input: []byte(`
 Checking test/qtest_mgrconf.lua
 `),
-			expected: map[string][]linters.LinterOutput{},
-			err:      nil,
+			expected:   map[string][]linters.LinterOutput{},
+			unexpected: nil,
 		},
 		{
-			input:    []byte(``),
-			expected: map[string][]linters.LinterOutput{},
-			err:      nil,
+			input:      []byte(``),
+			expected:   map[string][]linters.LinterOutput{},
+			unexpected: nil,
 		},
 	}
 
 	for _, c := range tc {
-		got, err := parser(xlog.New("UnitLuaCheckTest"), c.input)
-		if !errors.Is(err, c.err) {
-			t.Errorf("parser() error: %v, expected: %v", err, c.err)
-			return
-		}
+		got, unexpected := parser(xlog.New("UnitLuaCheckTest"), c.input)
 		if !reflect.DeepEqual(got, c.expected) {
 			t.Errorf("parser(): %v, expected: %v", got, c.expected)
+		}
+		if !reflect.DeepEqual(unexpected, c.unexpected) {
+			t.Errorf("parser(): %v, expected: %v", unexpected, c.unexpected)
 		}
 	}
 }
