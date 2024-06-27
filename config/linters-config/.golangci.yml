@@ -28,4 +28,6 @@ linters:
     - gomnd # deprecated
     - funlen # seems too arbitrary
     - lll # seems too arbitrary
+    - mnd # seems too arbitrary
+    - nilnil # seems too arbitrary
 

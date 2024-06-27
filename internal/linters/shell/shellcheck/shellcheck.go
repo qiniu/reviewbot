@@ -63,6 +63,7 @@ func shellcheck(log *xlog.Logger, a linters.Agent) error {
 			log.Warnf("unexpected output: %v", msg)
 			metric.NotifyWebhookByText(linters.ConstructUnknownMsg(linterName, a.PullRequestEvent.Repo.GetFullName(), a.PullRequestEvent.PullRequest.GetHTMLURL(), log.ReqId, msg))
 		}
+
 		lintResults = results
 	}
 

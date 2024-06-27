@@ -7,7 +7,9 @@ func LimitJoin(str []string, length int) string {
 		if len(result)+len(s) > length {
 			break
 		}
+
 		result += s + "\n"
 	}
+
 	return result
 }

@@ -32,7 +32,6 @@ func parser(log *xlog.Logger, input []byte) (map[string][]linters.LinterOutput, 
 		// which are the single quotes
 		line = line[1 : len(line)-1]
 		return linters.GeneralLineParser(line)
-
 	}
 	return linters.Parse(log, input, lineParser)
 }
