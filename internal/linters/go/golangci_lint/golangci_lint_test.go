@@ -1,7 +1,6 @@
 package golangcilint
 
 import (
-	"errors"
 	"reflect"
 	"testing"
 
@@ -11,9 +10,9 @@ import (
 
 func TestParser(t *testing.T) {
 	cases := []struct {
-		output []byte
-		want   map[string][]linters.LinterOutput
-		err    error
+		output     []byte
+		want       map[string][]linters.LinterOutput
+		unexpected []string
 	}{
 		{
 			output: []byte(`
@@ -38,7 +37,7 @@ golangci_lint.go:18:3: error: (golint)
 					},
 				},
 			},
-			err: nil,
+			unexpected: nil,
 		},
 		{
 			output: []byte(`
@@ -55,7 +54,7 @@ golangci_lint.go:16:1: error (gochecknoglobals)
 					},
 				},
 			},
-			err: nil,
+			unexpected: []string{"golangci_lint.go:16:1: error (typecheck)"},
 		},
 		{
 			output: []byte(`
@@ -73,19 +72,17 @@ golangci_lint.go:16:1: warning: (gochecknoglobals)
 					},
 				},
 			},
-			err: nil,
+			unexpected: nil,
 		},
 	}
 
 	for _, tt := range cases {
-		got, err := parser(xlog.New("UnitTest"), tt.output)
-		if !errors.Is(err, tt.err) {
-			t.Errorf("parser() error = %v, wantErr %v", err, tt.err)
-			return
-		}
-
+		got, unexpected := parser(xlog.New("UnitTest"), tt.output)
 		if !reflect.DeepEqual(got, tt.want) {
 			t.Errorf("parser() = %v, want %v", got, tt.want)
+		}
+		if !reflect.DeepEqual(unexpected, tt.unexpected) {
+			t.Errorf("unexpected = %v, want %v", unexpected, tt.unexpected)
 		}
 	}
 }

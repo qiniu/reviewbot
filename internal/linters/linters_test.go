@@ -119,7 +119,7 @@ func TestIsEmpty(t *testing.T) {
 	}
 }
 
-func TestConstructMessage(t *testing.T) {
+func TestConstructGotchaMessage(t *testing.T) {
 	tcs := []struct {
 		Linter        string
 		PR            string
@@ -141,7 +141,7 @@ func TestConstructMessage(t *testing.T) {
 					},
 				},
 			},
-			expected: fmt.Sprintf("Linter: %v \nPR:   %v \nLink: %v \nDetails:\n%v\n", "golangci-lint", "1", "http://", "cdn-admin.v2/client/dns/dnsapi.go:59:3: assignment to err\n"),
+			expected: fmt.Sprintf("✅ Linter: %v \nPR:   %v \nLink: %v \nDetails:\n%v\n", "golangci-lint", "1", "http://", "cdn-admin.v2/client/dns/dnsapi.go:59:3: assignment to err\n"),
 		},
 		{
 			Linter:        "golangci-lint",
@@ -153,7 +153,34 @@ func TestConstructMessage(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		actual := constructMessage(tc.Linter, tc.PR, tc.Link, tc.linterResults)
+		actual := ConstructGotchaMsg(tc.Linter, tc.PR, tc.Link, tc.linterResults)
+		if !reflect.DeepEqual(tc.expected, actual) {
+			t.Errorf("expected: %v, got: %v", tc.expected, actual)
+		}
+	}
+}
+
+func TestConstructUnknownMsg(t *testing.T) {
+	tcs := []struct {
+		Linter   string
+		Repo     string
+		PR       string
+		Event    string
+		message  string
+		expected string
+	}{
+		{
+			Linter:   "golangci-lint",
+			Repo:     "cdn-admin.v2",
+			PR:       "1",
+			Event:    "opened",
+			message:  "message",
+			expected: fmt.Sprintf("😱🚀 Linter: %v \nRepo: %v \nPR:   %v \nEvent: %v \nUnexpected: %v\n", "golangci-lint", "cdn-admin.v2", "1", "opened", "message"),
+		},
+	}
+
+	for _, tc := range tcs {
+		actual := ConstructUnknownMsg(tc.Linter, tc.Repo, tc.PR, tc.Event, tc.message)
 		if !reflect.DeepEqual(tc.expected, actual) {
 			t.Errorf("expected: %v, got: %v", tc.expected, actual)
 		}

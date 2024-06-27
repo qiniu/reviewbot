@@ -19,6 +19,8 @@ import (
 	"strings"
 
 	"github.com/qiniu/reviewbot/internal/linters"
+	"github.com/qiniu/reviewbot/internal/lintersutil"
+	"github.com/qiniu/reviewbot/internal/metric"
 	"github.com/qiniu/x/xlog"
 )
 
@@ -55,11 +57,14 @@ func shellcheck(log *xlog.Logger, a linters.Agent) error {
 			log.Warnf("%s run with error: %v, mark and continue", cmd, err)
 		}
 
-		lintResults, err = linters.GeneralParse(log, output)
-		if err != nil {
-			log.Errorf("failed to parse output failed: %v, cmd: %v", err, cmd)
-			return err
+		results, unexpected := linters.GeneralParse(log, output)
+		if len(unexpected) > 0 {
+			msg := lintersutil.LimitJoin(unexpected, 1000)
+			log.Warnf("unexpected output: %v", msg)
+			metric.NotifyWebhookByText(linters.ConstructUnknownMsg(linterName, a.PullRequestEvent.Repo.GetFullName(), a.PullRequestEvent.PullRequest.GetHTMLURL(), log.ReqId, msg))
 		}
+
+		lintResults = results
 	}
 
 	// even if the lintResults is empty, we still need to report the result

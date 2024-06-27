@@ -34,7 +34,7 @@ func golangciLintHandler(log *xlog.Logger, a linters.Agent) error {
 	return linters.GeneralHandler(log, a, parser)
 }
 
-func parser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, error) {
+func parser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, []string) {
 	var lineParser = func(line string) (*linters.LinterOutput, error) {
 		if strings.HasSuffix(line, "(typecheck)") {
 			// refer: https://github.com/qiniu/reviewbot/issues/82#issuecomment-2002340788
