@@ -123,7 +123,7 @@ func TestConstructMessage(t *testing.T) {
 					},
 				},
 			},
-			expected: fmt.Sprintf("Linter: %v \nPR:   %v \nLink: %v \nDetails:\n%v\n", "golangci-lint", "1", "http://", "cdn-admin.v2/client/dns/dnsapi.go:59:3: assignment to err\n"),
+			expected: fmt.Sprintf("✅ Linter: %v \nPR:   %v \nLink: %v \nDetails:\n%v\n", "golangci-lint", "1", "http://", "cdn-admin.v2/client/dns/dnsapi.go:59:3: assignment to err\n"),
 		},
 		{
 			Linter:        "golangci-lint",
@@ -135,7 +135,7 @@ func TestConstructMessage(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		actual := constructMessage(tc.Linter, tc.PR, tc.Link, tc.linterResults)
+		actual := ConstructGotchaMsg(tc.Linter, tc.PR, tc.Link, tc.linterResults)
 		if !reflect.DeepEqual(tc.expected, actual) {
 			t.Errorf("expected: %v, got: %v", tc.expected, actual)
 		}

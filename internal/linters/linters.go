@@ -27,6 +27,7 @@ import (
 
 	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/reviewbot/config"
+	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/reviewbot/internal/metric"
 	"github.com/qiniu/x/log"
 	"github.com/qiniu/x/xlog"
@@ -122,7 +123,12 @@ If you have any questions about this comment, feel free to raise an issue here:
 
 // ------------------------ Linter ------------------------
 
-func GeneralHandler(log *xlog.Logger, a Agent, ParseFunc func(*xlog.Logger, []byte) (map[string][]LinterOutput, error)) error {
+// LinterParser is a function that parses the output of a linter command.
+// It returns the structured lint results if parsed successfully and unexpected lines if failed.
+// The unexpected lines are the lines that cannot be parsed.
+type LinterParser func(*xlog.Logger, []byte) (map[string][]LinterOutput, []string)
+
+func GeneralHandler(log *xlog.Logger, a Agent, linterParser func(*xlog.Logger, []byte) (map[string][]LinterOutput, []string)) error {
 	linterName := a.LinterName
 	output, err := ExecRun(a.LinterConfig.WorkDir, a.LinterConfig.Command, a.LinterConfig.Args...)
 	if err != nil {
@@ -133,10 +139,12 @@ func GeneralHandler(log *xlog.Logger, a Agent, ParseFunc func(*xlog.Logger, []by
 	// even if the output is empty, we still need to parse it
 	// since we need delete the existed comments related to the linter
 
-	lintResults, err := ParseFunc(log, output)
-	if err != nil {
-		log.Errorf("failed to parse output failed: %v, cmd: %v", err, linterName)
-		return err
+	lintResults, unexpected := linterParser(log, output)
+	if len(unexpected) > 0 {
+		msg := lintersutil.LimitJoin(unexpected, 1000)
+		// just log the unexpected lines and notify the webhook, no need to return error
+		log.Warnf("unexpected lines: %v", msg)
+		metric.NotifyWebhookByText(ConstructUnknownMsg(linterName, a.PullRequestEvent.Repo.GetFullName(), a.PullRequestEvent.PullRequest.GetHTMLURL(), log.ReqId, msg))
 	}
 
 	return Report(log, a, lintResults)
@@ -161,7 +169,7 @@ func ExecRun(workDir string, command []string, args ...string) ([]byte, error) {
 }
 
 // GeneralParse parses the output of a linter command.
-func GeneralParse(log *xlog.Logger, output []byte) (map[string][]LinterOutput, error) {
+func GeneralParse(log *xlog.Logger, output []byte) (map[string][]LinterOutput, []string) {
 	return Parse(log, output, GeneralLineParser)
 }
 
@@ -199,7 +207,7 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 		}
 		log.Infof("[%s] create check run success, HTML_URL: %v", linterName, ch.GetHTMLURL())
 
-		metric.NotifyWebhookByText(constructMessage(linterName, a.PullRequestEvent.GetPullRequest().GetHTMLURL(), ch.GetHTMLURL(), lintResults))
+		metric.NotifyWebhookByText(ConstructGotchaMsg(linterName, a.PullRequestEvent.GetPullRequest().GetHTMLURL(), ch.GetHTMLURL(), lintResults))
 	case config.GithubPRReview:
 		// List existing comments
 		existedComments, err := ListPullRequestsComments(context.Background(), a.GithubClient, org, repo, num)
@@ -237,7 +245,7 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 			return err
 		}
 		log.Infof("[%s] add %d comments for this PR %d (%s) \n", linterName, len(addedCmts), num, orgRepo)
-		metric.NotifyWebhookByText(constructMessage(linterName, a.PullRequestEvent.GetPullRequest().GetHTMLURL(), addedCmts[0].GetHTMLURL(), lintResults))
+		metric.NotifyWebhookByText(ConstructGotchaMsg(linterName, a.PullRequestEvent.GetPullRequest().GetHTMLURL(), addedCmts[0].GetHTMLURL(), lintResults))
 	default:
 		log.Errorf("unsupported report format: %v", a.LinterConfig.ReportFormat)
 	}
@@ -249,18 +257,16 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 type LineParser func(line string) (*LinterOutput, error)
 
 // Parse parses the output of a linter command.
-func Parse(log *xlog.Logger, output []byte, lineParser LineParser) (map[string][]LinterOutput, error) {
+func Parse(log *xlog.Logger, output []byte, lineParser LineParser) (results map[string][]LinterOutput, unexpected []string) {
 	lines := strings.Split(string(output), "\n")
-
-	var unexpectedLines []string
-	var result = make(map[string][]LinterOutput)
+	results = make(map[string][]LinterOutput, len(lines))
 	for _, line := range lines {
 		if line == "" {
 			continue
 		}
 		output, err := lineParser(line)
 		if err != nil {
-			unexpectedLines = append(unexpectedLines, line)
+			unexpected = append(unexpected, line)
 			continue
 		}
 
@@ -268,8 +274,8 @@ func Parse(log *xlog.Logger, output []byte, lineParser LineParser) (map[string][
 			continue
 		}
 
-		if outs, ok := result[output.File]; !ok {
-			result[output.File] = []LinterOutput{*output}
+		if outs, ok := results[output.File]; !ok {
+			results[output.File] = []LinterOutput{*output}
 		} else {
 			// remove duplicate
 			var existed bool
@@ -281,34 +287,11 @@ func Parse(log *xlog.Logger, output []byte, lineParser LineParser) (map[string][
 			}
 
 			if !existed {
-				result[output.File] = append(result[output.File], *output)
+				results[output.File] = append(results[output.File], *output)
 			}
 		}
 	}
-
-	go func() {
-		var message string
-		for _, line := range unexpectedLines {
-			// trim the message to avoid too long
-			// wework webhook only support 4096 characters for markdown message
-			// see https://open.work.weixin.qq.com/api/doc/90000/90136/91770
-			if len(message) > 3000 {
-				message += "..."
-				break
-			}
-			message += line + "\n"
-		}
-
-		if message != "" {
-			message = fmt.Sprintf("unexpected lines:\n%v", message)
-			log.Warnf(message)
-			// seed the alert message if the linter output is unexpected
-			// so that we can know the issue and fix it in time
-			metric.NotifyWebhookByMarkdown(fmt.Sprintf("<font color=\"warning\">[ATTENTION PLEASE]</font> %v", message))
-		}
-	}()
-
-	return result, nil
+	return
 }
 
 // common format LinterLine
@@ -374,7 +357,7 @@ func countLinterErrors(lintResults map[string][]LinterOutput) int {
 	return count
 }
 
-func constructMessage(linter, pr, link string, linterResults map[string][]LinterOutput) string {
+func ConstructGotchaMsg(linter, pr, link string, linterResults map[string][]LinterOutput) string {
 	if len(linterResults) == 0 {
 		return ""
 	}
@@ -386,5 +369,9 @@ func constructMessage(linter, pr, link string, linterResults map[string][]Linter
 		}
 	}
 
-	return fmt.Sprintf("Linter: %v \nPR:   %v \nLink: %v \nDetails:\n%v\n", linter, pr, link, message)
+	return fmt.Sprintf("✅ Linter: %v \nPR:   %v \nLink: %v \nDetails:\n%v\n", linter, pr, link, message)
+}
+
+func ConstructUnknownMsg(linter, repo, pr, event, unexpected string) string {
+	return fmt.Sprintf("😱🚀 Linter: %v \nRepo: %v \nPR:   %v \nEvent: %v \nUnexpected: %v\n", linter, repo, pr, event, unexpected)
 }
