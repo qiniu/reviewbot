@@ -30,5 +30,5 @@ linters:
     - lll # seems too arbitrary
     - mnd # seems too arbitrary
     - nilnil # seems too arbitrary
-    - gofmt # duplicated linter
+    - gofmt # there is a more elegant implementation. see ./internal/linters/go/gofmt/
 
