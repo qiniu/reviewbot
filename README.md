@@ -22,7 +22,7 @@ It has been inspired by many tools in the industry, but with some differences:
 
 If you are facing similar challenges, we welcome you to try **Reviewbot**!
 
-## Components
+## Linters Support
 
 - go linters
   - [golangci-lint](/internal/linters/go/golangci_lint/)
