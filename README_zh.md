@@ -22,7 +22,7 @@
 
 如果你也面临着类似的问题，欢迎尝试**Reviewbot**!
 
-## Components
+## Linters Support
 
 - go linters
   - [golangci-lint](/internal/linters/go/golangci_lint/)
