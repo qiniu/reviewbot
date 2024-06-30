@@ -17,20 +17,7 @@ func init() {
 }
 
 func golangciLintHandler(log *xlog.Logger, a linters.Agent) error {
-	if linters.IsEmpty(a.LinterConfig.Args...) {
-		// refer: https://github.com/qiniu/reviewbot/issues/146
-		a.LinterConfig.Args = append([]string{}, "run", "--timeout=5m0s", "--allow-parallel-runners=true")
-	}
-
-	// recommend to use the line-number format and disable the issued lines, since these are more friendly to the reviewbot
-	// checking on golangci-lint 1.59.0, there is no problem even with multiple --out-format and --print-issued-lines parameters,
-	// so we can add these parameters directly
-	a.LinterConfig.Args = append(a.LinterConfig.Args, "--out-format=line-number", "--print-issued-lines=false")
-
-	if a.LinterConfig.ConfigPath != "" {
-		a.LinterConfig.Args = append(a.LinterConfig.Args, "--config", a.LinterConfig.ConfigPath)
-	}
-
+	a = args(a)
 	return linters.GeneralHandler(log, a, parser)
 }
 
@@ -53,4 +40,73 @@ func parser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput,
 	}
 
 	return linters.Parse(log, output, lineParser)
+}
+
+// args is used to set the default parameters for golangci-lint
+// see: ./docs/website/docs/component/go/golangci-lint
+func args(a linters.Agent) linters.Agent {
+	config := a.LinterConfig
+	if len(config.Command) == 0 || len(config.Command) > 1 || config.Command[0] != lintName {
+		return a
+	}
+
+	legacyArgs := config.Args
+
+	switch {
+	case len(legacyArgs) == 0:
+		legacyArgs = []string{}
+	case len(legacyArgs) > 0 && legacyArgs[0] != "run":
+		return a
+	default:
+		legacyArgs = legacyArgs[1:]
+	}
+
+	var newArgs = []string{"run"}
+
+	var (
+		timeoutFlag   bool
+		parallelFlag  bool
+		outFormatFlag bool
+		printFlag     bool
+		configFlag    bool
+	)
+
+	for _, arg := range legacyArgs {
+
+		switch {
+		case strings.HasPrefix(arg, "--timeout"):
+			timeoutFlag = true
+		case strings.HasPrefix(arg, "--allow-parallel-runners"):
+			parallelFlag = true
+		case strings.HasPrefix(arg, "--out-format"):
+			outFormatFlag = true
+		case strings.HasPrefix(arg, "--print-issued-lines"):
+			printFlag = true
+		case strings.HasPrefix(arg, "--config"):
+			configFlag = true
+		}
+
+		newArgs = append(newArgs, arg)
+	}
+
+	if !timeoutFlag {
+		newArgs = append(newArgs, "--timeout=5m0s")
+	}
+	if !parallelFlag {
+		newArgs = append(newArgs, "--allow-parallel-runners=true")
+	}
+	if !outFormatFlag {
+		newArgs = append(newArgs, "--out-format=line-number")
+	}
+	if !printFlag {
+		newArgs = append(newArgs, "--print-issued-lines=false")
+	}
+	if !configFlag && config.ConfigPath != "" {
+		newArgs = append(newArgs, "--config", config.ConfigPath)
+	}
+
+	config.Args = newArgs
+	a.LinterConfig = config
+
+	return a
 }
