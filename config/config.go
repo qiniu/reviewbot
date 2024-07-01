@@ -185,6 +185,9 @@ type GithubReportType string
 const (
 	GithubCheckRuns GithubReportType = "github_check_run"
 	GithubPRReview  GithubReportType = "github_pr_review"
+
+	// for debug and testing.
+	Quiet GithubReportType = "quiet"
 )
 
 func boolPtr(b bool) *bool {
