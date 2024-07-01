@@ -17,9 +17,12 @@
 package linters
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"testing"
+
+	"github.com/qiniu/reviewbot/config"
 )
 
 func TestFormatStaticcheckLine(t *testing.T) {
@@ -166,5 +169,70 @@ func TestConstructUnknownMsg(t *testing.T) {
 		if !reflect.DeepEqual(tc.expected, actual) {
 			t.Errorf("expected: %v, got: %v", tc.expected, actual)
 		}
+	}
+}
+
+func TestExecRun(t *testing.T) {
+	tp := true
+	tcs := []struct {
+		id     string
+		input  Agent
+		output []byte
+		err    error
+	}{
+		{
+			id: "case1 - without ARTIFACT",
+			input: Agent{
+				LinterName: "ut",
+				LinterConfig: config.Linter{
+					Enable:       &tp,
+					Command:      []string{"/bin/bash", "-c", "--"},
+					Args:         []string{"echo file:line:column:message"},
+					ReportFormat: config.Quiet,
+				},
+			},
+			output: []byte("file:line:column:message\n"),
+			err:    nil,
+		},
+		{
+			id: "case2 - with ARTIFACT",
+			input: Agent{
+				LinterName: "ut",
+				LinterConfig: config.Linter{
+					Enable:       &tp,
+					Command:      []string{"/bin/bash", "-c", "--"},
+					Args:         []string{"echo file2:6:7:message >> $ARTIFACT/golangci-lint.log 2>&1"},
+					ReportFormat: config.Quiet,
+				},
+			},
+			output: []byte("file2:6:7:message\n"),
+			err:    nil,
+		},
+		{
+			id: "case2 - with multi files under ARTIFACT",
+			input: Agent{
+				LinterName: "ut",
+				LinterConfig: config.Linter{
+					Enable:       &tp,
+					Command:      []string{"/bin/bash", "-c", "--"},
+					Args:         []string{"echo file2:6:7:message >> $ARTIFACT/golangci-lint.log 2>&1 ;echo file3:6:7:message >> $ARTIFACT/golangci-lint.log 2>&1"},
+					ReportFormat: config.Quiet,
+				},
+			},
+			output: []byte("file2:6:7:message\nfile3:6:7:message\n"),
+			err:    nil,
+		},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.id, func(t *testing.T) {
+			output, err := ExecRun(tc.input.LinterConfig.WorkDir, tc.input.LinterConfig.Command, tc.input.LinterConfig.Args)
+			if !errors.Is(err, tc.err) {
+				t.Errorf("expected: %v, got: %v", tc.err, err)
+			}
+
+			if string(output) != string(tc.output) {
+				t.Errorf("expected: %v, got: %v", string(tc.output), string(output))
+			}
+		})
 	}
 }
