@@ -49,5 +49,5 @@ customConfig: # custom config for specific orgs or repos
         - "--"
       args:
         - |
-          cd website && yarn build && cd .. && \
+          cd website && yarn build && cd ..
           golangci-lint run --enable-all --timeout=5m0s --allow-parallel-runners=true --print-issued-lines=false --out-format=line-number >> $ARTIFACT/lint.log 2>&1

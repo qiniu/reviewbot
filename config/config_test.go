@@ -9,7 +9,7 @@ import (
 )
 
 func TestConfig(t *testing.T) {
-	var testCases = []struct {
+	testCases := []struct {
 		name        string
 		expectError bool
 		rawConfig   string
@@ -109,7 +109,7 @@ customConfig: # custom config for specific orgs or repos
 		t.Run(tc.name, func(t *testing.T) {
 			configDir := t.TempDir()
 			configPath := filepath.Join(configDir, "config.yaml")
-			if err := os.WriteFile(configPath, []byte(tc.rawConfig), 0666); err != nil {
+			if err := os.WriteFile(configPath, []byte(tc.rawConfig), 0o600); err != nil {
 				t.Fatalf("fail to write prow config: %v", err)
 			}
 			defer os.Remove(configPath)
@@ -173,9 +173,22 @@ customConfig: # custom config for specific orgs or repos
   qbox/net-tools:	  
     golangci-lint:
       enable: false
+  
+  qbox/kodo-ops:
+    golangci-lint:
+      enable: true
+      command:
+        - "/bin/sh"
+        - "-c"
+        - "--"
+      args:
+        - |
+          cd website && yarn build && cd ..
+          golangci-lint run --enable-all --timeout=5m0s --allow-parallel-runners=true --print-issued-lines=false --out-format=line-number >> $ARTIFACT/lint.log 2>&1
+
 `
 
-	if err := os.WriteFile(configPath, []byte(rawConfig), 0666); err != nil {
+	if err := os.WriteFile(configPath, []byte(rawConfig), 0o600); err != nil {
 		t.Fatalf("fail to write prow config: %v", err)
 	}
 	defer os.Remove(configPath)
@@ -200,6 +213,7 @@ customConfig: # custom config for specific orgs or repos
 			want: Linter{
 				Enable:  boolPtr(true),
 				WorkDir: "nginx",
+				Command: []string{"luacheck"},
 			},
 		},
 		{
@@ -211,6 +225,7 @@ customConfig: # custom config for specific orgs or repos
 				Enable:     boolPtr(true),
 				Args:       []string{"run", "-D", "staticcheck"},
 				ConfigPath: "linters-config/.golangci.yml",
+				Command:    []string{"golangci-lint"},
 			},
 		},
 		{
@@ -219,7 +234,8 @@ customConfig: # custom config for specific orgs or repos
 			repo:   "net-cache",
 			linter: "staticcheck",
 			want: Linter{
-				Enable: boolPtr(true),
+				Enable:  boolPtr(true),
+				Command: []string{"staticcheck"},
 			},
 		},
 		{
@@ -228,7 +244,8 @@ customConfig: # custom config for specific orgs or repos
 			repo:   "net-gslb",
 			linter: "staticcheck",
 			want: Linter{
-				Enable: boolPtr(true),
+				Enable:  boolPtr(true),
+				Command: []string{"staticcheck"},
 			},
 		},
 		{
@@ -237,7 +254,8 @@ customConfig: # custom config for specific orgs or repos
 			repo:   "net-gslb",
 			linter: "staticcheck",
 			want: Linter{
-				Enable: boolPtr(true),
+				Enable:  boolPtr(true),
+				Command: []string{"staticcheck"},
 			},
 		},
 		{
@@ -249,6 +267,7 @@ customConfig: # custom config for specific orgs or repos
 				Enable:     boolPtr(true),
 				Args:       []string{"run", "-D", "staticcheck"},
 				ConfigPath: "linters-config/.golangci.yml",
+				Command:    []string{"golangci-lint"},
 			},
 		},
 		{
@@ -258,8 +277,8 @@ customConfig: # custom config for specific orgs or repos
 			linter: "golangci-lint",
 			want: Linter{
 				Enable:     boolPtr(true),
-				Args:       []string{},
 				ConfigPath: "linters-config/.golangci.yml",
+				Command:    []string{"golangci-lint"},
 			},
 		},
 		{
@@ -270,6 +289,7 @@ customConfig: # custom config for specific orgs or repos
 			want: Linter{
 				Enable:  boolPtr(true),
 				WorkDir: "src/qiniu.com/kodo",
+				Command: []string{"staticcheck"},
 			},
 		},
 		{
@@ -281,6 +301,7 @@ customConfig: # custom config for specific orgs or repos
 				Enable:     boolPtr(true),
 				ConfigPath: "repo.golangci.yml",
 				Args:       []string{},
+				Command:    []string{"golangci-lint"},
 			},
 		},
 		{
@@ -289,7 +310,22 @@ customConfig: # custom config for specific orgs or repos
 			repo:   "net-tools",
 			linter: "golangci-lint",
 			want: Linter{
-				Enable: boolPtr(false),
+				Enable:  boolPtr(false),
+				Command: []string{"golangci-lint"},
+				Args:    []string{"run", "-D", "staticcheck"},
+			},
+		},
+		{
+			name:   "case11 - complex script",
+			org:    "qbox",
+			repo:   "kodo-ops",
+			linter: "golangci-lint",
+			want: Linter{
+				Enable:  boolPtr(true),
+				Command: []string{"/bin/sh", "-c", "--"},
+				Args: []string{
+					"cd website && yarn build && cd ..\ngolangci-lint run --enable-all --timeout=5m0s --allow-parallel-runners=true --print-issued-lines=false --out-format=line-number >> $ARTIFACT/lint.log 2>&1\n",
+				},
 			},
 		},
 	}
@@ -305,8 +341,12 @@ customConfig: # custom config for specific orgs or repos
 				t.Errorf("expected %v, got %v", tc.want.WorkDir, got.WorkDir)
 			}
 
-			if tc.want.Args != nil && len(got.Args) != len(tc.want.Args) {
-				t.Errorf("expected %v, got %v", tc.want.Args, got.Args)
+			if len(got.Command) != len(tc.want.Command) || !reflect.DeepEqual(got.Command, tc.want.Command) {
+				t.Errorf("expected %v, got %v", tc.want.Command, got.Command)
+			}
+
+			if len(got.Args) != len(tc.want.Args) || !reflect.DeepEqual(got.Args, tc.want.Args) {
+				t.Errorf("args expected %v, got %v", tc.want.Args, got.Args)
 			}
 
 			if !strings.HasSuffix(got.ConfigPath, tc.want.ConfigPath) {
