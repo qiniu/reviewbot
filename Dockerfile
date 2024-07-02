@@ -15,13 +15,20 @@ FROM alpine:3.20 as runner
 # Do not install unnecessary tools to reduce image size.
 RUN set -eux  \
     apk update && \
-    apk --no-cache add ca-certificates luacheck cppcheck shellcheck git openssh curl openjdk11 bash
+    apk --no-cache add ca-certificates luacheck cppcheck shellcheck git openssh yarn curl openjdk11 bash
 
 #install open jdk
 
 ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk
 ENV PATH JAVA_HOME/bin:$PATH
 WORKDIR /
+# check binary
+RUN cppcheck --version \
+    && shellcheck --version \
+    && luacheck --version \
+    && git --version \
+    && ssh -V \
+    && yarn --version
 RUN java -version
 
 #install pmd

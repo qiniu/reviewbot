@@ -14,14 +14,42 @@ customConfig: # custom config for specific orgs or repos
   qbox/net-cache:
     golangci-lint:
       enable: true
-      args: ["run", "--enable-all", "--timeout=5m0s", "--allow-parallel-runners=true"] # disable staticcheck globally since we have a separate linter for it      
+      args: [
+          "run",
+          "--enable-all",
+          "--timeout=5m0s",
+          "--allow-parallel-runners=true",
+        ] # disable staticcheck globally since we have a separate linter for it
   qbox/net-gslb:
     golangci-lint:
       enable: true
-      args: ["run", "--enable-all", "--timeout=5m0s", "--allow-parallel-runners=true"] # disable staticcheck globally since we have a separate linter for it      
+      args: [
+          "run",
+          "--enable-all",
+          "--timeout=5m0s",
+          "--allow-parallel-runners=true",
+        ] # disable staticcheck globally since we have a separate linter for it
 
   qbox/kodo:
     golangci-lint:
       enable: true
       workDir: "src/qiniu.com/kodo"
-      args: ["run", "--enable-all", "--timeout=5m0s", "--allow-parallel-runners=true"] 
+      args:
+        [
+          "run",
+          "--enable-all",
+          "--timeout=5m0s",
+          "--allow-parallel-runners=true",
+        ]
+
+  qbox/kodo-ops:
+    golangci-lint:
+      enable: true
+      command:
+        - "/bin/sh"
+        - "-c"
+        - "--"
+      args:
+        - |
+          cd website && yarn build && cd ..
+          golangci-lint run --enable-all --timeout=5m0s --allow-parallel-runners=true --print-issued-lines=false --out-format=line-number >> $ARTIFACT/lint.log 2>&1
