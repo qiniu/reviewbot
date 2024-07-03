@@ -203,7 +203,7 @@ func ExecRun(workDir string, command []string, args []string) ([]byte, error) {
 
 	// use the content of the files under Artifact dir as first priority
 	if len(fileContent) > 0 {
-		log.Debugf("artifact files used instead. legacy output:\n%v", string(output))
+		log.Debugf("artifact files used instead. legacy output:\n%v, now:\n%v", string(output), string(fileContent))
 		output = fileContent
 	}
 
