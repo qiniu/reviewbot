@@ -7,9 +7,11 @@ sidebar_position: 1
 
 **Reviewbot** 也使用 **golangci-lint** 来规范 go 代码的编写。
 
+不过，从简化配置以及适配各种场景的角度，`Reviewbot` 本身也引入了一些设计。
+
 ### 执行逻辑
 
-从简化配置以及适配结果的角度，执行器有两类核心逻辑:
+有两种模式:
 
 - **缺省模式** 如果没有设置 Command, 或者 Command 唯一且为`golangci-lint`, 那么 Args 参数在子命令是`run`的情况下，会做如下检验(其他子命令，不会做处理)
 
