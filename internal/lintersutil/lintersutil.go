@@ -1,5 +1,12 @@
 package lintersutil
 
+import (
+	"os"
+	"path/filepath"
+
+	"github.com/qiniu/x/log"
+)
+
 // LimitJoin joins the strings in str with a newline separator until the length of the result is greater than length.
 func LimitJoin(str []string, length int) string {
 	var result string
@@ -12,4 +19,19 @@ func LimitJoin(str []string, length int) string {
 	}
 
 	return result
+}
+
+func FileExists(path string) (absPath string, exist bool) {
+	fileAbs, err := filepath.Abs(path)
+	if err != nil {
+		log.Warnf("failed to get absolute path of %s: %v", path, err)
+		return "", false
+	}
+
+	_, err = os.Stat(fileAbs)
+	if err != nil {
+		return "", false
+	}
+
+	return fileAbs, true
 }

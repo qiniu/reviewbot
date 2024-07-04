@@ -1,7 +1,9 @@
 package golangcilint
 
 import (
+	"os"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/qiniu/reviewbot/config"
@@ -196,9 +198,78 @@ func TestArgs(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.id, func(t *testing.T) {
-			got := args(tc.input)
+			got := argsApply(tc.input)
 			if !reflect.DeepEqual(got.LinterConfig, tc.want.LinterConfig) {
 				t.Errorf("args() = %v, want %v", got.LinterConfig, tc.want.LinterConfig)
+			}
+		})
+	}
+}
+
+func TestConfigApply(t *testing.T) {
+	tcs := []struct {
+		id         string
+		input      linters.Agent
+		wantSuffix string
+	}{
+		{
+			id: "case1 - default config path",
+			input: linters.Agent{
+				LinterConfig: config.Linter{
+					Command:    []string{"golangci-lint"},
+					Args:       []string{"run"},
+					ConfigPath: ".golangci.yml",
+				},
+			},
+			wantSuffix: ".golangci.yml",
+		},
+		{
+			id: "case2 - with workdir",
+			input: linters.Agent{
+				LinterConfig: config.Linter{
+					Command:    []string{"golangci-lint"},
+					Args:       []string{"run"},
+					ConfigPath: ".golangci.yaml",
+					WorkDir:    "testdata",
+				},
+			},
+			wantSuffix: "testdata/.golangci.yml",
+		},
+		{
+			id: "case3 - config outside repo",
+			input: linters.Agent{
+				LinterConfig: config.Linter{
+					Command:    []string{"golangci-lint"},
+					Args:       []string{"run"},
+					ConfigPath: "../../../../config/linters-config/.golangci.yml",
+					WorkDir:    "/tmp",
+				},
+			},
+			wantSuffix: "/tmp/.golangci.yml",
+		},
+		{
+			id: "case4 - empty config path",
+			input: linters.Agent{
+				LinterConfig: config.Linter{
+					Command: []string{"golangci-lint"},
+					Args:    []string{"run"},
+				},
+			},
+			wantSuffix: "",
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.id, func(t *testing.T) {
+			if tc.input.LinterConfig.WorkDir != "" {
+				if err := os.MkdirAll(tc.input.LinterConfig.WorkDir, 0o666); err != nil {
+					t.Errorf("failed to create workdir: %v", err)
+				}
+			}
+
+			got := configApply(tc.input)
+			if !strings.HasSuffix(got, tc.wantSuffix) {
+				t.Errorf("configApply() = %v, want with suffix %v", got, tc.wantSuffix)
 			}
 		})
 	}
