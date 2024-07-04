@@ -32,4 +32,5 @@ linters:
     - nilnil # seems too arbitrary
     - gofmt # there is a more elegant implementation. see ./internal/linters/go/gofmt/
     - wsl # seems too arbitrary
+    - nonamedreturns # seems too arbitrary
 
