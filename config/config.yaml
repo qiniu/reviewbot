@@ -9,25 +9,6 @@ globalDefaultConfig: # global default settings, will be overridden by qbox org a
   golangcilintConfig: "config/linters-config/.golangci.yml" # golangci-lint config file to use
 
 customConfig: # custom config for specific orgs or repos
-  qbox/net-cache:
-    golangci-lint:
-      enable: true
-      args: [
-          "run",
-          "--enable-all",
-          "--timeout=5m0s",
-          "--allow-parallel-runners=true",
-        ] # disable staticcheck globally since we have a separate linter for it
-  qbox/net-gslb:
-    golangci-lint:
-      enable: true
-      args: [
-          "run",
-          "--enable-all",
-          "--timeout=5m0s",
-          "--allow-parallel-runners=true",
-        ] # disable staticcheck globally since we have a separate linter for it
-
   qbox/kodo:
     golangci-lint:
       enable: true
