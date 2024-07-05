@@ -11,25 +11,6 @@ globalDefaultConfig: # global default settings, will be overridden by qbox org a
   javastylecheckruleConfig: ""    # Path to a ruleset xml file.  The path may be a local file system path, or a URL.  if not config reviewbot will auto download the https://raw.githubusercontent.com/checkstyle/checkstyle/master/src/main/resources/sun_checks.xml
 
 customConfig: # custom config for specific orgs or repos
-  qbox/net-cache:
-    golangci-lint:
-      enable: true
-      args: [
-          "run",
-          "--enable-all",
-          "--timeout=5m0s",
-          "--allow-parallel-runners=true",
-        ] # disable staticcheck globally since we have a separate linter for it
-  qbox/net-gslb:
-    golangci-lint:
-      enable: true
-      args: [
-          "run",
-          "--enable-all",
-          "--timeout=5m0s",
-          "--allow-parallel-runners=true",
-        ] # disable staticcheck globally since we have a separate linter for it
-
   qbox/kodo:
     golangci-lint:
       enable: true
