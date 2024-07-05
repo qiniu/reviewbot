@@ -41,11 +41,4 @@ customConfig: # custom config for specific orgs or repos
   qbox/dora-cloud:
     golangci-lint:
       enable: true
-      command:
-        - "/bin/sh"
-        - "-c"
-        - "--"
-      args:
-        - |
-          cd next
-          golangci-lint run --timeout=10m0s --allow-parallel-runners=true --print-issued-lines=false --out-format=line-number >> $ARTIFACT/lint.log 2>&1
+      workDir: "next" # go.mod file is in the next directory
