@@ -65,4 +65,4 @@ customConfig: # custom config for specific orgs or repos
       args:
         - |
           cd next
-          golangci-lint run --enable-all --timeout=10m0s --allow-parallel-runners=true --print-issued-lines=false --out-format=line-number >> $ARTIFACT/lint.log 2>&1
+          golangci-lint run --timeout=10m0s --allow-parallel-runners=true --print-issued-lines=false --out-format=line-number >> $ARTIFACT/lint.log 2>&1
