@@ -16,11 +16,13 @@ import (
 
 func TestParser(t *testing.T) {
 	cases := []struct {
+		id         string
 		output     []byte
 		want       map[string][]linters.LinterOutput
 		unexpected []string
 	}{
 		{
+			id: "case1 - no error",
 			output: []byte(`
 golangci_lint/golangci_lint.go:16:1: warning: (golint)
 golangci_lint.go:18:3: error: (golint)
@@ -43,9 +45,10 @@ golangci_lint.go:18:3: error: (golint)
 					},
 				},
 			},
-			unexpected: nil,
+			unexpected: []string{},
 		},
 		{
+			id: "case2 - with typecheck",
 			output: []byte(`
 golangci_lint.go:16:1: error (typecheck)
 golangci_lint.go:16:1: error (gochecknoglobals)
@@ -63,6 +66,7 @@ golangci_lint.go:16:1: error (gochecknoglobals)
 			unexpected: []string{"golangci_lint.go:16:1: error (typecheck)"},
 		},
 		{
+			id: "case3 - with warning",
 			output: []byte(`
 level=warning msg="[linters_context] copyloopvar: this linter is disabled because the Go version (1.18) of your project is lower than Go 1.22"
 golangci_lint.go:16:1: warning: (gochecknoglobals)
@@ -78,18 +82,20 @@ golangci_lint.go:16:1: warning: (gochecknoglobals)
 					},
 				},
 			},
-			unexpected: nil,
+			unexpected: []string{},
 		},
 	}
 
 	for _, tt := range cases {
-		got, unexpected := parser(xlog.New("UnitTest"), tt.output)
-		if !reflect.DeepEqual(got, tt.want) {
-			t.Errorf("parser() = %v, want %v", got, tt.want)
-		}
-		if !reflect.DeepEqual(unexpected, tt.unexpected) {
-			t.Errorf("unexpected = %v, want %v", unexpected, tt.unexpected)
-		}
+		t.Run(tt.id, func(t *testing.T) {
+			got, unexpected := parser(xlog.New("ut"), tt.output)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("parser() = %v, want %v", got, tt.want)
+			}
+			if !reflect.DeepEqual(unexpected, tt.unexpected) {
+				t.Errorf("parser() unexpected = %v, want %v", unexpected, tt.unexpected)
+			}
+		})
 	}
 }
 
@@ -201,7 +207,7 @@ func TestArgs(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.id, func(t *testing.T) {
-			got := argsApply(tc.input)
+			got := argsApply(xlog.New("ut"), tc.input)
 			if !reflect.DeepEqual(got.LinterConfig, tc.want.LinterConfig) {
 				t.Errorf("args() = %v, want %v", got.LinterConfig, tc.want.LinterConfig)
 			}
@@ -270,7 +276,7 @@ func TestConfigApply(t *testing.T) {
 				}
 			}
 
-			got := configApply(tc.input)
+			got := configApply(xlog.New("ut"), tc.input)
 			if !strings.HasSuffix(got, tc.wantSuffix) {
 				t.Errorf("configApply() = %v, want with suffix %v", got, tc.wantSuffix)
 			}
@@ -368,6 +374,7 @@ func TestWorkDirApply(t *testing.T) {
 			if err := os.MkdirAll(tc.input.LinterConfig.WorkDir, 0777); err != nil {
 				t.Errorf("failed to create workdir: %v", err)
 			}
+			defer os.RemoveAll(tc.input.LinterConfig.WorkDir)
 			if tc.isGoMod {
 				path := tc.input.LinterConfig.WorkDir + tc.createmodPath
 				err := os.MkdirAll(filepath.Dir(path), 0777)
@@ -381,9 +388,10 @@ func TestWorkDirApply(t *testing.T) {
 					return
 				}
 				defer file.Close()
+
 			}
 
-			a := workDirApply(tc.input)
+			a := workDirApply(xlog.New("ur"), tc.input)
 			if !strings.HasSuffix(a.LinterConfig.WorkDir, tc.wantdir) {
 				t.Errorf("workDirApply() = %v, want with suffix %v", a.LinterConfig.WorkDir, tc.wantdir)
 			}
@@ -394,4 +402,5 @@ func TestWorkDirApply(t *testing.T) {
 			}
 		})
 	}
+
 }

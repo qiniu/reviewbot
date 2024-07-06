@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/qiniu/reviewbot/config"
+	"github.com/qiniu/x/xlog"
 )
 
 func TestFormatStaticcheckLine(t *testing.T) {
@@ -232,6 +233,196 @@ func TestExecRun(t *testing.T) {
 
 			if string(output) != string(tc.output) {
 				t.Errorf("expected: %v, got: %v", string(tc.output), string(output))
+			}
+		})
+	}
+}
+
+func TestParseV2(t *testing.T) {
+	tcs := []struct {
+		id         string
+		input      []byte
+		trainer    func(LinterOutput) (*LinterOutput, []string)
+		expected   map[string][]LinterOutput
+		unexpected []string
+	}{
+		{
+			id:      "case1 - general case",
+			input:   []byte("file.txt:6:7: message\nfile2.txt:6:7: message\nfile2.txt:7:9: message\n"),
+			trainer: nil,
+			expected: map[string][]LinterOutput{
+				"file.txt": []LinterOutput{
+					{
+						File:    "file.txt",
+						Line:    6,
+						Column:  7,
+						Message: "message",
+					},
+				},
+				"file2.txt": []LinterOutput{
+					{
+						File:    "file2.txt",
+						Line:    6,
+						Column:  7,
+						Message: "message",
+					},
+					{
+						File:    "file2.txt",
+						Line:    7,
+						Column:  9,
+						Message: "message",
+					},
+				},
+			},
+			unexpected: []string{},
+		},
+		{
+			id: "case2 - complex case",
+			input: []byte(`
+level=warning msg="[linters_context] copyloopvar"
+level=error msg="[linters_context]"
+golangci_lint.go:16:1: warning: (gochecknoglobals)
+xxx.go:18:1: warning: xxxx
+xxx.gox (gochecknoglobals)
+golangci_lint.go:17:1: warning: (gochecknoglobals)
+io/upv2/upform/internal/mime/multipart/multipart_test.go:744:7: wrapperFunc: use strings.ReplaceAll method in ` + "`strings.Replace(`--08b84578eabc563dcba96\n7a945cd<...>: application/octet-stream\n\n`, \"\\n\", \"\\r\\n\", -1)` (gocritic)"),
+			trainer: nil,
+			expected: map[string][]LinterOutput{
+				"golangci_lint.go": []LinterOutput{
+					{
+						File:    "golangci_lint.go",
+						Line:    16,
+						Column:  1,
+						Message: "warning: (gochecknoglobals)",
+					},
+					{
+						File:    "golangci_lint.go",
+						Line:    17,
+						Column:  1,
+						Message: "warning: (gochecknoglobals)",
+					},
+				},
+				"xxx.go": []LinterOutput{
+					{
+						File:    "xxx.go",
+						Line:    18,
+						Column:  1,
+						Message: "warning: xxxx\nxxx.gox (gochecknoglobals)",
+					},
+				},
+				"io/upv2/upform/internal/mime/multipart/multipart_test.go": []LinterOutput{
+					{
+						File:    "io/upv2/upform/internal/mime/multipart/multipart_test.go",
+						Line:    744,
+						Column:  7,
+						Message: "wrapperFunc: use strings.ReplaceAll method in `strings.Replace(`--08b84578eabc563dcba96\n7a945cd<...>: application/octet-stream\n\n`, \"\\n\", \"\\r\\n\", -1)` (gocritic)",
+					},
+				},
+			},
+			unexpected: []string{"level=warning msg=\"[linters_context] copyloopvar\"", "level=error msg=\"[linters_context]\""},
+		},
+		{
+			id:         "case3 - invalid input",
+			input:      []byte("case3 - invalid input"),
+			trainer:    nil,
+			expected:   nil,
+			unexpected: []string{"case3 - invalid input"},
+		},
+		{
+			id:      "case4 - msg reached max length",
+			input:   []byte("file.txt:6:7: message\nfile2.txt:6:7: "),
+			trainer: nil,
+			expected: map[string][]LinterOutput{
+				"file.txt": []LinterOutput{
+					{
+						File:    "file.txt",
+						Line:    6,
+						Column:  7,
+						Message: "message",
+					},
+				},
+				"file2.txt": []LinterOutput{
+					{
+						File:    "file2.txt",
+						Line:    6,
+						Column:  7,
+						Message: "",
+					},
+				},
+			},
+			unexpected: []string{},
+		},
+		{
+			id:      "case5 - duplicate",
+			input:   []byte("file.txt:6:7: message\nfile.txt:6:7: message\n"),
+			trainer: nil,
+			expected: map[string][]LinterOutput{
+				"file.txt": []LinterOutput{
+					{
+						File:    "file.txt",
+						Line:    6,
+						Column:  7,
+						Message: "message",
+					},
+				},
+			},
+			unexpected: []string{},
+		},
+		{
+			id:    "case6 - with trainer",
+			input: []byte("file.txt:6:7: message\nfile2.txt:7:9: message\n"),
+			trainer: func(o LinterOutput) (*LinterOutput, []string) {
+				if o.Line == 6 {
+					return nil, []string{fmt.Sprintf("%s:%d:%d: %s", o.File, o.Line, o.Column, o.Message)}
+				}
+				return &o, nil
+			},
+			expected: map[string][]LinterOutput{
+				"file2.txt": []LinterOutput{
+					{
+						File:    "file2.txt",
+						Line:    7,
+						Column:  9,
+						Message: "message",
+					},
+				},
+			},
+			unexpected: []string{"file.txt:6:7: message"},
+		},
+		{
+			id:      "case7 - no column",
+			input:   []byte("file.txt:6: message\nfile2.txt:7: message\n"),
+			trainer: nil,
+			expected: map[string][]LinterOutput{
+				"file.txt": []LinterOutput{
+					{
+						File:    "file.txt",
+						Line:    6,
+						Column:  0,
+						Message: "message",
+					},
+				},
+				"file2.txt": []LinterOutput{
+					{
+						File:    "file2.txt",
+						Line:    7,
+						Column:  0,
+						Message: "message",
+					},
+				},
+			},
+			unexpected: []string{},
+		},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.id, func(t *testing.T) {
+			got, unexpected := ParseV2(xlog.New("ut"), tc.input, tc.trainer)
+			if !reflect.DeepEqual(tc.expected, got) {
+				t.Errorf("expected: %v, got: %v", tc.expected, got)
+			}
+
+			if !reflect.DeepEqual(tc.unexpected, unexpected) {
+				t.Errorf("expected: %v, got: %v", tc.unexpected, unexpected)
 			}
 		})
 	}
