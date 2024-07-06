@@ -23,6 +23,7 @@ issues:
         - funlen
         - goconst
         - noctx
+        - revive
 
 linters:
   # Enable all available linters.

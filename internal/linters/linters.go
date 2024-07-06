@@ -175,7 +175,7 @@ func ExecRun(a Agent) ([]byte, error) {
 	c.Env = append(os.Environ(), fmt.Sprintf("ARTIFACT=%s", artifact))
 	c.Env = append(c.Env, a.LinterConfig.Env...)
 
-	log.Infof("run command: %v", c)
+	log.Infof("run command: %v, workdir: %v", c, c.Dir)
 	output, execErr := c.CombinedOutput()
 
 	// read all files under the artifact dir
@@ -190,7 +190,7 @@ func ExecRun(a Agent) ([]byte, error) {
 		if file.IsDir() {
 			continue
 		}
-
+		log.Infof("artifact file: %v", file.Name())
 		content, err := os.ReadFile(fmt.Sprintf("%s/%s", artifact, file.Name()))
 		if err != nil {
 			return nil, err
@@ -340,6 +340,92 @@ func Parse(log *xlog.Logger, output []byte, lineParser LineParser) (results map[
 		}
 	}
 	return
+}
+
+// trainer is a function that trains the linter output.
+// It returns the trained linter output and unexpected lines.
+type trainer func(LinterOutput) (LinterOutput, []string)
+
+func ParseV2(log *xlog.Logger, output []byte, trainer func(LinterOutput) (*LinterOutput, []string)) (map[string][]LinterOutput, []string) {
+	pattern := `(.*?):(\d+):(\d+)?:?`
+	regex := regexp.MustCompile(pattern)
+	indices := regex.FindAllStringSubmatchIndex(string(output), -1)
+	if len(indices) == 0 {
+		return nil, strings.Split(string(output), "\n")
+	}
+
+	var unexpected = make([]string, 0, len(indices))
+	var prefix string
+	if len(indices) > 0 && indices[0][0] > 0 {
+		prefix = strings.TrimSpace(string(output[:indices[0][0]]))
+		if prefix != "" {
+			unexpected = append(unexpected, strings.Split(prefix, "\n")...)
+		}
+	}
+
+	var results = make(map[string][]LinterOutput, len(indices))
+	for i := 0; i < len(indices); i++ {
+		issue := LinterOutput{
+			File: string(output[indices[i][2]:indices[i][3]]),
+		}
+
+		line, err := strconv.ParseInt(string(output[indices[i][4]:indices[i][5]]), 10, 64)
+		if err != nil {
+			log.Errorf("unexpected line number: %s, err: %v", string(output[indices[i][4]:indices[i][5]]), err)
+			continue
+		}
+		issue.Line = int(line)
+
+		var msgStart = indices[i][5] + 1
+		if indices[i][6] != -1 && indices[i][7] != -1 {
+			column, err := strconv.ParseInt(string(output[indices[i][6]:indices[i][7]]), 10, 64)
+			if err != nil {
+				log.Errorf("unexpected column number: %s, err: %v", string(output[indices[i][6]:indices[i][7]]), err)
+				continue
+			}
+			issue.Column = int(column)
+			msgStart = indices[i][7] + 1
+		}
+
+		if msgStart < len(output) {
+			if i+1 < len(indices) {
+				issue.Message = strings.TrimSpace(string(output[msgStart:indices[i+1][0]]))
+			} else {
+				issue.Message = strings.TrimSpace(string(output[msgStart:]))
+			}
+		}
+
+		if trainer != nil {
+			t, u := trainer(issue)
+			if len(u) > 0 {
+				unexpected = append(unexpected, u...)
+			}
+
+			if t == nil {
+				// skip this issue
+				continue
+			}
+			issue = *t
+		}
+
+		if outputs, ok := results[issue.File]; !ok {
+			results[issue.File] = []LinterOutput{issue}
+		} else {
+			// remove duplicate
+			var existed bool
+			for _, v := range outputs {
+				if v.File == issue.File && v.Line == issue.Line && v.Column == issue.Column && v.Message == issue.Message {
+					existed = true
+					break
+				}
+			}
+			if !existed {
+				results[issue.File] = append(outputs, issue)
+			}
+		}
+	}
+
+	return results, unexpected
 }
 
 // common format LinterLine

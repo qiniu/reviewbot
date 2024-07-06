@@ -11,7 +11,6 @@ import (
 
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/reviewbot/internal/lintersutil"
-	"github.com/qiniu/x/log"
 	"github.com/qiniu/x/xlog"
 )
 
@@ -26,12 +25,12 @@ func init() {
 func golangciLintHandler(log *xlog.Logger, a linters.Agent) error {
 	if len(a.LinterConfig.Command) == 0 || (len(a.LinterConfig.Command) == 1 && a.LinterConfig.Command[0] == lintName) {
 		// Default mode, automatically apply golangci workdir
-		a = workDirApply(a)
+		a = workDirApply(log, a)
 		// Default mode, automatically apply parameters.
-		a = argsApply(a)
+		a = argsApply(log, a)
 	} else if a.LinterConfig.ConfigPath != "" {
 		// Custom mode, only apply golangci-lint configuration if necessary.
-		path := configApply(a)
+		path := configApply(log, a)
 		log.Infof("golangci-lint config prepared: %v", path)
 	}
 
@@ -40,29 +39,37 @@ func golangciLintHandler(log *xlog.Logger, a linters.Agent) error {
 }
 
 func parser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, []string) {
-	var lineParser = func(line string) (*linters.LinterOutput, error) {
-		if strings.HasSuffix(line, "(typecheck)") {
-			// refer: https://github.com/qiniu/reviewbot/issues/82#issuecomment-2002340788
-			return nil, fmt.Errorf("skip golangci-lint typecheck error: %s", line)
+	var trainer = func(o linters.LinterOutput) (*linters.LinterOutput, []string) {
+		// Perhaps it may not be precise enough？
+		// refer: https://golangci-lint.run/usage/linters/
+		if strings.Contains(o.Message, "(typecheck)") {
+			unexpected := fmt.Sprintf("%s:%d:%d: %s", o.File, o.Line, o.Column, o.Message)
+			return nil, []string{strings.TrimSpace(unexpected)}
 		}
 
+		return &o, []string{}
+	}
+
+	var unexpected = make([]string, 0)
+	rawResults, rawUnexpected := linters.ParseV2(log, output, trainer)
+	for _, ex := range rawUnexpected {
 		// skip the warning level log
 		// example: level=warning msg="[linters_context] copyloopvar: this linter is disabled because the Go version (1.18) of your project is lower than Go 1.22"
 		// the warning level log is not a real lint error, so we need to skip it
-		if strings.Contains(line, "level=warning") {
-			log.Warnf("skip golangci-lint warning: %s", line)
-			return nil, nil
+		if strings.Contains(ex, "level=warning") {
+			log.Warnf("skip golangci-lint warning: %s", ex)
+			continue
 		}
 
-		return linters.GeneralLineParser(line)
+		unexpected = append(unexpected, strings.TrimSpace(ex))
 	}
 
-	return linters.Parse(log, output, lineParser)
+	return rawResults, unexpected
 }
 
 // argsApply is used to set the default parameters for golangci-lint
 // see: ./docs/website/docs/component/go/golangci-lint
-func argsApply(a linters.Agent) linters.Agent {
+func argsApply(log *xlog.Logger, a linters.Agent) linters.Agent {
 	config := a.LinterConfig
 	if len(config.Command) == 0 || len(config.Command) > 1 || config.Command[0] != lintName {
 		return a
@@ -120,7 +127,7 @@ func argsApply(a linters.Agent) linters.Agent {
 		newArgs = append(newArgs, "--print-issued-lines=false")
 	}
 	if !configFlag && config.ConfigPath != "" {
-		config.ConfigPath = configApply(a)
+		config.ConfigPath = configApply(log, a)
 		newArgs = append(newArgs, "--config", config.ConfigPath)
 	}
 
@@ -134,7 +141,7 @@ func argsApply(a linters.Agent) linters.Agent {
 // 1. if the config file exists in current directory, return its absolute path.
 // 2. if the config file exists in the workDir directory, return its absolute path.
 // 3. if the config file exists in the repo linter ConfigPath.
-func configApply(a linters.Agent) string {
+func configApply(log *xlog.Logger, a linters.Agent) string {
 	// refer to https://golangci-lint.run/usage/configuration/
 	// the default config file name is .golangci.yml, .golangci.yaml, .golangci.json, .golangci.toml
 	var golangciConfigFiles = []string{".golangci.yml", ".golangci.yaml", ".golangci.json", ".golangci.toml"}
@@ -192,7 +199,7 @@ func configApply(a linters.Agent) string {
 }
 
 // workDirApply is used to configure the default execution path of golangci-lint when the user does not customize it.
-func workDirApply(a linters.Agent) linters.Agent {
+func workDirApply(log *xlog.Logger, a linters.Agent) linters.Agent {
 	var gomodPath string
 	var fileDirPath string
 
@@ -214,6 +221,7 @@ func workDirApply(a linters.Agent) linters.Agent {
 	}
 
 	a.LinterConfig.WorkDir = path.Dir(gomodPath)
+	log.Infof("go mod tidy workdir: %v", a.LinterConfig.WorkDir)
 
 	// Execute go mod tidy when go.mod exists.
 	cmd := exec.Command("go", "mod", "tidy")
