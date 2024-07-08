@@ -118,7 +118,13 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 		log.Errorf("failed to checkout pull request %d: %v", num, err)
 		return err
 	}
-	defer r.Clean()
+
+	defer func() {
+		err := r.Clean()
+		if err != nil {
+			log.Errorf("failed to remove the repository , err : %v", err)
+		}
+	}()
 
 	for name, fn := range linters.TotalPullRequestHandlers() {
 		var linterConfig = s.config.Get(org, repo, name)
@@ -132,7 +138,7 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 		if linterConfig.WorkDir != "" {
 			linterConfig.WorkDir = r.Directory() + "/" + linterConfig.WorkDir
 		} else {
-			linterConfig.WorkDir = r.Directory() //find . -name go.mod -execdir golangci-lint run --timeout=5m
+			linterConfig.WorkDir = r.Directory()
 		}
 
 		log.Infof("[%s] config on repo %v: %+v", name, orgRepo, linterConfig)
