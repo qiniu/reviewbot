@@ -40,3 +40,22 @@ customConfig: # custom config for specific orgs or repos
     golangci-lint:
       enable: true
       workDir: "next" # go.mod file is in the next directory
+
+  qbox/sofa:
+    golangci-lint:
+      enable: true
+      workDir: "sofa" # go.mod file is in the sofa directory
+
+  qbox/user-center:
+    golangci-lint:
+      enable: true
+      command:
+        - "/bin/sh"
+        - "-c"
+        - "--"
+      args:
+        - |
+          cd uc
+          golangci-lint run --timeout=10m0s --allow-parallel-runners=true --print-issued-lines=false --out-format=line-number >> $ARTIFACT/lint.log 2>&1
+          cd uc-biz
+          golangci-lint run --timeout=10m0s --allow-parallel-runners=true --print-issued-lines=false --out-format=line-number >> $ARTIFACT/lint.log 2>&1
