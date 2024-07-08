@@ -121,25 +121,25 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 	defer r.Clean()
 
 	for name, fn := range linters.TotalPullRequestHandlers() {
-		var lingerConfig = s.config.Get(org, repo, name)
+		var linterConfig = s.config.Get(org, repo, name)
 
 		// skip linter if it is disabled
-		if lingerConfig.Enable != nil && !*lingerConfig.Enable {
+		if linterConfig.Enable != nil && !*linterConfig.Enable {
 			continue
 		}
 
 		// set workdir
-		if lingerConfig.WorkDir != "" {
-			lingerConfig.WorkDir = r.Directory() + "/" + lingerConfig.WorkDir
+		if linterConfig.WorkDir != "" {
+			linterConfig.WorkDir = r.Directory() + "/" + linterConfig.WorkDir
 		} else {
-			lingerConfig.WorkDir = r.Directory()
+			linterConfig.WorkDir = r.Directory() //find . -name go.mod -execdir golangci-lint run --timeout=5m
 		}
 
-		log.Infof("[%s] config on repo %v: %+v", name, orgRepo, lingerConfig)
+		log.Infof("[%s] config on repo %v: %+v", name, orgRepo, linterConfig)
 
 		agent := linters.Agent{
 			GithubClient:            s.GithubClient(installationID),
-			LinterConfig:            lingerConfig,
+			LinterConfig:            linterConfig,
 			GitClient:               s.gitClientFactory,
 			PullRequestEvent:        *event,
 			PullRequestChangedFiles: pullRequestAffectedFiles,
