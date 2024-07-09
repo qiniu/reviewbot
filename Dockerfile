@@ -24,6 +24,7 @@ RUN cppcheck --version \
     && git --version \
     && ssh -V \
     && yarn --version \
+    && curl --version \
     && gcc --version
 
 COPY --from=builder /reviewbot /reviewbot
