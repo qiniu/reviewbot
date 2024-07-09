@@ -23,7 +23,8 @@ RUN cppcheck --version \
     && luacheck --version \
     && git --version \
     && ssh -V \
-    && yarn --version
+    && yarn --version \
+    && gcc --version
 
 COPY --from=builder /reviewbot /reviewbot
 COPY --from=builder /go/bin/golangci-lint /usr/local/bin/
