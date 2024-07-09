@@ -48,6 +48,11 @@ func parser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput,
 			return nil, nil
 		}
 
+		if strings.Contains(line, "typechecking error: pattern ./...: directory prefix") {
+			log.Warnf("golang ci run failed :  %s", line)
+			return nil, fmt.Errorf("need rerun")
+		}
+
 		return linters.GeneralLineParser(line)
 	}
 

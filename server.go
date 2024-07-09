@@ -18,8 +18,11 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"os/exec"
+	"path"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v57/github"
@@ -137,6 +140,34 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 		// set workdir
 		if linterConfig.WorkDir != "" {
 			linterConfig.WorkDir = r.Directory() + "/" + linterConfig.WorkDir
+		} else if name == "golangci-lint" {
+			filePath := pullRequestAffectedFiles[0].Filename
+			dirPath := path.Dir(*filePath)
+			c := exec.Command("go", "list", "-m", "-json")
+			c.Dir = r.Directory() + "/" + dirPath
+			output, err := c.Output()
+			if err != nil {
+				log.Errorf("failed to find the go mod path, err: %v", err)
+			}
+
+			type ModuleInfo struct {
+				Path      string
+				Main      bool
+				Dir       string
+				GOMod     string
+				GoVersion string
+			}
+			var modules ModuleInfo
+			if err := json.Unmarshal(output, &modules); err != nil {
+				log.Errorf("Error decoding JSON: %v", err)
+			}
+
+			if modules.Dir != "" {
+				linterConfig.WorkDir = modules.Dir
+			} else {
+				linterConfig.WorkDir = r.Directory()
+			}
+
 		} else {
 			linterConfig.WorkDir = r.Directory()
 		}

@@ -131,22 +131,22 @@ If you have any questions about this comment, feel free to raise an issue here:
 type LinterParser func(*xlog.Logger, []byte) (map[string][]LinterOutput, []string)
 
 func GeneralHandler(log *xlog.Logger, a Agent, linterParser func(*xlog.Logger, []byte) (map[string][]LinterOutput, []string)) error {
-	linterName := a.LinterName
-	output, err := ExecRun(a.LinterConfig.WorkDir, a.LinterConfig.Command, a.LinterConfig.Args)
-	if err != nil {
-		// NOTE(CarlJi): the error is *ExitError, it seems to have little information and needs to be handled in a better way.
-		log.Warnf("%s run with exit code: %v, mark and continue", linterName, err)
+
+	lintResults, unexpected := RunLinterAndParse(log, a, linterParser)
+
+	for _, v := range unexpected {
+		if strings.Contains(v, "typechecking error: pattern ./...: directory prefix") {
+			a.LinterConfig.Command = append([]string{"GO111MODULE=off"}, a.LinterConfig.Command...)
+			lintResults, unexpected = RerunLinterAndParse(log, a, linterParser)
+			break
+		}
 	}
 
-	// even if the output is empty, we still need to parse it
-	// since we need delete the existed comments related to the linter
-
-	lintResults, unexpected := linterParser(log, output)
 	if len(unexpected) > 0 {
 		msg := lintersutil.LimitJoin(unexpected, 1000)
 		// just log the unexpected lines and notify the webhook, no need to return error
 		log.Warnf("unexpected lines: %v", msg)
-		metric.NotifyWebhookByText(ConstructUnknownMsg(linterName, a.PullRequestEvent.Repo.GetFullName(), a.PullRequestEvent.PullRequest.GetHTMLURL(), log.ReqId, msg))
+		metric.NotifyWebhookByText(ConstructUnknownMsg(a.LinterName, a.PullRequestEvent.Repo.GetFullName(), a.PullRequestEvent.PullRequest.GetHTMLURL(), log.ReqId, msg))
 	}
 
 	return Report(log, a, lintResults)
@@ -418,4 +418,23 @@ func ConstructGotchaMsg(linter, pr, link string, linterResults map[string][]Lint
 
 func ConstructUnknownMsg(linter, repo, pr, event, unexpected string) string {
 	return fmt.Sprintf("😱🚀 Linter: %v \nRepo: %v \nPR:   %v \nEvent: %v \nUnexpected: %v\n", linter, repo, pr, event, unexpected)
+}
+
+func RunLinterAndParse(log *xlog.Logger, a Agent, linterParser func(*xlog.Logger, []byte) (map[string][]LinterOutput, []string)) (map[string][]LinterOutput, []string) {
+	linterName := a.LinterName
+	output, err := ExecRun(a.LinterConfig.WorkDir, a.LinterConfig.Command, a.LinterConfig.Args)
+	if err != nil {
+		// NOTE(CarlJi): the error is *ExitError, it seems to have little information and needs to be handled in a better way.
+		log.Warnf("%s run with exit code: %v, mark and continue", linterName, err)
+	}
+
+	// even if the output is empty, we still need to parse it
+	// since we need delete the existed comments related to the linter
+
+	lintResults, unexpected := linterParser(log, output)
+	return lintResults, unexpected
+}
+
+func RerunLinterAndParse(log *xlog.Logger, a Agent, linterParser func(*xlog.Logger, []byte) (map[string][]LinterOutput, []string)) (map[string][]LinterOutput, []string) {
+	return RunLinterAndParse(log, a, linterParser)
 }
