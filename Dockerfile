@@ -15,7 +15,7 @@ FROM alpine:3.20 as runner
 # Do not install unnecessary tools to reduce image size.
 RUN set -eux  \
     apk update && \
-    apk --no-cache add ca-certificates luacheck cppcheck shellcheck git openssh yarn libpcap-dev curl
+    apk --no-cache add ca-certificates luacheck cppcheck shellcheck git openssh yarn libpcap-dev curl gcc
 WORKDIR /
 # check binary
 RUN cppcheck --version \
