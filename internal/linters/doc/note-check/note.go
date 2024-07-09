@@ -31,7 +31,7 @@ func noteCheckHandler(log *xlog.Logger, a linters.Agent) error {
 	for _, file := range a.PullRequestChangedFiles {
 		fileName := file.GetFilename()
 		// Only check go files
-		if filepath.Ext(fileName) != ".go" {
+		if filepath.Ext(fileName) != ".go" || file.GetStatus() == "removed" {
 			continue
 		}
 
