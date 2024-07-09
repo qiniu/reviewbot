@@ -3,9 +3,12 @@ package golangcilint
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 
+	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/x/log"
@@ -24,6 +27,14 @@ func golangciLintHandler(log *xlog.Logger, a linters.Agent) error {
 	if len(a.LinterConfig.Command) == 0 || (len(a.LinterConfig.Command) == 1 && a.LinterConfig.Command[0] == lintName) {
 		// Default mode, automatically apply parameters.
 		a = argsApply(a)
+		if !strings.Contains(strings.Join(a.LinterConfig.Command, ","), "GO111MODULE=off") {
+			cmd := exec.Command("go", "mod", "tidy")
+			cmd.Dir = a.LinterConfig.WorkDir
+			_, err := cmd.CombinedOutput()
+			if err != nil {
+				log.Warnf("Error running go mod tidy:%v", err)
+			}
+		}
 	} else if a.LinterConfig.ConfigPath != "" {
 		// Custom mode, only apply golangci-lint configuration if necessary.
 		path := configApply(a)
@@ -119,6 +130,7 @@ func argsApply(a linters.Agent) linters.Agent {
 	}
 
 	config.Args = newArgs
+	config.WorkDir, config.Command = workDirApply(config)
 	a.LinterConfig = config
 
 	return a
@@ -183,4 +195,39 @@ func configApply(a linters.Agent) string {
 	}
 
 	return path
+}
+
+func workDirApply(config config.Linter) (string, []string) {
+	currentdir := config.WorkDir
+	if modpath, exist := lintersutil.FileExists("go.mod"); exist {
+		return modpath, config.Command
+	} else {
+		var absPath string
+		filepath.Walk(currentdir, func(dirpath string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+
+			if !info.IsDir() && info.Name() == "go.mod" {
+				absPath, err = filepath.Abs(dirpath)
+				if err != nil {
+					return err
+				}
+				// retun err in order to break go.mod searching
+				return fmt.Errorf("found go.mod at %s", absPath)
+			}
+
+			return nil
+		})
+
+		if absPath != "" {
+			modPath := path.Dir(absPath)
+			return modPath, config.Command
+		} else {
+			config.Command = append([]string{"GO111MODULE=off"}, config.Command...)
+		}
+
+	}
+
+	return currentdir, config.Command
 }

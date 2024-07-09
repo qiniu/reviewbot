@@ -1,6 +1,7 @@
 package golangcilint
 
 import (
+	"fmt"
 	"os"
 	"reflect"
 	"strings"
@@ -270,6 +271,78 @@ func TestConfigApply(t *testing.T) {
 			got := configApply(tc.input)
 			if !strings.HasSuffix(got, tc.wantSuffix) {
 				t.Errorf("configApply() = %v, want with suffix %v", got, tc.wantSuffix)
+			}
+		})
+	}
+}
+
+func TestWorkDirApply(t *testing.T) {
+	tcs := []struct {
+		id           string
+		currentDir   string
+		LinterConfig config.Linter
+		wantdir      string
+		isGoMod      bool
+	}{
+		{
+			id:         "repo1/ && find go.mod",
+			currentDir: "./repo1",
+
+			LinterConfig: config.Linter{
+				WorkDir: "",
+			},
+
+			wantdir: "repo1",
+			isGoMod: true,
+		},
+		{
+			id:         "repo2/ && can't find go.mod",
+			currentDir: "./repo2",
+
+			LinterConfig: config.Linter{
+				WorkDir: "",
+			},
+
+			wantdir: "./repo2",
+			isGoMod: false,
+		},
+
+		{
+			id:         "repo3/testworkdir && find go.mod",
+			currentDir: "./repo3",
+
+			LinterConfig: config.Linter{
+				WorkDir: "testworkdir",
+			},
+
+			wantdir: "repo3/testworkdir",
+			isGoMod: true,
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.id, func(t *testing.T) {
+			if tc.LinterConfig.WorkDir != "" {
+				tc.LinterConfig.WorkDir = tc.currentDir + "/" + tc.LinterConfig.WorkDir
+			} else {
+				tc.LinterConfig.WorkDir = tc.currentDir
+			}
+
+			if err := os.MkdirAll(tc.LinterConfig.WorkDir, 0777); err != nil {
+				t.Errorf("failed to create workdir: %v", err)
+			}
+			if tc.isGoMod {
+				file, err := os.Create(tc.LinterConfig.WorkDir + "/go.mod")
+				if err != nil {
+					fmt.Println("Error creating file:", err)
+					return
+				}
+				defer file.Close()
+			}
+
+			gotdir, _ := workDirApply(tc.LinterConfig)
+			if !strings.HasSuffix(gotdir, tc.wantdir) {
+				t.Errorf("workDirApply() = %v, want with suffix %v", gotdir, tc.wantdir)
 			}
 		})
 	}
