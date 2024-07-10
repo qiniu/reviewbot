@@ -42,6 +42,8 @@ type Server struct {
 	// support github app model
 	appID         int64
 	appPrivateKey string
+
+	debug bool
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -120,6 +122,9 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 	}
 
 	defer func() {
+		if s.debug {
+			return // do not remove the repository in debug mode
+		}
 		err := r.Clean()
 		if err != nil {
 			log.Errorf("failed to remove the repository , err : %v", err)
