@@ -49,6 +49,7 @@ import (
 type options struct {
 	port          int
 	dryRun        bool
+	debug         bool
 	logLevel      int
 	accessToken   string
 	webhookSecret string
@@ -82,6 +83,7 @@ func gatherOptions() options {
 	fs := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	fs.IntVar(&o.port, "port", 8888, "port to listen on")
 	fs.BoolVar(&o.dryRun, "dry-run", false, "dry run")
+	fs.BoolVar(&o.debug, "debug", false, "debug mode")
 	fs.IntVar(&o.logLevel, "log-level", 0, "log level")
 	fs.StringVar(&o.accessToken, "access-token", "", "personal access token")
 	fs.StringVar(&o.webhookSecret, "webhook-secret", "", "webhook secret file")
@@ -140,6 +142,7 @@ func main() {
 		accessToken:      o.accessToken,
 		appID:            o.appID,
 		appPrivateKey:    o.appPrivateKey,
+		debug:            o.debug,
 	}
 
 	mux := http.NewServeMux()
