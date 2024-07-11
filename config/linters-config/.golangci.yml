@@ -11,6 +11,14 @@ linters-settings:
     # Default: false
     ignore-missing-subtests: true
 
+issues:
+  exclude-rules:
+    - path: '(.+)_test\.go'
+      linters:
+        - funlen
+        - goconst
+        - noctx
+
 linters:
   # Enable all available linters.
   enable-all: true
@@ -33,4 +41,5 @@ linters:
     - gofmt # there is a more elegant implementation. see ./internal/linters/go/gofmt/
     - wsl # seems too arbitrary
     - nonamedreturns # seems too arbitrary
+    - ireturn # seems too arbitrary. also see: https://github.com/go-proverbs/go-proverbs.github.io/issues/37
 
