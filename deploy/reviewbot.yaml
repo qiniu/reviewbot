@@ -68,6 +68,10 @@ spec:
               subPath: .golangci.yml
               name: golangci-config
               readOnly: true
+            - mountPath: /config/linters-config/.golangci.goplus.yml # use your own linters config file
+              subPath: .golangci.goplus.yml
+              name: golangci-config-goplus
+              readOnly: true
       volumes:
         - configMap:
             defaultMode: 420
@@ -91,6 +95,10 @@ spec:
             defaultMode: 420
             name: golangci-config
           name: golangci-config
+        - configMap:
+            defaultMode: 420
+            name: golangci-config-goplus
+          name: golangci-config-goplus
 ---
 apiVersion: v1
 kind: Service
