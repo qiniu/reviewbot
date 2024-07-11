@@ -149,6 +149,11 @@ globalDefaultConfig:
   golangciLintConfig: "linters-config/.golangci.yml"
 
 customConfig: # custom config for specific orgs or repos
+  goplus:
+    golangci-lint:
+      enable: true
+      configPath: "config/linters-config/.golangci.goplus.yml"
+
   qbox: # github organization name
     golangci-lint:
       enable: true
@@ -326,6 +331,17 @@ customConfig: # custom config for specific orgs or repos
 				Args: []string{
 					"cd website && yarn build && cd ..\ngolangci-lint run --enable-all --timeout=5m0s --allow-parallel-runners=true --print-issued-lines=false --out-format=line-number >> $ARTIFACT/lint.log 2>&1\n",
 				},
+			},
+		},
+		{
+			name:   "case12 - ",
+			org:    "goplus",
+			repo:   "llgo",
+			linter: "golangci-lint",
+			want: Linter{
+				Enable:     boolPtr(true),
+				Command:    []string{"golangci-lint"},
+				ConfigPath: "config/linters-config/.golangci.goplus.yml",
 			},
 		},
 	}
