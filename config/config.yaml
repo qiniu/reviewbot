@@ -9,6 +9,11 @@ globalDefaultConfig: # global default settings, will be overridden by qbox org a
   golangcilintConfig: "config/linters-config/.golangci.yml" # golangci-lint config file to use
 
 customConfig: # custom config for specific orgs or repos
+  goplus:
+    golangci-lint:
+      enable: true
+      configPath: "/config/linters-config/.golangci.goplus.yml"
+
   qbox/kodo:
     golangci-lint:
       enable: true

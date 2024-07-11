@@ -1,0 +1,56 @@
+# 这是我们当前内部使用的配置文件，会基于实际的变化和我们的认知而迭代，仅供参考
+
+linters-settings:
+  paralleltest:
+    # Ignore missing calls to `t.Parallel()` and only report incorrect uses of it.
+    # Default: false
+    # see: https://github.com/qiniu/reviewbot/issues/149
+    ignore-missing: true
+    # Ignore missing calls to `t.Parallel()` in subtests. Top-level tests are
+    # still required to have `t.Parallel`, but subtests are allowed to skip it.
+    # Default: false
+    ignore-missing-subtests: true
+  revive:
+    enable-all-rules: true
+    rules:
+      - name: unused-parameter
+        disabled: true
+      - name: unused-receiver
+        disabled: true
+      - name: blank-imports
+        disabled: true
+      - name: unexported-return
+        disabled: true
+
+issues:
+  exclude-rules:
+    - path: '(.+)_test\.go'
+      linters:
+        - funlen
+        - goconst
+        - noctx
+
+linters:
+  # Enable all available linters.
+  enable-all: true
+  # Disable specific linter
+  disable:
+    - nlreturn # see https://github.com/qiniu/reviewbot/issues/148
+    - wrapcheck # see https://github.com/qiniu/reviewbot/issues/180
+    - gochecknoglobals # see https://github.com/qiniu/reviewbot/issues/182
+    - varnamelen # seems too arbitrary
+    - testpackage # seems too arbitrary
+    - depguard # seems too arbitrary
+    - cyclop # seems too arbitrary
+    - exhaustruct # seems too arbitrary
+    - execinquery # deprecated
+    - gomnd # deprecated
+    - funlen # seems too arbitrary
+    - lll # seems too arbitrary
+    - mnd # seems too arbitrary
+    - nilnil # seems too arbitrary
+    - gofmt # there is a more elegant implementation. see ./internal/linters/go/gofmt/
+    - wsl # seems too arbitrary
+    - nonamedreturns # seems too arbitrary
+    - ireturn # seems too arbitrary. also see: https://github.com/go-proverbs/go-proverbs.github.io/issues/37
+
