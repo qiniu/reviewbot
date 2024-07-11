@@ -112,6 +112,8 @@ type Agent struct {
 	PullRequestChangedFiles []*github.CommitFile
 	// LinterName is the linter name.
 	LinterName string
+	// RepoDir is the repo directory.
+	RepoDir string
 }
 
 const CommentFooter = `
@@ -132,7 +134,7 @@ type LinterParser func(*xlog.Logger, []byte) (map[string][]LinterOutput, []strin
 
 func GeneralHandler(log *xlog.Logger, a Agent, linterParser func(*xlog.Logger, []byte) (map[string][]LinterOutput, []string)) error {
 	linterName := a.LinterName
-	output, err := ExecRun(a.LinterConfig.WorkDir, a.LinterConfig.Command, a.LinterConfig.Args)
+	output, err := ExecRun(a)
 	if err != nil {
 		// NOTE(CarlJi): the error is *ExitError, it seems to have little information and needs to be handled in a better way.
 		log.Warnf("%s run with exit code: %v, mark and continue", linterName, err)
@@ -153,15 +155,16 @@ func GeneralHandler(log *xlog.Logger, a Agent, linterParser func(*xlog.Logger, [
 }
 
 // ExecRun executes a command.
-func ExecRun(workDir string, command []string, args []string) ([]byte, error) {
+func ExecRun(a Agent) ([]byte, error) {
+	command := a.LinterConfig.Command
 	executable := command[0]
 	var cmdArgs []string
 	if len(command) > 1 {
 		cmdArgs = command[1:]
 	}
-	cmdArgs = append(cmdArgs, args...)
+	cmdArgs = append(cmdArgs, a.LinterConfig.Args...)
 	c := exec.Command(executable, cmdArgs...)
-	c.Dir = workDir
+	c.Dir = a.LinterConfig.WorkDir
 
 	// create a temp dir for the artifact
 	artifact, err := os.MkdirTemp("", artifactDirFlag)
@@ -170,6 +173,7 @@ func ExecRun(workDir string, command []string, args []string) ([]byte, error) {
 	}
 	defer os.RemoveAll(artifact)
 	c.Env = append(os.Environ(), fmt.Sprintf("ARTIFACT=%s", artifact))
+	c.Env = append(c.Env, a.LinterConfig.Env...)
 
 	log.Infof("run command: %v", c)
 	output, execErr := c.CombinedOutput()

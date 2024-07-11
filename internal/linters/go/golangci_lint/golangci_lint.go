@@ -1,6 +1,7 @@
 package golangcilint
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -8,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/x/log"
@@ -25,16 +25,10 @@ func init() {
 
 func golangciLintHandler(log *xlog.Logger, a linters.Agent) error {
 	if len(a.LinterConfig.Command) == 0 || (len(a.LinterConfig.Command) == 1 && a.LinterConfig.Command[0] == lintName) {
+		// Default mode, automatically apply golangci workdir
+		a = workDirApply(a)
 		// Default mode, automatically apply parameters.
 		a = argsApply(a)
-		if !strings.Contains(strings.Join(a.LinterConfig.Command, ","), "GO111MODULE=off") {
-			cmd := exec.Command("go", "mod", "tidy")
-			cmd.Dir = a.LinterConfig.WorkDir
-			_, err := cmd.CombinedOutput()
-			if err != nil {
-				log.Warnf("Error running go mod tidy:%v", err)
-			}
-		}
 	} else if a.LinterConfig.ConfigPath != "" {
 		// Custom mode, only apply golangci-lint configuration if necessary.
 		path := configApply(a)
@@ -130,7 +124,6 @@ func argsApply(a linters.Agent) linters.Agent {
 	}
 
 	config.Args = newArgs
-	config.WorkDir, config.Command = workDirApply(config)
 	a.LinterConfig = config
 
 	return a
@@ -197,37 +190,63 @@ func configApply(a linters.Agent) string {
 	return path
 }
 
-func workDirApply(config config.Linter) (string, []string) {
-	currentdir := config.WorkDir
-	if modpath, exist := lintersutil.FileExists("go.mod"); exist {
-		return modpath, config.Command
-	} else {
-		var absPath string
-		filepath.Walk(currentdir, func(dirpath string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
+// workDirApply is used to configure the default execution path of golangci-lint when the user does not customize it.
+func workDirApply(a linters.Agent) linters.Agent {
+	var gomodPath string
+	var fileDirPath string
+
+	// When WorkDir and RepoDir are the same, then find the path where go.mod is located.
+	if a.LinterConfig.WorkDir == a.RepoDir {
+		for _, file := range a.PullRequestChangedFiles {
+			if strings.HasSuffix(*file.Filename, ".go") {
+				fileDirPath = *file.Filename
+				break
 			}
-
-			if !info.IsDir() && info.Name() == "go.mod" {
-				absPath, err = filepath.Abs(dirpath)
-				if err != nil {
-					return err
-				}
-				// retun err in order to break go.mod searching
-				return fmt.Errorf("found go.mod at %s", absPath)
-			}
-
-			return nil
-		})
-
-		if absPath != "" {
-			modPath := path.Dir(absPath)
-			return modPath, config.Command
-		} else {
-			config.Command = append([]string{"GO111MODULE=off"}, config.Command...)
 		}
-
+		pathParts := strings.Split(fileDirPath, string(filepath.Separator))
+		gomodPath = findGoMod(a, pathParts)
+	}
+	// When the go.mod file is not found, set GO111MODULE=off, so that golangci does not run through gomod.
+	if gomodPath == "" {
+		a.LinterConfig.Env = append(a.LinterConfig.Env, "GO111MODULE=off")
+		return a
 	}
 
-	return currentdir, config.Command
+	a.LinterConfig.WorkDir = path.Dir(gomodPath)
+
+	// Execute go mod tidy when go.mod exists.
+	cmd := exec.Command("go", "mod", "tidy")
+	cmd.Dir = a.LinterConfig.WorkDir
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	if err != nil {
+		log.Warnf("Error running go mod tidy:%v", err)
+	} else {
+		log.Info("running go mod tidy successfully")
+	}
+	if stderr.Len() > 0 {
+		log.Warnf("running go mod tidy something wrong :%s", stderr.String())
+	}
+
+	return a
+}
+
+func findGoMod(a linters.Agent, pathParts []string) string {
+	if path, exist := lintersutil.FileExists(a.RepoDir + "/" + "go.mod"); exist {
+		return path
+	}
+
+	searchPath := a.RepoDir
+	for k, v := range pathParts {
+		if k == len(pathParts) {
+			break
+		}
+		searchPath = filepath.Join(searchPath, v)
+		if path, exist := lintersutil.FileExists(searchPath + "/" + "go.mod"); exist {
+			return path
+		}
+	}
+
+	return ""
 }

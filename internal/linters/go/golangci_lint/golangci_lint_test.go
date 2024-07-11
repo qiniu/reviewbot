@@ -3,10 +3,12 @@ package golangcilint
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/x/xlog"
@@ -277,62 +279,103 @@ func TestConfigApply(t *testing.T) {
 }
 
 func TestWorkDirApply(t *testing.T) {
+	filename := "test1/test2/test3/a.go"
+	filename2 := "a.go"
 	tcs := []struct {
-		id           string
-		currentDir   string
-		LinterConfig config.Linter
-		wantdir      string
-		isGoMod      bool
+		id            string
+		currentDir    string
+		input         linters.Agent
+		wantdir       string
+		createmodPath string
+		isGoMod       bool
 	}{
 		{
-			id:         "repo1/ && find go.mod",
-			currentDir: "./repo1",
+			id: "workdir == repodir ,find go.mod in repo/",
+			input: linters.Agent{
+				LinterConfig: config.Linter{
 
-			LinterConfig: config.Linter{
-				WorkDir: "",
+					WorkDir: "repo1/",
+				},
+				PullRequestChangedFiles: []*github.CommitFile{
+					{
+						Filename: &filename,
+					},
+				},
+				RepoDir: "repo1/",
 			},
-
-			wantdir: "repo1",
-			isGoMod: true,
+			createmodPath: "go.mod",
+			wantdir:       "repo1",
+			isGoMod:       true,
 		},
 		{
-			id:         "repo2/ && can't find go.mod",
-			currentDir: "./repo2",
+			id: "workdir == repodir, find go.mod in subdir (repo/test1/go.mod)",
+			input: linters.Agent{
+				LinterConfig: config.Linter{
 
-			LinterConfig: config.Linter{
-				WorkDir: "",
+					WorkDir: "repo2/",
+				},
+				PullRequestChangedFiles: []*github.CommitFile{
+					{
+						Filename: &filename,
+					},
+				},
+				RepoDir: "repo2/",
 			},
-
-			wantdir: "./repo2",
-			isGoMod: false,
+			createmodPath: "test1/go.mod",
+			wantdir:       "repo2/test1",
+			isGoMod:       true,
 		},
 
 		{
-			id:         "repo3/testworkdir && find go.mod",
-			currentDir: "./repo3",
-
-			LinterConfig: config.Linter{
-				WorkDir: "testworkdir",
+			id: "workdir == repodir, can't find go.mod ",
+			input: linters.Agent{
+				LinterConfig: config.Linter{
+					WorkDir: "repo3/",
+				},
+				PullRequestChangedFiles: []*github.CommitFile{
+					{
+						Filename: &filename2,
+					},
+				},
+				RepoDir: "repo3/",
 			},
+			createmodPath: "test1/go.mod",
+			wantdir:       "repo3/",
+			isGoMod:       false,
+		},
 
-			wantdir: "repo3/testworkdir",
-			isGoMod: true,
+		{
+			id: "workdir == repodir,  find go.mod , len(filedirpaht)==1",
+			input: linters.Agent{
+				LinterConfig: config.Linter{
+					WorkDir: "repo4/",
+				},
+				PullRequestChangedFiles: []*github.CommitFile{
+					{
+						Filename: &filename2,
+					},
+				},
+				RepoDir: "repo4/",
+			},
+			createmodPath: "go.mod",
+			wantdir:       "repo4",
+			isGoMod:       true,
 		},
 	}
 
 	for _, tc := range tcs {
 		t.Run(tc.id, func(t *testing.T) {
-			if tc.LinterConfig.WorkDir != "" {
-				tc.LinterConfig.WorkDir = tc.currentDir + "/" + tc.LinterConfig.WorkDir
-			} else {
-				tc.LinterConfig.WorkDir = tc.currentDir
-			}
-
-			if err := os.MkdirAll(tc.LinterConfig.WorkDir, 0777); err != nil {
+			if err := os.MkdirAll(tc.input.LinterConfig.WorkDir, 0777); err != nil {
 				t.Errorf("failed to create workdir: %v", err)
 			}
 			if tc.isGoMod {
-				file, err := os.Create(tc.LinterConfig.WorkDir + "/go.mod")
+				path := tc.input.LinterConfig.WorkDir + tc.createmodPath
+				err := os.MkdirAll(filepath.Dir(path), 0777)
+				if err != nil {
+					fmt.Println("Error creating directories:", err)
+					return
+				}
+				file, err := os.Create(path)
 				if err != nil {
 					fmt.Println("Error creating file:", err)
 					return
@@ -340,9 +383,14 @@ func TestWorkDirApply(t *testing.T) {
 				defer file.Close()
 			}
 
-			gotdir, _ := workDirApply(tc.LinterConfig)
-			if !strings.HasSuffix(gotdir, tc.wantdir) {
-				t.Errorf("workDirApply() = %v, want with suffix %v", gotdir, tc.wantdir)
+			a := workDirApply(tc.input)
+			if !strings.HasSuffix(a.LinterConfig.WorkDir, tc.wantdir) {
+				t.Errorf("workDirApply() = %v, want with suffix %v", a.LinterConfig.WorkDir, tc.wantdir)
+			}
+			if !tc.isGoMod {
+				if !strings.HasSuffix(a.LinterConfig.Env[0], "GO111MODULE=off") {
+					t.Errorf("env = %v, want with suffix GO111MODULE=off", a.LinterConfig.Env[0])
+				}
 			}
 		})
 	}
