@@ -21,6 +21,8 @@ linters-settings:
         disabled: true
       - name: unexported-return
         disabled: true
+      - name: line-length-limit
+        disabled: true
 
 issues:
   exclude-rules:
