@@ -155,6 +155,7 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 			PullRequestEvent:        *event,
 			PullRequestChangedFiles: pullRequestAffectedFiles,
 			LinterName:              name,
+			RepoDir:                 r.Directory(),
 		}
 
 		if !linters.LinterRelated(name, agent) {
