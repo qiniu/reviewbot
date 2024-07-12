@@ -31,7 +31,7 @@ import (
 	"github.com/qiniu/reviewbot/internal/metric"
 	"github.com/qiniu/x/log"
 	"github.com/qiniu/x/xlog"
-	gitv2 "k8s.io/test-infra/prow/git/v2"
+	gitv2 "sigs.k8s.io/prow/pkg/git/v2"
 )
 
 var (

@@ -32,7 +32,7 @@ import (
 	"github.com/qiniu/reviewbot/internal/version"
 	"github.com/qiniu/x/log"
 	"github.com/sirupsen/logrus"
-	gitv2 "k8s.io/test-infra/prow/git/v2"
+	gitv2 "sigs.k8s.io/prow/pkg/git/v2"
 
 	// linters import
 	_ "github.com/qiniu/reviewbot/internal/linters/c/cppcheck"
