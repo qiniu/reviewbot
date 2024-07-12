@@ -10,6 +10,11 @@ linters-settings:
     # still required to have `t.Parallel`, but subtests are allowed to skip it.
     # Default: false
     ignore-missing-subtests: true
+  revive:
+    enable-all-rules: true
+    rules:
+      - name: line-length-limit
+        disabled: true
 
 issues:
   exclude-rules:

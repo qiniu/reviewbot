@@ -35,6 +35,7 @@ func golangciLintHandler(log *xlog.Logger, a linters.Agent) error {
 		log.Infof("golangci-lint config prepared: %v", path)
 	}
 
+	log.Infof("golangci-lint run config: %v", a.LinterConfig)
 	return linters.GeneralHandler(log, a, parser)
 }
 
