@@ -39,6 +39,8 @@ type Linter struct {
 	Command []string `json:"command,omitempty"`
 	// Args is the arguments of the command.
 	Args []string `json:"args,omitempty"`
+	// Env is the environment variables required for the linter execution.
+	Env []string `json:"env,omitempty"`
 
 	// ReportFormat is the format of the report, if empty, use globalDefaultConfig.
 	// For more details, see:
