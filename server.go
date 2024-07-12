@@ -28,7 +28,7 @@ import (
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/x/log"
 	"github.com/qiniu/x/xlog"
-	gitv2 "k8s.io/test-infra/prow/git/v2"
+	gitv2 "sigs.k8s.io/prow/pkg/git/v2"
 )
 
 type Server struct {
@@ -110,7 +110,9 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 	log.Infof("found %d files affected by pull request %d\n", len(pullRequestAffectedFiles), num)
 
 	// clone the repo
-	r, err := s.gitClientFactory.ClientFor(org, repo)
+	r, err := s.gitClientFactory.ClientForWithRepoOpts(org, repo, gitv2.RepoOpts{
+		CloneToSubDir: repo, // clone to a sub directory
+	})
 	if err != nil {
 		log.Errorf("failed to create git client: %v", err)
 		return err
