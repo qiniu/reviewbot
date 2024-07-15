@@ -54,6 +54,11 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=pr
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
       - name: Build and push Docker image
         id: push
         uses: docker/build-push-action@v6
@@ -61,7 +66,5 @@ jobs:
           platforms: linux/amd64,linux/arm64
           context: .
           push: true
-          tags: |
-            ghcr.io/${{ env.IMAGE_NAME }}:latest
-            ghcr.io/${{ env.IMAGE_NAME }}:${{ steps.ref.outputs.ref }}
+          tags: ${{ steps.meta.outputs.tags }}
           target: runner
