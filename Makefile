@@ -36,10 +36,10 @@ build: check-go
 	CGO_ENABLED=0 go build -v -trimpath -ldflags "$(LDFLAGS)" -o ./reviewbot .
 
 docker-build-latest: check-docker
-	docker builder build --push -t $(DOCKER_IMAGE):$(TAG) -t $(DOCKER_IMAGE):latest --target runner .
+	docker builder build --push -t $(DOCKER_IMAGE):$(TAG) -t $(DOCKER_IMAGE):latest .
 
 docker-dev: check-docker
-	docker builder build -t $(DOCKER_IMAGE):$(TAG) --target runner .
+	docker builder build -t $(DOCKER_IMAGE):$(TAG)  .
 
 kubernetes-deploy: check-kubectl
 	kubectl apply -k .
