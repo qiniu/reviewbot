@@ -35,10 +35,10 @@ staticcheck: check-staticcheck
 build: check-go
 	CGO_ENABLED=0 go build -v -trimpath -ldflags "$(LDFLAGS)" -o ./reviewbot .
 
-docker-build-latest: check-docker
+docker-build-latest: check-docker build
 	docker builder build --push -t $(DOCKER_IMAGE):$(TAG) -t $(DOCKER_IMAGE):latest .
 
-docker-dev: check-docker
+docker-dev: check-docker build
 	docker builder build -t $(DOCKER_IMAGE):$(TAG)  .
 
 kubernetes-deploy: check-kubectl
