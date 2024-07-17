@@ -1,4 +1,5 @@
-FROM alpine:3.20
+# go lint tool dependencies `go list` `gofmt`
+FROM golang:alpine
 
 # if you want to install other tools, please add them here.
 # Do not install unnecessary tools to reduce image size.
@@ -17,7 +18,8 @@ RUN cppcheck --version \
     && yarn --version \
     && curl --version \
     && gcc --version \
-    && golangci-lint --version
+    && golangci-lint --version \
+    && go version
 
 COPY reviewbot /reviewbot
 
