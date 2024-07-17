@@ -391,7 +391,7 @@ func TestWorkDirApply(t *testing.T) {
 
 			}
 
-			a := workDirApply(xlog.New("ur"), tc.input)
+			a, _ := workDirApply(tc.input)
 			if !strings.HasSuffix(a.LinterConfig.WorkDir, tc.wantdir) {
 				t.Errorf("workDirApply() = %v, want with suffix %v", a.LinterConfig.WorkDir, tc.wantdir)
 			}
