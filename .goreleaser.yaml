@@ -1,0 +1,60 @@
+env:
+  - GO111MODULE=on
+  - CGO_ENABLED=0
+
+metadata:
+  mod_timestamp: "{{ .CommitTimestamp }}"
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X github.com/qiniu/reviewbot/internal/version.version={{.Version}}
+dockers:
+  - image_templates:
+      [
+        "ghcr.io/qiniu/reviewbot:{{ .Version }}",
+        "ghcr.io/qiniu/reviewbot:latest",
+      ]
+    dockerfile: Dockerfile
+    use: buildx
+    build_flag_templates:
+      - "--pull"
+      - "--label=io.artifacthub.package.readme-url=https://raw.githubusercontent.com/qiniu/reviewbot/master/README.md"
+      - "--label=org.opencontainers.image.description=Comprehensive linters runner for code review"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.name={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source={{.GitURL}}"
+      - "--platform=linux/amd64"
+  - image_templates:
+      [
+        "ghcr.io/qiniu/reviewbot:{{ .Version }}",
+        "ghcr.io/qiniu/reviewbot:latest",
+      ]
+    dockerfile: Dockerfile
+    use: buildx
+    build_flag_templates:
+      - "--pull"
+      - "--label=io.artifacthub.package.readme-url=https://raw.githubusercontent.com/qiniu/reviewbot/master/README.md"
+      - "--label=org.opencontainers.image.description=Comprehensive linters runner for code review"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.name={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source={{.GitURL}}"
+      - "--platform=linux/arm64"
+    goarch: arm64
+archives:
+  - format: binary
