@@ -11,6 +11,7 @@ import (
 
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/reviewbot/internal/lintersutil"
+	"github.com/qiniu/x/log"
 	"github.com/qiniu/x/xlog"
 )
 
@@ -26,7 +27,7 @@ func golangciLintHandler(log *xlog.Logger, a linters.Agent) error {
 	var gomodPaths []string
 	if len(a.LinterConfig.Command) == 0 || (len(a.LinterConfig.Command) == 1 && a.LinterConfig.Command[0] == lintName) {
 		// Default mode, automatically find the go.mod path in current repo
-		a, gomodPaths = findAllFilesGoModsPath(a)
+		gomodPaths = findAllFilesGoModsPath(a)
 		// Default mode, automatically apply parameters.
 		a = argsApply(log, a)
 	} else if a.LinterConfig.ConfigPath != "" {
@@ -36,6 +37,11 @@ func golangciLintHandler(log *xlog.Logger, a linters.Agent) error {
 	}
 
 	log.Infof("golangci-lint run config: %v", a.LinterConfig)
+
+	// When the go.mod file is not found, set GO111MODULE=off, so that golangci does not run through gomod.
+	if len(gomodPaths) == 0 {
+		a.LinterConfig.Env = append(a.LinterConfig.Env, "GO111MODULE=off")
+	}
 
 	if len(gomodPaths) > 0 {
 		var outputs []byte
@@ -53,7 +59,6 @@ func golangciLintHandler(log *xlog.Logger, a linters.Agent) error {
 		}
 
 		return linters.GeneralHandler(log, a, execrun, parser)
-
 	}
 
 	return linters.GeneralHandler(log, a, linters.ExecRun, parser)
@@ -222,7 +227,7 @@ func configApply(log *xlog.Logger, a linters.Agent) string {
 // findAllFilesGoModsPath is used to determine and find out if there is go.mod file in the current project,
 // if there is, it will store the gomod path in the array,
 // if not, it will set the “GO111MODULE=off” environment variable.
-func findAllFilesGoModsPath(a linters.Agent) (linters.Agent, []string) {
+func findAllFilesGoModsPath(a linters.Agent) []string {
 	var gomodPaths []string
 	var fileDirPaths []string
 	var pathmap = make(map[string]string)
@@ -240,17 +245,9 @@ func findAllFilesGoModsPath(a linters.Agent) (linters.Agent, []string) {
 				pathmap[gomodpath] = gomodpath
 				gomodPaths = append(gomodPaths, gomodpath)
 			}
-
 		}
-
 	}
-	// When the go.mod file is not found, set GO111MODULE=off, so that golangci does not run through gomod.
-	if len(gomodPaths) == 0 {
-		a.LinterConfig.Env = append(a.LinterConfig.Env, "GO111MODULE=off")
-		return a, []string{}
-	}
-
-	return a, gomodPaths
+	return gomodPaths
 }
 
 func findGoMod(a linters.Agent, pathParts []string) string {
