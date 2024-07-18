@@ -24,10 +24,9 @@ func init() {
 
 func golangciLintHandler(log *xlog.Logger, a linters.Agent) error {
 	var gomodPaths []string
-	var errs []error
 	if len(a.LinterConfig.Command) == 0 || (len(a.LinterConfig.Command) == 1 && a.LinterConfig.Command[0] == lintName) {
-		// Default mode, automatically apply golangci workdir
-		a, gomodPaths = workDirApply(a)
+		// Default mode, automatically find the go.mod path in current repo
+		a, gomodPaths = findAllFilesGoModsPath(a)
 		// Default mode, automatically apply parameters.
 		a = argsApply(log, a)
 	} else if a.LinterConfig.ConfigPath != "" {
@@ -39,20 +38,25 @@ func golangciLintHandler(log *xlog.Logger, a linters.Agent) error {
 	log.Infof("golangci-lint run config: %v", a.LinterConfig)
 
 	if len(gomodPaths) > 0 {
-		for _, gomodPath := range gomodPaths {
-			a.LinterConfig.WorkDir = path.Dir(gomodPath)
-			execGoModTidy(a.LinterConfig.WorkDir)
-			err := linters.GeneralHandler(log, a, parser)
-			if err != nil {
-				errs = append(errs, err)
+		var outputs []byte
+		execrun := func(a linters.Agent) ([]byte, error) {
+			for _, gomodPath := range gomodPaths {
+				a.LinterConfig.WorkDir = path.Dir(gomodPath)
+				execGoModTidy(a.LinterConfig.WorkDir)
+				output, err := linters.ExecRun(a)
+				if err != nil {
+					log.Warnf("golangci-lint run with exit code: %v, mark and continue", err)
+				}
+				outputs = append(outputs, output...)
 			}
-			if len(errs) > 0 {
-				return fmt.Errorf("golangci-lint errors occurred while processing in gomod paths : %v", errs)
-			}
+			return outputs, nil
 		}
+
+		return linters.GeneralHandler(log, a, execrun, parser)
+
 	}
 
-	return linters.GeneralHandler(log, a, parser)
+	return linters.GeneralHandler(log, a, linters.ExecRun, parser)
 }
 
 func parser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, []string) {
@@ -215,8 +219,10 @@ func configApply(log *xlog.Logger, a linters.Agent) string {
 	return path
 }
 
-// workDirApply is used to configure the default execution path of golangci-lint when the user does not customize it.
-func workDirApply(a linters.Agent) (linters.Agent, []string) {
+// findAllFilesGoModsPath is used to determine and find out if there is go.mod file in the current project,
+// if there is, it will store the gomod path in the array,
+// if not, it will set the “GO111MODULE=off” environment variable.
+func findAllFilesGoModsPath(a linters.Agent) (linters.Agent, []string) {
 	var gomodPaths []string
 	var fileDirPaths []string
 	var pathmap = make(map[string]string)

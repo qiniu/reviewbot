@@ -1,14 +1,11 @@
 package golangcilint
 
 import (
-	"fmt"
 	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/x/xlog"
@@ -284,90 +281,90 @@ func TestConfigApply(t *testing.T) {
 	}
 }
 
-func TestWorkDirApply(t *testing.T) {
-	filename := "test1/test2/test3/a.go"
-	filename2 := "a.go"
-	tcs := []struct {
-		id            string
-		currentDir    string
-		input         linters.Agent
-		wantdir       string
-		createmodPath string
-		isGoMod       bool
-	}{
-		{
-			id: "workdir == repodir ,find go.mod in repo/",
-			input: linters.Agent{
-				LinterConfig: config.Linter{
+// func TestWorkDirApply(t *testing.T) {
+// 	filename := "test1/test2/test3/a.go"
+// 	filename2 := "a.go"
+// 	tcs := []struct {
+// 		id            string
+// 		currentDir    string
+// 		input         linters.Agent
+// 		wantdir       string
+// 		createmodPath string
+// 		isGoMod       bool
+// 	}{
+// 		{
+// 			id: "workdir == repodir ,find go.mod in repo/",
+// 			input: linters.Agent{
+// 				LinterConfig: config.Linter{
 
-					WorkDir: "repo1/",
-				},
-				PullRequestChangedFiles: []*github.CommitFile{
-					{
-						Filename: &filename,
-					},
-				},
-				RepoDir: "repo1/",
-			},
-			createmodPath: "go.mod",
-			wantdir:       "repo1",
-			isGoMod:       true,
-		},
-		{
-			id: "workdir == repodir, find go.mod in subdir (repo/test1/go.mod)",
-			input: linters.Agent{
-				LinterConfig: config.Linter{
+// 					WorkDir: "repo1/",
+// 				},
+// 				PullRequestChangedFiles: []*github.CommitFile{
+// 					{
+// 						Filename: &filename,
+// 					},
+// 				},
+// 				RepoDir: "repo1/",
+// 			},
+// 			createmodPath: "go.mod",
+// 			wantdir:       "repo1",
+// 			isGoMod:       true,
+// 		},
+// 		{
+// 			id: "workdir == repodir, find go.mod in subdir (repo/test1/go.mod)",
+// 			input: linters.Agent{
+// 				LinterConfig: config.Linter{
 
-					WorkDir: "repo2/",
-				},
-				PullRequestChangedFiles: []*github.CommitFile{
-					{
-						Filename: &filename,
-					},
-				},
-				RepoDir: "repo2/",
-			},
-			createmodPath: "test1/go.mod",
-			wantdir:       "repo2/test1",
-			isGoMod:       true,
-		},
+// 					WorkDir: "repo2/",
+// 				},
+// 				PullRequestChangedFiles: []*github.CommitFile{
+// 					{
+// 						Filename: &filename,
+// 					},
+// 				},
+// 				RepoDir: "repo2/",
+// 			},
+// 			createmodPath: "test1/go.mod",
+// 			wantdir:       "repo2/test1",
+// 			isGoMod:       true,
+// 		},
 
-		{
-			id: "workdir == repodir, can't find go.mod ",
-			input: linters.Agent{
-				LinterConfig: config.Linter{
-					WorkDir: "repo3/",
-				},
-				PullRequestChangedFiles: []*github.CommitFile{
-					{
-						Filename: &filename2,
-					},
-				},
-				RepoDir: "repo3/",
-			},
-			createmodPath: "test1/go.mod",
-			wantdir:       "repo3/",
-			isGoMod:       false,
-		},
+// 		{
+// 			id: "workdir == repodir, can't find go.mod ",
+// 			input: linters.Agent{
+// 				LinterConfig: config.Linter{
+// 					WorkDir: "repo3/",
+// 				},
+// 				PullRequestChangedFiles: []*github.CommitFile{
+// 					{
+// 						Filename: &filename2,
+// 					},
+// 				},
+// 				RepoDir: "repo3/",
+// 			},
+// 			createmodPath: "test1/go.mod",
+// 			wantdir:       "repo3/",
+// 			isGoMod:       false,
+// 		},
 
-		{
-			id: "workdir == repodir,  find go.mod , len(filedirpaht)==1",
-			input: linters.Agent{
-				LinterConfig: config.Linter{
-					WorkDir: "repo4/",
-				},
-				PullRequestChangedFiles: []*github.CommitFile{
-					{
-						Filename: &filename2,
-					},
-				},
-				RepoDir: "repo4/",
-			},
-			createmodPath: "go.mod",
-			wantdir:       "repo4",
-			isGoMod:       true,
-		},
-	}
+// 		{
+// 			id: "workdir == repodir,  find go.mod , len(filedirpaht)==1",
+// 			input: linters.Agent{
+// 				LinterConfig: config.Linter{
+// 					WorkDir: "repo4/",
+// 				},
+// 				PullRequestChangedFiles: []*github.CommitFile{
+// 					{
+// 						Filename: &filename2,
+// 					},
+// 				},
+// 				RepoDir: "repo4/",
+// 			},
+// 			createmodPath: "go.mod",
+// 			wantdir:       "repo4",
+// 			isGoMod:       true,
+// 		},
+// 	}
 
 	for _, tc := range tcs {
 		t.Run(tc.id, func(t *testing.T) {

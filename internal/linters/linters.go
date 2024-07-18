@@ -132,9 +132,9 @@ If you have any questions about this comment, feel free to raise an issue here:
 // The unexpected lines are the lines that cannot be parsed.
 type LinterParser func(*xlog.Logger, []byte) (map[string][]LinterOutput, []string)
 
-func GeneralHandler(log *xlog.Logger, a Agent, linterParser func(*xlog.Logger, []byte) (map[string][]LinterOutput, []string)) error {
+func GeneralHandler(log *xlog.Logger, a Agent, execRun func(a Agent) ([]byte, error), linterParser func(*xlog.Logger, []byte) (map[string][]LinterOutput, []string)) error {
 	linterName := a.LinterName
-	output, err := ExecRun(a)
+	output, err := execRun(a)
 	if err != nil {
 		// NOTE(CarlJi): the error is *ExitError, it seems to have little information and needs to be handled in a better way.
 		log.Warnf("%s run with exit code: %v, mark and continue", linterName, err)
