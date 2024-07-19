@@ -1,6 +1,7 @@
 package pmdcheck
 
 import (
+	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/x/log"
 	"io"
 	"net/http"
@@ -16,12 +17,10 @@ import (
 const linterName = "pmdcheck"
 
 func init() {
-	linters.RegisterPullRequestHandler(linterName, pmdcheckHandler)
+	linters.RegisterPullRequestHandler(linterName, pmdCheckHandler)
 	linters.RegisterLinterLanguages(linterName, []string{".java"})
-
 }
-
-func pmdcheckHandler(log *xlog.Logger, a linters.Agent) error {
+func pmdCheckHandler(log *xlog.Logger, a linters.Agent) error {
 	var javaFiles []string
 	rulePath := a.LinterConfig.ConfigPath
 	for _, arg := range a.PullRequestChangedFiles {
@@ -31,10 +30,10 @@ func pmdcheckHandler(log *xlog.Logger, a linters.Agent) error {
 	}
 	checkrulePath, checkerr := pmdRuleCheck(rulePath)
 	if checkerr != nil {
-		log.Errorf("pmd rule file check failed: %v", checkerr)
+		log.Errorf("pmd rule check failed: %v", checkerr)
 	}
-	log.Infof("pmd  rule check succes,file path: %v", checkrulePath)
-	if (len(javaFiles) == 0) || !linters.IsExist(checkrulePath) || checkerr != nil {
+	_, exist := lintersutil.FileExists(checkrulePath)
+	if (len(javaFiles) == 0) || !exist || checkerr != nil {
 		return nil
 	}
 	if linters.IsEmpty(a.LinterConfig.Args...) {
@@ -44,21 +43,15 @@ func pmdcheckHandler(log *xlog.Logger, a linters.Agent) error {
 		args = append(args, "-R", checkrulePath)
 		a.LinterConfig.Args = args
 	}
-	if a.LinterConfig.Command == "" || a.LinterConfig.Command == linterName {
-		a.LinterConfig.Command = "pmd"
-	}
-	if a.LinterConfig.LinterName == "" {
-		a.LinterConfig.LinterName = linterName
-	}
+	a.LinterConfig.Command = []string{"pmd"}
+
 	return linters.GeneralHandler(log, a, pmdcheckParser)
 
 }
-func pmdcheckParser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, error) {
+func pmdcheckParser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, []string) {
 	var lineParse = func(line string) (*linters.LinterOutput, error) {
 		// pmdcheck will output lines starting with ' [WARN]'  warring information
 		// which are no meaningful for the reviewbot scenario, so we discard them
-
-		strings.ToLower(line)
 		if strings.Contains(line, "[WARN]") || line == "" {
 			return nil, nil
 		}
@@ -66,21 +59,19 @@ func pmdcheckParser(log *xlog.Logger, output []byte) (map[string][]linters.Linte
 	}
 	return linters.Parse(log, output, lineParse)
 }
-
 func getFileFromURL(url string, filepath string) (string, error) {
-	if linters.IsExist(filepath) {
+	_, exist := lintersutil.FileExists(filepath)
+	if exist {
 		return filepath, nil
 	}
 	res, err := http.Get(url)
 	if err != nil {
-		log.Errorf("The file download  encountered  an error，"+
-			"Please check the file  download url: %v,the error is:%v", url, err)
+		log.Errorf("The file download encountered an error, Please check the file download url: %v, the error is:%v", url, err)
 		return "", err
 	}
-
 	f, err := os.Create(filepath)
 	if err != nil {
-		log.Errorf("The file saving   encountered an error,Please check the directory: %v", err)
+		log.Errorf("The file saving encountered an error, Please check the directory: %v", err)
 		return "", err
 	}
 	_, err = io.Copy(f, res.Body)
@@ -90,23 +81,21 @@ func getFileFromURL(url string, filepath string) (string, error) {
 		log.Errorf("The file saving   encountered an error: %v", err)
 		return "", err
 	}
-	if linters.IsExist(filepath) {
-		log.Infof("pmd  rule check succes,file path: %v", filepath)
-		return filepath, nil
-	}
-	return "", err
+	return filepath, nil
 }
 func pmdRuleCheck(pmdConf string) (string, error) {
-	if linters.IsExist(pmdConf) {
-		return pmdConf, nil
 
+	_, exist := lintersutil.FileExists(pmdConf)
+	if exist {
+		return pmdConf, nil
 	}
+
 	if pmdConf == "" {
 		pmdConf = "https://raw.githubusercontent.com/pmd/pmd/master/pmd-java/src/main/resources/category/java/bestpractices.xml"
 	}
 	fileDir, err := os.Getwd()
 	rulefiledirpath := filepath.Join(fileDir, "config/linters-config")
-	rulefilepath := filepath.Join(rulefiledirpath, ".bestpractices.xml")
+	rulefilepath := filepath.Join(rulefiledirpath, ".java-bestpractices.xml")
 	madirerr := os.MkdirAll(rulefiledirpath, 0755)
 	if madirerr != nil {
 		log.Errorf("dir make failed: %v", err)
