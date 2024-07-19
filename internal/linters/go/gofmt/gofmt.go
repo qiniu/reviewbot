@@ -89,9 +89,9 @@ func NewgofmtExecutor(dir string) (linters.Linter, error) {
 func (g *Gofmt) Run(log *xlog.Logger, args ...string) ([]byte, error) {
 	stdoutput, stderr, err := g.execute(g.dir, g.gofmt, args...)
 	if err != nil {
-		log.Errorf("gofmt run with status: %v, mark and continue", err)
+		log.Warnf("gofmt run with status: %v, mark and continue", err)
 		if stderr != nil {
-			log.Errorf("gofmt run cause stderr: %s, mark and continue", stderr)
+			log.Warnf("gofmt run cause stderr: %s, mark and continue", stderr)
 		}
 		return stdoutput, nil
 	} else {
