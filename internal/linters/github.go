@@ -165,10 +165,12 @@ func CreateGithubChecks(ctx context.Context, a Agent, lintErrs map[string][]Lint
 	err := RetryWithBackoff(ctx, func() error {
 		checkRun, resp, err := a.GithubClient.Checks.CreateCheckRun(ctx, owner, repo, check)
 		if err != nil {
+			log.Errorf("create check run failed: %v", err)
 			return err
 		}
 
 		if resp.StatusCode != http.StatusCreated {
+			log.Errorf("unexpected response when create check run: %v", resp)
 			return fmt.Errorf("create check run failed: %v", resp)
 		}
 

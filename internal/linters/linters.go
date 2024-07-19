@@ -346,6 +346,10 @@ func Parse(log *xlog.Logger, output []byte, lineParser LineParser) (results map[
 // It returns the trained linter output and unexpected lines.
 type trainer func(LinterOutput) (LinterOutput, []string)
 
+// ParseV2 parses the output of a linter command.
+// It returns the structured lint results `file:line:column: message` if parsed successfully and unexpected lines if failed.
+// Message can be multi-line, column is optional, the unexpected lines are the lines that cannot be parsed.
+// Use trainer if there is any special case for the linter output. e.g. mark (typecheck) as unexpected.
 func ParseV2(log *xlog.Logger, output []byte, trainer func(LinterOutput) (*LinterOutput, []string)) (map[string][]LinterOutput, []string) {
 	pattern := `(.*?):(\d+):(\d+)?:?`
 	regex := regexp.MustCompile(pattern)
@@ -356,6 +360,7 @@ func ParseV2(log *xlog.Logger, output []byte, trainer func(LinterOutput) (*Linte
 
 	var unexpected = make([]string, 0, len(indices))
 	var prefix string
+	// get the prefix before the first issue which generally is some unexpected message.
 	if len(indices) > 0 && indices[0][0] > 0 {
 		prefix = strings.TrimSpace(string(output[:indices[0][0]]))
 		if prefix != "" {
@@ -377,6 +382,8 @@ func ParseV2(log *xlog.Logger, output []byte, trainer func(LinterOutput) (*Linte
 		issue.Line = int(line)
 
 		var msgStart = indices[i][5] + 1
+
+		// column is optional in some linters' output
 		if indices[i][6] != -1 && indices[i][7] != -1 {
 			column, err := strconv.ParseInt(string(output[indices[i][6]:indices[i][7]]), 10, 64)
 			if err != nil {
