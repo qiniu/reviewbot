@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/reviewbot/internal/lintersutil"
-	"github.com/qiniu/x/log"
 	"github.com/qiniu/x/xlog"
 )
 
@@ -27,7 +27,7 @@ func golangciLintHandler(log *xlog.Logger, a linters.Agent) error {
 	var gomodPaths []string
 	if len(a.LinterConfig.Command) == 0 || (len(a.LinterConfig.Command) == 1 && a.LinterConfig.Command[0] == lintName) {
 		// Default mode, automatically find the go.mod path in current repo
-		gomodPaths = findAllFilesGoModsPath(a)
+		gomodPaths = findGoMods(a)
 		// Default mode, automatically apply parameters.
 		a = argsApply(log, a)
 	} else if a.LinterConfig.ConfigPath != "" {
@@ -41,27 +41,24 @@ func golangciLintHandler(log *xlog.Logger, a linters.Agent) error {
 	// When the go.mod file is not found, set GO111MODULE=off, so that golangci does not run through gomod.
 	if len(gomodPaths) == 0 {
 		a.LinterConfig.Env = append(a.LinterConfig.Env, "GO111MODULE=off")
+		return linters.GeneralHandler(log, a, linters.ExecRun, parser)
 	}
 
-	if len(gomodPaths) > 0 {
-		var outputs []byte
-		execrun := func(a linters.Agent) ([]byte, error) {
-			for _, gomodPath := range gomodPaths {
-				a.LinterConfig.WorkDir = path.Dir(gomodPath)
-				execGoModTidy(a.LinterConfig.WorkDir)
-				output, err := linters.ExecRun(a)
-				if err != nil {
-					log.Warnf("golangci-lint run with exit code: %v, mark and continue", err)
-				}
-				outputs = append(outputs, output...)
+	var outputs []byte
+	execrun := func(a linters.Agent) ([]byte, error) {
+		for _, gomodPath := range gomodPaths {
+			a.LinterConfig.WorkDir = path.Dir(gomodPath)
+			execGoModTidy(log, a.LinterConfig.WorkDir)
+			output, err := linters.ExecRun(a)
+			if err != nil {
+				log.Warnf("golangci-lint run with exit code: %v, mark and continue", err)
 			}
-			return outputs, nil
+			outputs = append(outputs, output...)
 		}
-
-		return linters.GeneralHandler(log, a, execrun, parser)
+		return outputs, nil
 	}
 
-	return linters.GeneralHandler(log, a, linters.ExecRun, parser)
+	return linters.GeneralHandler(log, a, execrun, parser)
 }
 
 func parser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, []string) {
@@ -224,53 +221,52 @@ func configApply(log *xlog.Logger, a linters.Agent) string {
 	return path
 }
 
-// findAllFilesGoModsPath is used to determine and find out if there is go.mod file in the current project,
-// if there is, it will store the gomod path in the array,
-// if not, it will set the “GO111MODULE=off” environment variable.
-func findAllFilesGoModsPath(a linters.Agent) []string {
+// findGoMods is used to determine and find out if there are go.mod files in the current project.
+func findGoMods(a linters.Agent) []string {
 	var gomodPaths []string
-	var fileDirPaths []string
-	var pathmap = make(map[string]string)
+	if a.LinterConfig.WorkDir != a.RepoDir {
+		return []string{}
+	}
 	// When WorkDir and RepoDir are the same, then find the path where go.mod is located.
-	if a.LinterConfig.WorkDir == a.RepoDir {
-		for _, file := range a.PullRequestChangedFiles {
-			if strings.HasSuffix(*file.Filename, ".go") {
-				fileDirPaths = append(fileDirPaths, *file.Filename)
-			}
-		}
-		for _, fileDirPath := range fileDirPaths {
-			pathParts := strings.Split(fileDirPath, string(filepath.Separator))
-			gomodpath := findGoMod(a, pathParts)
-			if _, ok := pathmap[gomodpath]; !ok && gomodpath != "" {
-				pathmap[gomodpath] = gomodpath
-				gomodPaths = append(gomodPaths, gomodpath)
-			}
+
+	uniquePaths := findUniquePaths(a.PullRequestChangedFiles)
+
+	// Firstly, find file in repodir
+	if path, exist := lintersutil.FileExists(a.RepoDir + "/" + "go.mod"); exist {
+		gomodPaths = append(gomodPaths, path)
+	}
+	// Nextly, find file in  uniquePaths
+	for path := range uniquePaths {
+		searchPath := filepath.Join(a.RepoDir, path)
+		if path, exist := lintersutil.FileExists(searchPath + "/" + "go.mod"); exist {
+			gomodPaths = append(gomodPaths, path)
 		}
 	}
+
 	return gomodPaths
 }
 
-func findGoMod(a linters.Agent, pathParts []string) string {
-	if path, exist := lintersutil.FileExists(a.RepoDir + "/" + "go.mod"); exist {
-		return path
-	}
-
-	searchPath := a.RepoDir
-	for k, v := range pathParts {
-		if k == len(pathParts)-1 {
-			break
+func findUniquePaths(commitfiles []*github.CommitFile) map[string]bool {
+	uniquePaths := make(map[string]bool)
+	for _, file := range commitfiles {
+		if strings.HasSuffix(*file.Filename, ".go") {
+			parts := strings.Split(*file.Filename, string(filepath.Separator))
+			for i := range parts {
+				// Remove when path ends in a filename . eg. A/B/c.txt
+				if i == len(parts)-1 {
+					continue
+				}
+				path := filepath.Join(parts[:i+1]...)
+				uniquePaths[path] = true
+			}
 		}
-		searchPath = filepath.Join(searchPath, v)
-		if path, exist := lintersutil.FileExists(searchPath + "/" + "go.mod"); exist {
-			return path
-		}
 	}
-
-	return ""
+	return uniquePaths
 }
 
 // Execute go mod tidy when go.mod exists.
-func execGoModTidy(workdir string) {
+func execGoModTidy(log *xlog.Logger, workdir string) {
+	log.Infof("go mod tidy workdir: %v", workdir)
 	cmd := exec.Command("go", "mod", "tidy")
 	cmd.Dir = workdir
 	var stderr bytes.Buffer

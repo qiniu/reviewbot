@@ -348,7 +348,7 @@ func TestFindGoModsPaths(t *testing.T) {
 			isGoMod:      false,
 		},
 		{
-			id: "2 gomod file in different dir",
+			id: "3 gomod file in different dir, 1 gomod is not in filepath",
 			input: linters.Agent{
 				LinterConfig: config.Linter{
 					WorkDir: "repo3/",
@@ -369,8 +369,10 @@ func TestFindGoModsPaths(t *testing.T) {
 			createmodPath: []string{
 				"test1/go.mod",
 				"test2/go.mod",
+				"go.mod",
+				"test3/go.mod",
 			},
-			gomodfilenum: 2,
+			gomodfilenum: 3,
 			isGoMod:      true,
 		},
 	}
@@ -398,7 +400,7 @@ func TestFindGoModsPaths(t *testing.T) {
 				}
 			}
 
-			gomodpaths := findAllFilesGoModsPath(tc.input)
+			gomodpaths := findGoMods(tc.input)
 
 			if len(gomodpaths) != tc.gomodfilenum {
 				t.Errorf("gomodpath num is err, got:%d ,want: %d,\n gomodpath: %v", len(gomodpaths), tc.gomodfilenum, gomodpaths)
