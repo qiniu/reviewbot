@@ -431,6 +431,25 @@ io/upv2/upform/internal/mime/multipart/multipart_test.go:744:7: wrapperFunc: use
 			},
 			unexpected: []string{},
 		},
+		{
+			id: "case8 - unexpected file format",
+			input: []byte(`
+abc x:18:1: warning: xxxx
+golangci_lint.go:16:1: warning: (gochecknoglobals)
+`),
+			trainer: nil,
+			expected: map[string][]LinterOutput{
+				"golangci_lint.go": []LinterOutput{
+					{
+						File:    "golangci_lint.go",
+						Line:    16,
+						Column:  1,
+						Message: "warning: (gochecknoglobals)",
+					},
+				},
+			},
+			unexpected: []string{},
+		},
 	}
 	for _, tc := range tcs {
 		t.Run(tc.id, func(t *testing.T) {

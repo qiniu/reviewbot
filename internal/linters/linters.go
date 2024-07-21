@@ -370,8 +370,15 @@ func ParseV2(log *xlog.Logger, output []byte, trainer func(LinterOutput) (*Linte
 
 	var results = make(map[string][]LinterOutput, len(indices))
 	for i := 0; i < len(indices); i++ {
+		file := string(output[indices[i][2]:indices[i][3]])
+		if strings.ContainsAny(file, " :") {
+			log.Errorf("unexpected file name: %s", file)
+			// skip the unexpected line
+			continue
+		}
+
 		issue := LinterOutput{
-			File: string(output[indices[i][2]:indices[i][3]]),
+			File: file,
 		}
 
 		line, err := strconv.ParseInt(string(output[indices[i][4]:indices[i][5]]), 10, 64)
