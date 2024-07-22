@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -24,10 +23,10 @@ func init() {
 }
 
 func golangciLintHandler(log *xlog.Logger, a linters.Agent) error {
-	var gomodPaths []string
+	var goModDirs []string
 	if len(a.LinterConfig.Command) == 0 || (len(a.LinterConfig.Command) == 1 && a.LinterConfig.Command[0] == lintName) {
 		// Default mode, automatically find the go.mod path in current repo
-		gomodPaths = findGoMods(a)
+		goModDirs = findGoModDirs(a)
 		// Default mode, automatically apply parameters.
 		a = argsApply(log, a)
 	} else if a.LinterConfig.ConfigPath != "" {
@@ -39,15 +38,16 @@ func golangciLintHandler(log *xlog.Logger, a linters.Agent) error {
 	log.Infof("golangci-lint run config: %v", a.LinterConfig)
 
 	// When the go.mod file is not found, set GO111MODULE=off, so that golangci does not run through gomod.
-	if len(gomodPaths) == 0 {
+	if len(goModDirs) == 0 {
 		a.LinterConfig.Env = append(a.LinterConfig.Env, "GO111MODULE=off")
 		return linters.GeneralHandler(log, a, linters.ExecRun, parser)
 	}
 
 	var outputs []byte
-	execrun := func(a linters.Agent) ([]byte, error) {
-		for _, gomodPath := range gomodPaths {
-			a.LinterConfig.WorkDir = path.Dir(gomodPath)
+	runFn := func(a linters.Agent) ([]byte, error) {
+		// run golangci-lint for each go.mod directory
+		for _, goModDir := range goModDirs {
+			a.LinterConfig.WorkDir = goModDir
 			execGoModTidy(log, a.LinterConfig.WorkDir)
 			output, err := linters.ExecRun(a)
 			if err != nil {
@@ -58,10 +58,11 @@ func golangciLintHandler(log *xlog.Logger, a linters.Agent) error {
 		return outputs, nil
 	}
 
-	return linters.GeneralHandler(log, a, execrun, parser)
+	return linters.GeneralHandler(log, a, runFn, parser)
 }
 
 func parser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, []string) {
+	log.Infof("golangci-lint output: %s", output)
 	var trainer = func(o linters.LinterOutput) (*linters.LinterOutput, []string) {
 		// Perhaps it may not be precise enough？
 		// refer: https://golangci-lint.run/usage/linters/
@@ -221,47 +222,51 @@ func configApply(log *xlog.Logger, a linters.Agent) string {
 	return path
 }
 
-// findGoMods is used to determine and find out if there are go.mod files in the current project.
-func findGoMods(a linters.Agent) []string {
-	var gomodPaths []string
+// findGoModDirs aims to find the dirs where go.mod files exist in the current repo based on the changed files.
+func findGoModDirs(a linters.Agent) []string {
+	// it means WorkDir is specified via the config file probably, so we don't need to find go.mod
 	if a.LinterConfig.WorkDir != a.RepoDir {
 		return []string{}
 	}
-	// When WorkDir and RepoDir are the same, then find the path where go.mod is located.
 
-	uniquePaths := findUniquePaths(a.PullRequestChangedFiles)
-
-	// Firstly, find file in repodir
-	if path, exist := lintersutil.FileExists(a.RepoDir + "/" + "go.mod"); exist {
-		gomodPaths = append(gomodPaths, path)
-	}
-	// Nextly, find file in  uniquePaths
-	for path := range uniquePaths {
-		searchPath := filepath.Join(a.RepoDir, path)
-		if path, exist := lintersutil.FileExists(searchPath + "/" + "go.mod"); exist {
-			gomodPaths = append(gomodPaths, path)
+	var goModDirs []string
+	dirs := extractDirs(a.PullRequestChangedFiles)
+	for _, dir := range dirs {
+		goModFile := filepath.Join(a.RepoDir, dir, "go.mod")
+		if _, exist := lintersutil.FileExists(goModFile); exist {
+			goModDirs = append(goModDirs, filepath.Join(a.RepoDir, dir))
 		}
 	}
-
-	return gomodPaths
+	return goModDirs
 }
 
-func findUniquePaths(commitfiles []*github.CommitFile) map[string]bool {
-	uniquePaths := make(map[string]bool)
-	for _, file := range commitfiles {
-		if strings.HasSuffix(*file.Filename, ".go") {
-			parts := strings.Split(*file.Filename, string(filepath.Separator))
-			for i := range parts {
-				// Remove when path ends in a filename . eg. A/B/c.txt
-				if i == len(parts)-1 {
-					continue
-				}
-				path := filepath.Join(parts[:i+1]...)
-				uniquePaths[path] = true
-			}
+func extractDirs(commitFiles []*github.CommitFile) []string {
+	directorySet := make(map[string]bool)
+
+	for _, file := range commitFiles {
+		if filepath.Ext(file.GetFilename()) != ".go" {
+			continue
+		}
+		dir := filepath.Dir(file.GetFilename())
+
+		// Split the directory path into individual directories
+		dirs := strings.Split(dir, string(filepath.Separator))
+		prefix := "."
+		// root directory
+		directorySet[prefix] = true
+		for _, d := range dirs {
+			prefix = filepath.Join(prefix, d)
+			// current directory
+			directorySet[prefix] = true
 		}
 	}
-	return uniquePaths
+
+	directories := make([]string, 0, len(directorySet))
+	for dir := range directorySet {
+		directories = append(directories, dir)
+	}
+
+	return directories
 }
 
 // Execute go mod tidy when go.mod exists.
