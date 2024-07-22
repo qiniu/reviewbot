@@ -27,6 +27,15 @@ type GlobalConfig struct {
 	// if not empty, use the config to run golangci-lint.
 	// it can be overridden by linter.ConfigPath.
 	GolangCiLintConfig string `json:"golangciLintConfig,omitempty"`
+
+	// JavaPmdCheckRuleConfig is the path of javapmdcheck-lint rules config file to run javapmdcheck-lint globally.
+	// if not empty, use the config to run javapmdcheck-lint.
+	// it can be overridden by linter.ConfigPath.
+	JavaPmdCheckRuleConfig string `json:"javapmdcheckruleConfig,omitempty"`
+	// JavaStyleCheckRuleConfig is the path of javastylecheck-lint rules config file to run javastylecheck-lint globally.
+	// if not empty, use the config to run javastylecheck-lint.
+	// it can be overridden by linter.ConfigPath.
+	JavaStyleCheckRuleConfig string `json:"javastylecheckruleConfig,omitempty"`
 }
 
 type Linter struct {
@@ -87,6 +96,20 @@ func NewConfig(conf string) (Config, error) {
 		c.GlobalDefaultConfig.GolangCiLintConfig = filepath.Join(absPath, c.GlobalDefaultConfig.GolangCiLintConfig)
 		if _, err := os.Stat(c.GlobalDefaultConfig.GolangCiLintConfig); err != nil {
 			return c, fmt.Errorf("golangci-lint config file not found: %v", c.GlobalDefaultConfig.GolangCiLintConfig)
+		}
+		// check java pmd check config path
+		if c.GlobalDefaultConfig.JavaPmdCheckRuleConfig != "" {
+			c.GlobalDefaultConfig.JavaPmdCheckRuleConfig = filepath.Join(absPath, c.GlobalDefaultConfig.JavaPmdCheckRuleConfig)
+			if _, err := os.Stat(c.GlobalDefaultConfig.JavaPmdCheckRuleConfig); err != nil {
+				return c, fmt.Errorf("java pmd check config file not found: %v", c.GlobalDefaultConfig.JavaPmdCheckRuleConfig)
+			}
+		}
+		// check java style check config path
+		if c.GlobalDefaultConfig.JavaStyleCheckRuleConfig != "" {
+			c.GlobalDefaultConfig.JavaStyleCheckRuleConfig = filepath.Join(absPath, c.GlobalDefaultConfig.JavaStyleCheckRuleConfig)
+			if _, err := os.Stat(c.GlobalDefaultConfig.JavaStyleCheckRuleConfig); err != nil {
+				return c, fmt.Errorf("java style check config file not found: %v", c.GlobalDefaultConfig.JavaStyleCheckRuleConfig)
+			}
 		}
 	}
 
