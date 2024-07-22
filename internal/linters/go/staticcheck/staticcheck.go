@@ -36,5 +36,5 @@ func staticcheckHandler(log *xlog.Logger, a linters.Agent) error {
 		a.LinterConfig.Args = append([]string{}, "-debug.no-compile-errors=true", "./...")
 	}
 
-	return linters.GeneralHandler(log, a, linters.GeneralParse)
+	return linters.GeneralHandler(log, a, linters.ExecRun, linters.GeneralParse)
 }
