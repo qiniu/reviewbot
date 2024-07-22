@@ -342,10 +342,6 @@ func Parse(log *xlog.Logger, output []byte, lineParser LineParser) (results map[
 	return
 }
 
-// trainer is a function that trains the linter output.
-// It returns the trained linter output and unexpected lines.
-type trainer func(LinterOutput) (LinterOutput, []string)
-
 // ParseV2 parses the output of a linter command.
 // It returns the structured lint results `file:line:column: message` if parsed successfully and unexpected lines if failed.
 // Message can be multi-line, column is optional, the unexpected lines are the lines that cannot be parsed.
@@ -370,7 +366,7 @@ func ParseV2(log *xlog.Logger, output []byte, trainer func(LinterOutput) (*Linte
 
 	var results = make(map[string][]LinterOutput, len(indices))
 	for i := 0; i < len(indices); i++ {
-		file := string(output[indices[i][2]:indices[i][3]])
+		file := strings.TrimSpace(string(output[indices[i][2]:indices[i][3]]))
 		if strings.ContainsAny(file, " :") {
 			log.Errorf("unexpected file name: %s", file)
 			// skip the unexpected line
