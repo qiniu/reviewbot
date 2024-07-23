@@ -23,6 +23,8 @@ linters-settings:
         disabled: true
       - name: line-length-limit
         disabled: true
+      - name: cognitive-complexity
+        arguments: [50]
 
 issues:
   exclude-rules:
