@@ -1,3 +1,17 @@
+FROM aslan-spock-register.qiniu.io/golang:latest as builder
+ENV GOPROXY https://goproxy.cn,direct
+ENV TimeZone=Asia/Shanghai
+# 设置工作目录
+RUN mkdir /app
+WORKDIR /app
+
+# 复制 Go 程序源代码到工作目录
+COPY  . .
+RUN go mod download
+
+RUN go build -o reviewbot
+# 编译 Go 程序
+#RUN rm -rf ./app/
 # go lint tool dependencies `go list` `gofmt`
 FROM golang:alpine
 
@@ -51,6 +65,7 @@ RUN cppcheck --version \
     && go version
 
 COPY reviewbot /reviewbot
+COPY --from=builder /app/reviewbot /reviewbot
 
 # SSH config
 RUN mkdir -p /root/.ssh && chown -R root /root/.ssh/ &&  chgrp -R root /root/.ssh/ \
