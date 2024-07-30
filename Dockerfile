@@ -9,7 +9,7 @@ WORKDIR /app
 COPY  . .
 RUN go mod download
 
-RUN go build -o reviewbot
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build .
 # 编译 Go 程序
 #RUN rm -rf ./app/
 # go lint tool dependencies `go list` `gofmt`
