@@ -1,8 +1,6 @@
 module github.com/qiniu/reviewbot
 
-go 1.22.3
-
-toolchain go1.22.5
+go 1.22.5
 
 require (
 	github.com/bradleyfalzon/ghinstallation/v2 v2.8.0

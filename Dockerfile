@@ -5,9 +5,10 @@ FROM golang:alpine
 # Do not install unnecessary tools to reduce image size.
 RUN set -eux  \
     apk update && \
-    apk --no-cache add ca-certificates luacheck cppcheck shellcheck git openssh yarn libpcap-dev curl openjdk11 bash build-base && \
+    apk --no-cache add ca-certificates luacheck cppcheck shellcheck git openssh yarn libpcap-dev curl build-base && \
     curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b  /usr/local/bin v1.59.1
 
+WORKDIR /
 
 #install open jdk
 
@@ -37,9 +38,6 @@ ENV StyleCheck_DOWNLOAD_SHA256 51c34d738520c1389d71998a9ab0e6dabe0d7cf262149f3e0
 RUN curl -fsSL "$StyleCheck_DOWNLOAD_URL" -o checkstyle.jar \
     && echo "$StyleCheck_DOWNLOAD_SHA256  checkstyle.jar" | sha256sum -c -
 
-
-
-WORKDIR /
 # check binary
 RUN cppcheck --version \
     && shellcheck --version \

@@ -7,14 +7,16 @@
 globalDefaultConfig: # global default settings, will be overridden by qbox org and repo specific settings if they exist
   githubReportType: "github_check_run" # github_pr_review, github_check_run
   golangcilintConfig: "config/linters-config/.golangci.yml" # golangci-lint config file to use
-  javapmdcheckruleConfig: ""   # Path to a ruleset xml file.  The path may be a local file system path, or a URL. if not config reviewbot will auto download the  https://raw.githubusercontent.com/pmd/pmd/master/pmd-java/src/main/resources/category/java/bestpractices.xml
-  javastylecheckruleConfig: ""    # Path to a ruleset xml file.  The path may be a local file system path, or a URL.  if not config reviewbot will auto download the https://raw.githubusercontent.com/checkstyle/checkstyle/master/src/main/resources/sun_checks.xml
 
 customConfig: # custom config for specific orgs or repos
   goplus:
     golangci-lint:
       enable: true
       configPath: "/config/linters-config/.golangci.goplus.yml"
+
+  goplus/llgo:
+    golangci-lint:
+      enable: false
 
   qbox/kodo:
     golangci-lint:

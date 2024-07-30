@@ -23,6 +23,10 @@ linters-settings:
         disabled: true
       - name: line-length-limit
         disabled: true
+      - name: cognitive-complexity
+        arguments: [50]
+      - name: add-constant
+        disabled: true
 
 issues:
   exclude-rules:
@@ -56,4 +60,6 @@ linters:
     - wsl # seems too arbitrary
     - nonamedreturns # seems too arbitrary
     - ireturn # seems too arbitrary. also see: https://github.com/go-proverbs/go-proverbs.github.io/issues/37
+    - godox # seems too arbitrary
+    - err113 # seems too arbitrary
 

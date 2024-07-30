@@ -293,10 +293,10 @@ func TestFindGoModsPaths(t *testing.T) {
 		id            string
 		currentDir    string
 		input         linters.Agent
-		wantdir       string
-		createmodPath []string
+		wantDir       string
+		createModPath []string
 		isGoMod       bool
-		gomodfilenum  int
+		goModFileNum  int
 	}{
 		{
 			id: "1 gomod file ",
@@ -317,10 +317,10 @@ func TestFindGoModsPaths(t *testing.T) {
 				},
 				RepoDir: "repo1/",
 			},
-			createmodPath: []string{
+			createModPath: []string{
 				"test1/go.mod",
 			},
-			gomodfilenum: 1,
+			goModFileNum: 1,
 			isGoMod:      true,
 		},
 
@@ -343,12 +343,11 @@ func TestFindGoModsPaths(t *testing.T) {
 				},
 				RepoDir: "repo2/",
 			},
-			// createmodPath: "test1/go.mod",
-			gomodfilenum: 0,
+			goModFileNum: 0,
 			isGoMod:      false,
 		},
 		{
-			id: "3 gomod file in different dir, 1 gomod is not in filepath",
+			id: "3 go.mod files in different dir, 1 go.mod file is not in filepath",
 			input: linters.Agent{
 				LinterConfig: config.Linter{
 					WorkDir: "repo3/",
@@ -366,13 +365,13 @@ func TestFindGoModsPaths(t *testing.T) {
 				},
 				RepoDir: "repo3/",
 			},
-			createmodPath: []string{
+			createModPath: []string{
 				"test1/go.mod",
 				"test2/go.mod",
 				"go.mod",
 				"test3/go.mod",
 			},
-			gomodfilenum: 3,
+			goModFileNum: 3,
 			isGoMod:      true,
 		},
 	}
@@ -384,8 +383,8 @@ func TestFindGoModsPaths(t *testing.T) {
 			}
 			defer os.RemoveAll(tc.input.LinterConfig.WorkDir)
 			if tc.isGoMod {
-				for _, gomodpath := range tc.createmodPath {
-					path := tc.input.LinterConfig.WorkDir + gomodpath
+				for _, goModDir := range tc.createModPath {
+					path := tc.input.LinterConfig.WorkDir + goModDir
 					err := os.MkdirAll(filepath.Dir(path), 0777)
 					if err != nil {
 						fmt.Println("Error creating directories:", err)
@@ -400,12 +399,69 @@ func TestFindGoModsPaths(t *testing.T) {
 				}
 			}
 
-			gomodpaths := findGoMods(tc.input)
+			goModFiles := findGoModDirs(tc.input)
 
-			if len(gomodpaths) != tc.gomodfilenum {
-				t.Errorf("gomodpath num is err, got:%d ,want: %d,\n gomodpath: %v", len(gomodpaths), tc.gomodfilenum, gomodpaths)
+			if len(goModFiles) != tc.goModFileNum {
+				t.Errorf("gomodpath num is err, got:%d ,want: %d,\n gomodpath: %v", len(goModFiles), tc.goModFileNum, goModFiles)
 			}
 		})
 	}
+}
 
+func TestExtractDirs(t *testing.T) {
+	tcs := []struct {
+		id            string
+		commitFiles   []*github.CommitFile
+		wantDirectory []string
+	}{
+		{
+			id: "case1 - no go file",
+			commitFiles: []*github.CommitFile{
+				{
+					Filename: nil,
+				},
+			},
+			wantDirectory: []string{},
+		},
+		{
+			id: "case2 - go files",
+			commitFiles: []*github.CommitFile{
+				{
+					Filename: github.String("a/b/c/a.go"),
+				},
+				{
+					Filename: github.String("e/f/g/b.go"),
+				},
+				{
+					Filename: github.String("a/b/c/d/e.go"),
+				},
+				{
+					Filename: github.String("c/g/h/i/e.java"),
+				},
+			},
+			wantDirectory: []string{".", "a", "a/b", "a/b/c", "e", "e/f", "e/f/g", "a/b/c/d"},
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.id, func(t *testing.T) {
+			got := extractDirs(tc.commitFiles)
+			if len(got) != len(tc.wantDirectory) {
+				t.Errorf("extractDirs() = %v, want %v", got, tc.wantDirectory)
+			}
+
+			for _, dir := range got {
+				var found bool
+				for _, d := range tc.wantDirectory {
+					if dir == d {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("extractDirs() = %v, want %v", got, tc.wantDirectory)
+				}
+			}
+		})
+	}
 }
