@@ -19,7 +19,7 @@ FROM aslan-spock-register.qiniu.io/golang:alpine
 # Do not install unnecessary tools to reduce image size.
 RUN set -eux  \
     apk update && \
-    apk --no-cache add ca-certificates luacheck cppcheck shellcheck git openssh yarn libpcap-dev curl openjdk11 build-base && \
+    apk --no-cache add ca-certificates luacheck cppcheck shellcheck git openssh yarn libpcap-dev curl openjdk11 bash build-base && \
     curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b  /usr/local/bin v1.59.1
 
 WORKDIR /
