@@ -1,6 +1,7 @@
 package golangcilint
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -461,6 +462,68 @@ func TestExtractDirs(t *testing.T) {
 				if !found {
 					t.Errorf("extractDirs() = %v, want %v", got, tc.wantDirectory)
 				}
+			}
+		})
+	}
+}
+
+func TestGoBuild(t *testing.T) {
+	log := xlog.New("eventGUID")
+	tcs := []struct {
+		id      string
+		workdir string
+		canBuid bool
+		want    error
+	}{
+		{
+			id:      "1. go buid successful",
+			workdir: "test1/test1/a.go",
+			canBuid: true,
+			want:    nil,
+		},
+		{
+			id:      "2. go buid failed , no go file",
+			workdir: "test2/test2/t.txt",
+			want:    errors.New(`go: warning: "./..." matched no packages`),
+		},
+		{
+			id:      "3. go buid no main module",
+			workdir: "test3/test3/b.go",
+			want:    errors.New("b.go:1:1: expected 'package', found 'EOF'"),
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.id, func(t *testing.T) {
+			path := tc.workdir
+			err := os.MkdirAll(filepath.Dir(path), 0777)
+			if err != nil {
+				fmt.Println("Error creating directories:", err)
+				return
+			}
+			file, err := os.Create(path)
+			if err != nil {
+				fmt.Println("Error creating file:", err)
+				return
+			}
+			defer file.Close()
+			if tc.canBuid {
+				_, err = file.WriteString(`
+			package main
+			import "fmt"
+
+			func main() {
+				fmt.Println("main file")
+			}
+			`)
+				if err != nil {
+					fmt.Println("Error writing to file:", err)
+					return
+				}
+			}
+			err = execGoBuild(log, filepath.Dir(path))
+			if !strings.Contains(fmt.Sprintf("%v", err), fmt.Sprintf("%v", tc.want)) {
+				t.Errorf("want %v ,got: %v", tc.want, err)
 			}
 		})
 	}

@@ -39,6 +39,10 @@ func golangciLintHandler(log *xlog.Logger, a linters.Agent) error {
 
 	// When the go.mod file is not found, set GO111MODULE=off, so that golangci does not run through gomod.
 	if len(goModDirs) == 0 {
+		if err := execGoBuild(log, a.LinterConfig.WorkDir); err != nil {
+			log.Warnf("golangci-lint go buid in %s was wrong, marked and continue, err details: %v ", a.LinterConfig.WorkDir, err)
+			return linters.GeneralHandler(log, a, func(linters.Agent) ([]byte, error) { return []byte{}, nil }, parser)
+		}
 		a.LinterConfig.Env = append(a.LinterConfig.Env, "GO111MODULE=off")
 		return linters.GeneralHandler(log, a, linters.ExecRun, parser)
 	}
@@ -48,6 +52,10 @@ func golangciLintHandler(log *xlog.Logger, a linters.Agent) error {
 		// run golangci-lint for each go.mod directory
 		for _, goModDir := range goModDirs {
 			a.LinterConfig.WorkDir = goModDir
+			if err := execGoBuild(log, a.LinterConfig.WorkDir); err != nil {
+				log.Warnf("golangci-lint go buid in %s was wrong, marked and continue, err details: %v ", a.LinterConfig.WorkDir, err)
+				continue
+			}
 			execGoModTidy(log, a.LinterConfig.WorkDir)
 			output, err := linters.ExecRun(a)
 			if err != nil {
@@ -285,4 +293,21 @@ func execGoModTidy(log *xlog.Logger, workdir string) {
 	if stderr.Len() > 0 {
 		log.Warnf("running go mod tidy something wrong :%s", stderr.String())
 	}
+}
+
+func execGoBuild(log *xlog.Logger, workdir string) error {
+	log.Infof("go build workdir: %v", workdir)
+	cmd := exec.Command("go", "build", "./...")
+	cmd.Dir = workdir
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	err := cmd.Run()
+	if err != nil || stderr.Len() > 0 || stdout.Len() > 0 {
+		return fmt.Errorf("err:%v , details:%s ,%s  ", err, stderr.String(), stdout.String())
+	}
+
+	log.Info("running go build successfully")
+	return nil
 }
