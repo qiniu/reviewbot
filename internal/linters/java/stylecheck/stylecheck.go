@@ -57,7 +57,7 @@ func stylecheckHandler(log *xlog.Logger, a linters.Agent) error {
 
 	a.LinterConfig.Command = []string{"java"}
 
-	return linters.GeneralHandler(log, a, stylecheckParser)
+	return linters.GeneralHandler(log, a, linters.ExecRun, stylecheckParser)
 }
 func stylecheckParser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, []string) {
 	var lineParse = func(line string) (*linters.LinterOutput, error) {

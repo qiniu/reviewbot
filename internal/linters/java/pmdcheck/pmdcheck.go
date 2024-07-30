@@ -45,7 +45,7 @@ func pmdCheckHandler(log *xlog.Logger, a linters.Agent) error {
 	}
 	a.LinterConfig.Command = []string{"pmd"}
 
-	return linters.GeneralHandler(log, a, pmdcheckParser)
+	return linters.GeneralHandler(log, a, linters.ExecRun, pmdcheckParser)
 
 }
 func pmdcheckParser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, []string) {
