@@ -70,7 +70,4 @@ customConfig: # custom config for specific orgs or repos
         - "/bin/sh"
         - "-c"
         - "--"
-      args:
-        - |
-          sh scripts/ci/ci_env_init.sh
-          CGO_ENABLED=1 golangci-lint run --timeout=10m0s --allow-parallel-runners=true --print-issued-lines=false --out-format=line-number >> $ARTIFACT/lint.log 2>&1
+      args: ["scripts/ci/ci_env_init.sh && CGO_ENABLED=1 golangci-lint run --timeout=10m0s --allow-parallel-runners=true --print-issued-lines=false --out-format=line-number >> $ARTIFACT/lint.log 2>&1"]

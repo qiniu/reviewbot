@@ -16,6 +16,7 @@ FROM alpine:3.20 as runner
 RUN set -eux  \
     apk update && \
 <<<<<<< HEAD
+<<<<<<< HEAD
     apk --no-cache add ca-certificates luacheck cppcheck shellcheck git openssh yarn curl openjdk11 bash
 
 #install open jdk
@@ -25,6 +26,9 @@ ENV PATH JAVA_HOME/bin:$PATH
 =======
     apk --no-cache add ca-certificates luacheck cppcheck shellcheck git openssh yarn libpcap-dev curl
 >>>>>>> e5cfc71 (fix golangci-lint init env (#226))
+=======
+    apk --no-cache add ca-certificates luacheck cppcheck shellcheck git openssh yarn libpcap-dev curl gcc
+>>>>>>> 7b380c7 (add cgo lib (#231))
 WORKDIR /
 # check binary
 RUN cppcheck --version \
@@ -32,6 +36,7 @@ RUN cppcheck --version \
     && luacheck --version \
     && git --version \
     && ssh -V \
+<<<<<<< HEAD
     && yarn --version
 RUN java -version
 
@@ -54,6 +59,11 @@ RUN curl -fsSL "$StyleCheck_DOWNLOAD_URL" -o /usr/local/checkstyle-10.17.0-all.j
 
 RUN java -jar /usr/local/checkstyle-10.17.0-all.jar --version
 
+=======
+    && yarn --version \
+    && curl --version \
+    && gcc --version
+>>>>>>> 7b380c7 (add cgo lib (#231))
 
 COPY --from=builder /reviewbot /reviewbot
 COPY --from=builder /go/bin/golangci-lint /usr/local/bin/
