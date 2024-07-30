@@ -64,7 +64,7 @@ RUN cppcheck --version \
     && golangci-lint --version \
     && go version
 
-COPY reviewbot /reviewbot
+#COPY reviewbot /reviewbot
 COPY --from=builder /app/reviewbot /reviewbot
 
 # SSH config
