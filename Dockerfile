@@ -13,7 +13,7 @@ RUN go build -o reviewbot
 # 编译 Go 程序
 #RUN rm -rf ./app/
 # go lint tool dependencies `go list` `gofmt`
-FROM golang:alpine
+FROM aslan-spock-register.qiniu.io/golang:alpine
 
 # if you want to install other tools, please add them here.
 # Do not install unnecessary tools to reduce image size.
