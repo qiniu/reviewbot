@@ -5,9 +5,9 @@ metadata:
   labels:
     app: reviewbot
   name: reviewbot
-  namespace: reviewbot
+  namespace: reviewbot2
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: reviewbot
@@ -106,7 +106,7 @@ metadata:
   labels:
     app: reviewbot
   name: reviewbot
-  namespace: reviewbot
+  namespace: reviewbot2
 spec:
   ports:
     - name: http
@@ -125,10 +125,10 @@ metadata:
   labels:
     app: reviewbot
   name: reviewbot
-  namespace: reviewbot
+  namespace: reviewbot2
 spec:
   rules:
-    - host: cr-bot.qiniu.io
+    - host: botagent.reviewbot2.jfcs-k8s-qa1.qiniu.io
       http:
         paths:
           - backend:
@@ -138,7 +138,7 @@ spec:
                   number: 8888
             path: /
             pathType: Prefix
-    - host: cr-bot.qiniu.io
+    - host: botagent.reviewbot2.jfcs-k8s-qa1.qiniu.io
       http:
         paths:
           - backend:

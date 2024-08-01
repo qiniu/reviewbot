@@ -18,7 +18,6 @@ package stylecheck
 
 import (
 	"github.com/qiniu/reviewbot/internal/linters"
-	"github.com/qiniu/x/errors"
 	"github.com/qiniu/x/xlog"
 	"os"
 	"path/filepath"
@@ -54,9 +53,9 @@ func TestCheckJar(t *testing.T) {
 }
 func TestFormatStyleCheckLine(t *testing.T) {
 	tc := []struct {
-		input    []byte
-		expected map[string][]linters.LinterOutput
-		err      error
+		input      []byte
+		expected   map[string][]linters.LinterOutput
+		unexpected []string
 	}{
 		{
 			input: []byte(`[ERROR]/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test2.java:21:18: '{' 前应有空格。 [WhitespaceAround]`),
@@ -70,7 +69,7 @@ func TestFormatStyleCheckLine(t *testing.T) {
 					},
 				},
 			},
-			err: nil,
+			unexpected: nil,
 		},
 		{
 			input: []byte(`[ERROR]/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java:1: 文件未以空行结尾。 [NewlineAtEndOfFile]`),
@@ -84,34 +83,34 @@ func TestFormatStyleCheckLine(t *testing.T) {
 					},
 				},
 			},
-			err: nil,
+			unexpected: nil,
 		},
 		{
-			input:    []byte(`6月 14, 2024 7:19:02 下午 com.puppycrawl.tools.checkstyle.Main runCli`),
-			expected: map[string][]linters.LinterOutput{},
-			err:      nil,
+			input:      []byte(`6月 14, 2024 7:19:02 下午 com.puppycrawl.tools.checkstyle.Main runCli`),
+			expected:   map[string][]linters.LinterOutput{},
+			unexpected: nil,
 		},
 		{
-			input:    []byte(`详细: Checkstyle debug logging enabled`),
-			expected: map[string][]linters.LinterOutput{},
-			err:      nil,
+			input:      []byte(`详细: Checkstyle debug logging enabled`),
+			expected:   map[string][]linters.LinterOutput{},
+			unexpected: nil,
 		},
 		{
-			input:    []byte(`开始检查……`),
-			expected: map[string][]linters.LinterOutput{},
-			err:      nil,
+			input:      []byte(`开始检查……`),
+			expected:   map[string][]linters.LinterOutput{},
+			unexpected: nil,
 		},
 		{
-			input:    []byte(``),
-			expected: map[string][]linters.LinterOutput{},
-			err:      nil,
+			input:      []byte(``),
+			expected:   map[string][]linters.LinterOutput{},
+			unexpected: nil,
 		},
 	}
 
 	for _, c := range tc {
 		got, err := stylecheckParser(xlog.New("UnitJavaStyleCheckTest"), c.input)
-		if !errors.Is(err, c.err) {
-			t.Errorf("stylecheckParser() error: %v, expected: %v", err, c.err)
+		if !reflect.DeepEqual(err, c.unexpected) {
+			t.Errorf("stylecheckParser() error: %v, unexpected: %v", err, c.unexpected)
 			return
 		}
 		if !reflect.DeepEqual(got, c.expected) {
