@@ -81,5 +81,4 @@ func TestFormatPmdCheckLine(t *testing.T) {
 			t.Errorf("pmdcheckParser(): %v, expected: %v", got, c.expected)
 		}
 	}
-
 }
