@@ -20,6 +20,7 @@ func init() {
 	linters.RegisterPullRequestHandler(linterName, pmdCheckHandler)
 	linters.RegisterLinterLanguages(linterName, []string{".java"})
 }
+
 func pmdCheckHandler(log *xlog.Logger, a linters.Agent) error {
 	var javaFiles []string
 	rulePath := a.LinterConfig.ConfigPath
@@ -46,9 +47,9 @@ func pmdCheckHandler(log *xlog.Logger, a linters.Agent) error {
 	a.LinterConfig.Command = []string{"pmd"}
 
 	return linters.GeneralHandler(log, a, linters.ExecRun, pmdcheckParser)
-
 }
-func pmdcheckParser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, []string) {
+
+func pmdcheckParser(plog *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, []string) {
 	var lineParse = func(line string) (*linters.LinterOutput, error) {
 		// pmdcheck will output lines starting with ' [WARN]'  warring information
 		// which are no meaningful for the reviewbot scenario, so we discard them
@@ -57,7 +58,7 @@ func pmdcheckParser(log *xlog.Logger, output []byte) (map[string][]linters.Linte
 		}
 		return linters.GeneralLineParser(strings.TrimLeft(line, " "))
 	}
-	return linters.Parse(log, output, lineParse)
+	return linters.Parse(plog, output, lineParse)
 }
 func getFileFromURL(url string, filepath string) (string, error) {
 	_, exist := lintersutil.FileExists(filepath)
@@ -83,6 +84,7 @@ func getFileFromURL(url string, filepath string) (string, error) {
 	}
 	return filepath, nil
 }
+
 func pmdRuleCheck(pmdConf string) (string, error) {
 
 	_, exist := lintersutil.FileExists(pmdConf)

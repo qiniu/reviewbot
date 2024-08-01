@@ -24,14 +24,13 @@ func init() {
 
 }
 
-func stylecheckHandler(log *xlog.Logger, a linters.Agent) error {
+func stylecheckHandler(slog *xlog.Logger, a linters.Agent) error {
 	var javaFiles []string
 	rulePath := a.LinterConfig.ConfigPath
 	linterWorkDir = a.LinterConfig.WorkDir
 	for _, arg := range a.PullRequestChangedFiles {
 		if strings.HasSuffix(arg.GetFilename(), ".java") {
 			javaFiles = append(javaFiles, arg.GetFilename())
-
 		}
 	}
 	jarfile, err := stylecheckJar()
@@ -57,8 +56,9 @@ func stylecheckHandler(log *xlog.Logger, a linters.Agent) error {
 
 	a.LinterConfig.Command = []string{"java"}
 
-	return linters.GeneralHandler(log, a, linters.ExecRun, stylecheckParser)
+	return linters.GeneralHandler(slog, a, linters.ExecRun, stylecheckParser)
 }
+
 func stylecheckParser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, []string) {
 	var lineParse = func(line string) (*linters.LinterOutput, error) {
 		// stylecheck will output lines starting with ' 开始检查 ' or '检查结束 ' or 'stylecheck info'
