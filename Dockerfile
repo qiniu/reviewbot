@@ -30,7 +30,7 @@ RUN curl -fsSL "$PMD_DOWNLOAD_URL" -o pmd.zip \
     && rm pmd.zip
 
 ENV PATH /usr/local/pmd-bin-7.1.0/bin:$PATH
-#RUN pmd --version
+RUN pmd --version
 
 #install stylecheck
 ENV StyleCheck_DOWNLOAD_URL https://github.com/checkstyle/checkstyle/releases/download/checkstyle-10.17.0/checkstyle-10.17.0-all.jar
