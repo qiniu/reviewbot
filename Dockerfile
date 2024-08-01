@@ -1,17 +1,5 @@
-
-<<<<<<< HEAD
-FROM golang:alpine
-=======
-# 复制 Go 程序源代码到工作目录
-COPY  . .
-RUN go mod download
-
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build .
-# 编译 Go 程序
-#RUN rm -rf ./app/
 # go lint tool dependencies `go list` `gofmt`
-FROM aslan-spock-register.qiniu.io/golang:alpine
->>>>>>> origin/forqiniuci
+FROM golang:alpine
 
 # if you want to install other tools, please add them here.
 # Do not install unnecessary tools to reduce image size.
@@ -62,12 +50,7 @@ RUN cppcheck --version \
     && golangci-lint --version \
     && go version
 
-<<<<<<< HEAD
 COPY reviewbot /reviewbot
-=======
-#COPY reviewbot /reviewbot
-COPY --from=builder /app/reviewbot /reviewbot
->>>>>>> origin/forqiniuci
 
 # SSH config
 RUN mkdir -p /root/.ssh && chown -R root /root/.ssh/ &&  chgrp -R root /root/.ssh/ \
