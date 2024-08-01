@@ -144,9 +144,7 @@ func styleRuleCheck(styleConf string) (string, error) {
 		return styleConf, nil
 
 	}
-	if styleConf == "" {
-		styleConf = "https://raw.githubusercontent.com/checkstyle/checkstyle/master/src/main/resources/sun_checks.xml"
-	}
+	styleConf = "https://raw.githubusercontent.com/checkstyle/checkstyle/master/src/main/resources/sun_checks.xml"
 	fileDir, err := os.Getwd()
 	rulefiledirpath := filepath.Join(fileDir, "config/linters-config")
 	rulefilepath := filepath.Join(rulefiledirpath, ".java-sun-checks.xml")

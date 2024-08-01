@@ -37,7 +37,30 @@ func TestForConfig(t *testing.T) {
 	if path != rulefilepath {
 		t.Errorf("pmdRuleCheck(): %v, expected: %v", path, rulefilepath)
 	}
-
+}
+func TestForConfigNotExit(t *testing.T) {
+	fileDir, err := os.Getwd()
+	rulefiledirpath := filepath.Join(fileDir, "config/linters-config")
+	rulefilepath := filepath.Join(rulefiledirpath, ".java-bestpractices.xml")
+	path, err := pmdRuleCheck("config/linters-config/.notjava-bestpractices.xml")
+	if err != nil {
+		t.Errorf("pmdRuleCheck(): %v, expected: %v", err, nil)
+	}
+	if path != rulefilepath {
+		t.Errorf("pmdRuleCheck(): %v, expected: %v", path, rulefilepath)
+	}
+}
+func TestForConfigNil(t *testing.T) {
+	fileDir, err := os.Getwd()
+	rulefiledirpath := filepath.Join(fileDir, "config/linters-config")
+	rulefilepath := filepath.Join(rulefiledirpath, ".java-bestpractices.xml")
+	path, err := pmdRuleCheck("")
+	if err != nil {
+		t.Errorf("pmdRuleCheck(): %v, expected: %v", err, nil)
+	}
+	if path != rulefilepath {
+		t.Errorf("pmdRuleCheck(): %v, expected: %v", path, rulefilepath)
+	}
 }
 func TestFormatPmdCheckLine(t *testing.T) {
 	tc := []struct {

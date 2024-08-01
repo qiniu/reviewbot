@@ -92,9 +92,7 @@ func pmdRuleCheck(pmdConf string) (string, error) {
 		return pmdConf, nil
 	}
 
-	if pmdConf == "" {
-		pmdConf = "https://raw.githubusercontent.com/pmd/pmd/master/pmd-java/src/main/resources/category/java/bestpractices.xml"
-	}
+	pmdConf = "https://raw.githubusercontent.com/pmd/pmd/master/pmd-java/src/main/resources/category/java/bestpractices.xml"
 	fileDir, err := os.Getwd()
 	rulefiledirpath := filepath.Join(fileDir, "config/linters-config")
 	rulefilepath := filepath.Join(rulefiledirpath, ".java-bestpractices.xml")
