@@ -10,6 +10,17 @@ RUN set -eux  \
 
 WORKDIR /
 
+# check binary
+RUN cppcheck --version \
+    && shellcheck --version \
+    && luacheck --version \
+    && git --version \
+    && ssh -V \
+    && yarn --version \
+    && curl --version \
+    && gcc --version \
+    && golangci-lint --version \
+    && go version
 #install open jdk
 
 #ENV JDK_DOWNLOAD_URL https://download.java.net/java/GA/jdk18.0.2/f6ad4b4450fd4d298113270ec84f30ee/9/GPL/openjdk-18.0.2_linux-x64_bin.tar.gz
@@ -38,17 +49,6 @@ ENV StyleCheck_DOWNLOAD_SHA256 51c34d738520c1389d71998a9ab0e6dabe0d7cf262149f3e0
 RUN curl -fsSL "$StyleCheck_DOWNLOAD_URL" -o checkstyle.jar \
     && echo "$StyleCheck_DOWNLOAD_SHA256  checkstyle.jar" | sha256sum -c -
 
-# check binary
-RUN cppcheck --version \
-    && shellcheck --version \
-    && luacheck --version \
-    && git --version \
-    && ssh -V \
-    && yarn --version \
-    && curl --version \
-    && gcc --version \
-    && golangci-lint --version \
-    && go version
 
 COPY reviewbot /reviewbot
 
