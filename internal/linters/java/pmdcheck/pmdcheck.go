@@ -88,7 +88,7 @@ func getFileFromURL(url string, filepath string) (string, error) {
 func pmdRuleCheck(pmdConf string) (string, error) {
 
 	_, exist := lintersutil.FileExists(pmdConf)
-	if exist {
+	if exist && pmdConf != "" {
 		return pmdConf, nil
 	}
 

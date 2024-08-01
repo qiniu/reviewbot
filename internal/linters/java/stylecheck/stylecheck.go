@@ -76,7 +76,7 @@ func stylecheckParser(log *xlog.Logger, output []byte) (map[string][]linters.Lin
 func stylecheckJar() (string, error) {
 	var stylejar = "/usr/local/checkstyle-10.17.0-all.jar"
 	_, exist := lintersutil.FileExists(stylejar)
-	if exist {
+	if exist && stylejar != "" {
 		return stylejar, nil
 	}
 	var stylejarurl = "https://github.com/checkstyle/checkstyle/releases/download/checkstyle-10.17.0/checkstyle-10.17.0-all.jar"
@@ -140,7 +140,7 @@ func getFileFromURL(url string, filepath string) (string, error) {
 }
 func styleRuleCheck(styleConf string) (string, error) {
 	_, existstyleConf := lintersutil.FileExists(styleConf)
-	if existstyleConf {
+	if existstyleConf && styleConf != "" {
 		return styleConf, nil
 
 	}
