@@ -62,8 +62,8 @@ func stylecheckHandler(slog *xlog.Logger, a linters.Agent) error {
 func stylecheckParser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, []string) {
 	var lineParse = func(line string) (*linters.LinterOutput, error) {
 		// stylecheck will output lines starting with ' 开始检查 ' or '检查结束 ' or 'stylecheck info'
-		// which are no meaningful for the reviewbot scenario, so we discard them
-		if strings.Contains(strings.ToLower(line), "checkstyle") || strings.HasPrefix(line, "开始") || strings.HasPrefix(line, "检查") || line == "" {
+		// which are no meaningful for the reviewbot scenario, so we discard them Starting auditAudit done.
+		if strings.Contains(strings.ToLower(line), "checkstyle") || strings.HasPrefix(line, "Starting audit") || strings.HasPrefix(line, "Audit done") || strings.HasPrefix(line, "开始") || strings.HasPrefix(line, "检查") || line == "" {
 			return nil, nil
 		}
 		line = strings.ReplaceAll(line, "[ERROR]", "")
