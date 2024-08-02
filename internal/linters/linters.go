@@ -137,7 +137,7 @@ func GeneralHandler(log *xlog.Logger, a Agent, execRun func(a Agent) ([]byte, er
 	output, err := execRun(a)
 	if err != nil {
 		// NOTE(CarlJi): the error is *ExitError, it seems to have little information and needs to be handled in a better way.
-		log.Warnf("%s run with exit code: %v,  erro message: %v,mark and continue", linterName, err, output)
+		log.Warnf("%s run with exit code: %v,  erro message: %v,mark and continue", linterName, err, string(output))
 	}
 
 	// even if the output is empty, we still need to parse it
