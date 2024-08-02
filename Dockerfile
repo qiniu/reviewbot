@@ -33,14 +33,14 @@ RUN cppcheck --version \
 
 RUN java -version
 #install pmd
-ENV PMD_DOWNLOAD_URL https://github.com/pmd/pmd/releases/download/pmd_releases%2F7.1.0/pmd-dist-7.1.0-bin.zip
-ENV PMD_DOWNLOAD_SHA256 0d31d257450f85d995cc87099f5866a7334f26d6599dacab285f2d761c049354
+ENV PMD_DOWNLOAD_URL https://github.com/pmd/pmd/releases/download/pmd_releases%2F7.4.0/pmd-dist-7.4.0-bin.zip
+ENV PMD_DOWNLOAD_SHA256 1dcbb7784a7fba1fd3c6efbaf13dcb63f05fe069fcf026ad5e2933711ddf5026
 RUN curl -fsSL "$PMD_DOWNLOAD_URL" -o pmd.zip \
     && echo "$PMD_DOWNLOAD_SHA256  pmd.zip" | sha256sum -c - \
     && unzip pmd.zip -d /usr/local\
     && rm pmd.zip
 
-ENV PATH /usr/local/pmd-bin-7.1.0/bin:$PATH
+ENV PATH /usr/local/pmd-bin-7.4.0/bin:$PATH
 RUN pmd --version
 
 #install stylecheck

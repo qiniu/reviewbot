@@ -53,7 +53,7 @@ func pmdcheckParser(plog *xlog.Logger, output []byte) (map[string][]linters.Lint
 	var lineParse = func(line string) (*linters.LinterOutput, error) {
 		// pmdcheck will output lines starting with ' [WARN]'  warring information
 		// which are no meaningful for the reviewbot scenario, so we discard them
-		if strings.Contains(line, "[WARN]") || line == "" {
+		if strings.Contains(line, "[WARN]") || line == "" || !strings.Contains(line, ":") || !strings.Contains(line, ".java") {
 			return nil, nil
 		}
 		return linters.GeneralLineParser(strings.TrimLeft(line, " "))
