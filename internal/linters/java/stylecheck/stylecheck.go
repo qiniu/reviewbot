@@ -68,6 +68,7 @@ func stylecheckParser(log *xlog.Logger, output []byte) (map[string][]linters.Lin
 		}
 		line = strings.ReplaceAll(line, "[ERROR]", "")
 		line = strings.ReplaceAll(line, "/private"+linterWorkDir+"/", "")
+		line = strings.ReplaceAll(line, linterWorkDir+"/", "")
 		return linters.GeneralLineParser(strings.TrimLeft(line, " "))
 	}
 	return linters.Parse(log, output, lineParse)
