@@ -26,7 +26,7 @@ import (
 )
 
 func TestForConfig(t *testing.T) {
-	fileDir, err := os.Getwd()
+	fileDir, _ := os.Getwd()
 	rulefiledirpath := filepath.Join(fileDir, "config/linters-config")
 	rulefilepath := filepath.Join(rulefiledirpath, ".java-sun-checks.xml")
 	path, err := styleRuleCheck("https://raw.githubusercontent.com/checkstyle/checkstyle/master/src/main/resources/sun_checks.xml")
@@ -40,7 +40,7 @@ func TestForConfig(t *testing.T) {
 }
 func TestCheckJar(t *testing.T) {
 	var stykejarfilename = "checkstyle-10.17.0-all.jar"
-	filePath, err := os.Getwd()
+	filePath, _ := os.Getwd()
 	filename2 := filepath.Join(filePath, stykejarfilename)
 	path, err := stylecheckJar()
 	if err != nil {
@@ -60,9 +60,9 @@ func TestFormatStyleCheckLine(t *testing.T) {
 		{
 			input: []byte(`[ERROR]/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test2.java:21:18: '{' 前应有空格。 [WhitespaceAround]`),
 			expected: map[string][]linters.LinterOutput{
-				"/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test2.java": {
+				"test2.java": {
 					{
-						File:    "/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test2.java",
+						File:    "test2.java",
 						Line:    21,
 						Column:  18,
 						Message: "'{' 前应有空格。 [WhitespaceAround]",
@@ -74,9 +74,9 @@ func TestFormatStyleCheckLine(t *testing.T) {
 		{
 			input: []byte(`[ERROR]/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java:1: 文件未以空行结尾。 [NewlineAtEndOfFile]`),
 			expected: map[string][]linters.LinterOutput{
-				"/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java": {
+				"test.java": {
 					{
-						File:    "/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/test.java",
+						File:    "test.java",
 						Line:    1,
 						Column:  0,
 						Message: "文件未以空行结尾。 [NewlineAtEndOfFile]",
@@ -108,6 +108,7 @@ func TestFormatStyleCheckLine(t *testing.T) {
 	}
 
 	for _, c := range tc {
+		linterWorkDir = "/Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples"
 		got, err := stylecheckParser(xlog.New("UnitJavaStyleCheckTest"), c.input)
 		if !reflect.DeepEqual(err, c.unexpected) {
 			t.Errorf("stylecheckParser() error: %v, unexpected: %v", err, c.unexpected)

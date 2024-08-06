@@ -27,7 +27,7 @@ import (
 )
 
 func TestForConfig(t *testing.T) {
-	fileDir, err := os.Getwd()
+	fileDir, _ := os.Getwd()
 	rulefiledirpath := filepath.Join(fileDir, "config/linters-config")
 	rulefilepath := filepath.Join(rulefiledirpath, ".java-bestpractices.xml")
 	path, err := pmdRuleCheck("https://raw.githubusercontent.com/pmd/pmd/master/pmd-java/src/main/resources/category/java/bestpractices.xml")
@@ -39,7 +39,7 @@ func TestForConfig(t *testing.T) {
 	}
 }
 func TestForConfigNotExit(t *testing.T) {
-	fileDir, err := os.Getwd()
+	fileDir, _ := os.Getwd()
 	rulefiledirpath := filepath.Join(fileDir, "config/linters-config")
 	rulefilepath := filepath.Join(rulefiledirpath, ".java-bestpractices.xml")
 	path, err := pmdRuleCheck("config/linters-config/.notjava-bestpractices.xml")
@@ -51,7 +51,7 @@ func TestForConfigNotExit(t *testing.T) {
 	}
 }
 func TestForConfigNil(t *testing.T) {
-	fileDir, err := os.Getwd()
+	fileDir, _ := os.Getwd()
 	rulefiledirpath := filepath.Join(fileDir, "config/linters-config")
 	rulefilepath := filepath.Join(rulefiledirpath, ".java-bestpractices.xml")
 	path, err := pmdRuleCheck("")
