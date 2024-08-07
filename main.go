@@ -40,6 +40,8 @@ import (
 	_ "github.com/qiniu/reviewbot/internal/linters/git-flow/commit-check"
 	_ "github.com/qiniu/reviewbot/internal/linters/go/gofmt"
 	_ "github.com/qiniu/reviewbot/internal/linters/go/golangci_lint"
+	_ "github.com/qiniu/reviewbot/internal/linters/java/pmdcheck"
+	_ "github.com/qiniu/reviewbot/internal/linters/java/stylecheck"
 	_ "github.com/qiniu/reviewbot/internal/linters/lua/luacheck"
 	_ "github.com/qiniu/reviewbot/internal/linters/shell/shellcheck"
 )
