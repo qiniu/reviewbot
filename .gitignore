@@ -3,3 +3,6 @@ reviewbot
 .idea
 .DS_Store
 *.jar
+
+# Local Netlify folder
+.netlify
