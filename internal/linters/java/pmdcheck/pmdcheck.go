@@ -31,15 +31,15 @@ func pmdCheckHandler(plog *xlog.Logger, a linters.Agent) error {
 			javaFiles = append(javaFiles, arg.GetFilename())
 		}
 	}
+	if len(javaFiles) == 0 {
+		return nil
+	}
 	checkrulePath, checkerr := pmdRuleCheck(plog, rulePath)
 	if checkerr != nil {
 		plog.Errorf("pmd rule check failed: %v", checkerr)
 		return checkerr
 	}
-	_, exist := lintersutil.FileExists(checkrulePath)
-	if (len(javaFiles) == 0) || !exist {
-		return nil
-	}
+
 	if linters.IsEmpty(a.LinterConfig.Args...) {
 		args := append([]string{}, "check")
 		args = append(args, "-f", "emacs")
