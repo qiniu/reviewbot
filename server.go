@@ -20,6 +20,9 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
+	"os/exec"
+	"path"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v57/github"
@@ -121,6 +124,21 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 	if err := r.CheckoutPullRequest(num); err != nil {
 		log.Errorf("failed to checkout pull request %d: %v", num, err)
 		return err
+	}
+
+	gitmodulespath := path.Join(r.Directory(), ".gitmodules")
+	_, err = os.Stat(gitmodulespath)
+	if err == nil {
+		log.Info("git pull submodule in progress")
+		cmd := exec.Command("git", "submodule", "update", "--init", "--recursive")
+		cmd.Dir = r.Directory()
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			log.Errorf("git pull submodule meet something wrong ,marked and continue , details :%v ", err)
+		}
+		log.Infof("submodule details: %s ", out)
+	} else {
+		log.Infof("repo %s can not find the .gitmodules file", repo)
 	}
 
 	defer func() {
