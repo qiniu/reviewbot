@@ -30,6 +30,10 @@ RUN mkdir -p /root/.ssh && chown -R root /root/.ssh/ &&  chgrp -R root /root/.ss
 COPY deploy/config /root/.ssh/config
 COPY deploy/github-known-hosts /github_known_hosts
 
+# set go proxy and private repo
+RUN go env -w GOPROXY=https://goproxy.cn,direct \
+    && go env -w GOPRIVATE=github.com/qbox
+
 EXPOSE 8888
 
 ENTRYPOINT [ "/reviewbot" ]
