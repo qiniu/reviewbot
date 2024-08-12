@@ -126,19 +126,19 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 		return err
 	}
 
-	gitmodulespath := path.Join(r.Directory(), ".gitmodules")
-	_, err = os.Stat(gitmodulespath)
+	gitModulesFile := path.Join(r.Directory(), ".gitmodules")
+	_, err = os.Stat(gitModulesFile)
 	if err == nil {
 		log.Info("git pull submodule in progress")
 		cmd := exec.Command("git", "submodule", "update", "--init", "--recursive")
 		cmd.Dir = r.Directory()
 		out, err := cmd.CombinedOutput()
 		if err != nil {
-			log.Errorf("git pull submodule meet something wrong ,marked and continue , details :%v ", err)
+			log.Errorf("error when git pull submodule, marked and continue, details :%v ", err)
 		}
-		log.Infof("submodule details: %s ", out)
+		log.Infof("git pull submodule output: %s ", out)
 	} else {
-		log.Infof("repo %s can not find the .gitmodules file", repo)
+		log.Infof("no .gitmodules file in repo %s", repo)
 	}
 
 	defer func() {
