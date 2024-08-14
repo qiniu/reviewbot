@@ -76,4 +76,7 @@ Command 和 Args 的使用姿势跟 Kubernetes Pod 中的 Command 和 Args 的 Y
 Unexpected: level=error msg="[linters_context] typechecking error: pattern ./...: directory prefix . does not contain main module or its selected dependencies"
 ```
 
-执行器会自动分析该类型错误，尝试判断合适的目标，然后重新执行。
+- 在缺省模式下执行器会根据 Github PR 所涉及到的文件目录进行 go.mod 文件的查找，设置 go.mod 文件所在目录为执行器的工作目录，并执行go mod tidy 下载相关依赖；若一个PR中涉及多个 go.mod 文件，则分别执行 go mod tidy 进行依赖下载，并且 golangci-lint 执行器也分别执行一次。
+- 在自定义模式下，若自定义参数不指定相应的工作目录，执行器则会在仓库根目录下执行。由于 golangci-lint 执行时不会下载相关依赖项，因此自定义模式下建议手动在linter执行目录下添加 go mod tidy 命令 ，否则可能导致golangci-lint执行失败。
+
+
