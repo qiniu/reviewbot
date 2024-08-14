@@ -15,6 +15,8 @@ sidebar_position: 3
   - clone 主仓
     - 主仓会作为缓存
   - checkout PR，并放置在临时目录
+  - pull 子模块
+    - 仓库若使用submodule管理则自动拉取代码
 - 进入 Linter 执行逻辑
   - 筛选 linter
     - 默认只要支持的 linter 都对所有仓库适用，除非有单独配置
