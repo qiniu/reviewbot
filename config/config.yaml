@@ -30,6 +30,7 @@ customConfig: # custom config for specific orgs or repos
           source env.sh
           cp .golangci.yml src/qiniu.com/kodo/.golangci.yml
           cd src/qiniu.com/kodo
+          export GO111MODULE=auto
           go mod tidy
           golangci-lint run --timeout=10m0s --allow-parallel-runners=true --print-issued-lines=false --out-format=line-number >> $ARTIFACT/lint.log 2>&1
 
@@ -54,6 +55,7 @@ customConfig: # custom config for specific orgs or repos
         - "--"
       args:
         - |
+          export GO111MODULE=auto
           cd uc
           go mod tidy
           golangci-lint run --timeout=10m0s --allow-parallel-runners=true --print-issued-lines=false --out-format=line-number >> $ARTIFACT/lint.log 2>&1
