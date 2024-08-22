@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 
 	"github.com/qiniu/reviewbot/internal/linters"
@@ -41,12 +42,16 @@ func pmdCheckHandler(plog *xlog.Logger, a linters.Agent) error {
 	}
 
 	if linters.IsEmpty(a.LinterConfig.Args...) {
-		args := append([]string{}, "pmd")
-		args = append(args, "check", "-f", "emacs")
+		args := append([]string{}, "check")
+		args = append(args, "-f", "emacs")
 		args = append(args, javaFiles...)
 		args = append(args, "-R", checkrulePath)
 		a.LinterConfig.Args = args
 	}
+	if reflect.DeepEqual(a.LinterConfig.Command, []string{linterName}) {
+		a.LinterConfig.Command = []string{"pmd"}
+	}
+
 	return linters.GeneralHandler(plog, a, linters.ExecRun, pmdcheckParser)
 }
 

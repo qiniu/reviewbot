@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 
 	"github.com/qiniu/reviewbot/internal/linters"
@@ -42,10 +43,13 @@ func stylecheckHandler(slog *xlog.Logger, a linters.Agent) error {
 		return checkerr
 	}
 	if linters.IsEmpty(a.LinterConfig.Args...) {
-		args := append([]string{}, "java", "-jar", localStyleJar)
+		args := append([]string{}, "-jar", localStyleJar)
 		args = append(args, javaFiles...)
 		args = append(args, "-c", checkrulePath)
 		a.LinterConfig.Args = args
+	}
+	if reflect.DeepEqual(a.LinterConfig.Command, []string{linterName}) {
+		a.LinterConfig.Command = []string{"java"}
 	}
 
 	return linters.GeneralHandler(slog, a, linters.ExecRun, stylecheckParser(a.LinterConfig.WorkDir))
