@@ -22,10 +22,79 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/x/errors"
 	"github.com/qiniu/x/xlog"
 )
+
+func TestArgs(t *testing.T) {
+	tp := true
+	tcs := []struct {
+		id    string
+		input linters.Agent
+		want  linters.Agent
+	}{
+		{
+			id: "case1 - default command and args",
+			input: linters.Agent{
+				LinterConfig: config.Linter{
+					Enable:  &tp,
+					Command: []string{"stylecheck"},
+				},
+			},
+			want: linters.Agent{
+				LinterConfig: config.Linter{
+					Enable:  &tp,
+					Command: []string{"java"},
+					Args:    []string{"-f", "plain"},
+				},
+			},
+		},
+		{
+			id: "case2 - custom command",
+			input: linters.Agent{
+				LinterConfig: config.Linter{
+					Enable:  &tp,
+					Command: []string{"/usr/java"},
+				},
+			},
+			want: linters.Agent{
+				LinterConfig: config.Linter{
+					Enable:  &tp,
+					Command: []string{"/usr/java"},
+					Args:    []string{"-f", "plain"},
+				},
+			},
+		},
+		{
+			id: "case3 - custom args",
+			input: linters.Agent{
+				LinterConfig: config.Linter{
+					Enable:  &tp,
+					Command: []string{"stylecheck"},
+					Args:    []string{"-f", "xml"},
+				},
+			},
+			want: linters.Agent{
+				LinterConfig: config.Linter{
+					Enable:  &tp,
+					Command: []string{"java"},
+					Args:    []string{"-f", "xml"},
+				},
+			},
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.id, func(t *testing.T) {
+			got := argsApply(xlog.New("ut"), tc.input)
+			if !reflect.DeepEqual(got.LinterConfig, tc.want.LinterConfig) {
+				t.Errorf("args() = %v, want %v", got.LinterConfig, tc.want.LinterConfig)
+			}
+		})
+	}
+}
 
 func TestForConfig(t *testing.T) {
 	fileDir := "/var/tmp/linters-config/"

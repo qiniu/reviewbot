@@ -39,15 +39,23 @@ func pmdCheckHandler(plog *xlog.Logger, a linters.Agent) error {
 		plog.Errorf("pmd rule check failed: %v", checkerr)
 		return checkerr
 	}
-
-	if linters.IsEmpty(a.LinterConfig.Args...) {
-		args := append([]string{}, "pmd")
-		args = append(args, "check", "-f", "emacs")
-		args = append(args, javaFiles...)
-		args = append(args, "-R", checkrulePath)
-		a.LinterConfig.Args = args
-	}
+	a = argsApply(plog, a)
+	a.LinterConfig.Args = append(append(a.LinterConfig.Args, javaFiles...), "-R", checkrulePath)
 	return linters.GeneralHandler(plog, a, linters.ExecRun, pmdcheckParser)
+}
+func argsApply(log *xlog.Logger, a linters.Agent) linters.Agent {
+	config := a.LinterConfig
+	if len(config.Command) == 1 && config.Command[0] == linterName {
+		config.Command = []string{"pmd"}
+	}
+	log.Info("pmdcheck comamnd:" + strings.Join(config.Command, " "))
+	if linters.IsEmpty(config.Args...) {
+		args := append([]string{}, "check")
+		args = append(args, "-f", "emacs")
+		config.Args = args
+	}
+	a.LinterConfig = config
+	return a
 }
 
 func pmdcheckParser(plog *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, []string) {

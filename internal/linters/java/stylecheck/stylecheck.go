@@ -41,14 +41,25 @@ func stylecheckHandler(slog *xlog.Logger, a linters.Agent) error {
 		slog.Errorf("style rule check failed: %v", checkerr)
 		return checkerr
 	}
-	if linters.IsEmpty(a.LinterConfig.Args...) {
-		args := append([]string{}, "java", "-jar", localStyleJar)
-		args = append(args, javaFiles...)
-		args = append(args, "-c", checkrulePath)
-		a.LinterConfig.Args = args
-	}
+
+	a = argsApply(slog, a)
+	a.LinterConfig.Args = append(append(a.LinterConfig.Args, javaFiles...), "-jar", localStyleJar, "-c", checkrulePath)
 
 	return linters.GeneralHandler(slog, a, linters.ExecRun, stylecheckParser(a.LinterConfig.WorkDir))
+}
+
+func argsApply(log *xlog.Logger, a linters.Agent) linters.Agent {
+	config := a.LinterConfig
+	if len(a.LinterConfig.Command) == 1 && a.LinterConfig.Command[0] == linterName {
+		config.Command = []string{"java"}
+	}
+	log.Info("stylecheck comamnd:" + strings.Join(config.Command, " "))
+	if linters.IsEmpty(config.Args...) {
+		args := append([]string{}, "-f", "plain")
+		config.Args = args
+	}
+	a.LinterConfig = config
+	return a
 }
 
 func stylecheckParser(codedir string) func(slog *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, []string) {
