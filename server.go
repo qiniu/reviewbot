@@ -97,7 +97,7 @@ func (s *Server) processPullRequestEvent(log *xlog.Logger, event *github.PullReq
 	return s.handle(log, context.Background(), event)
 }
 func (s *Server) processCheckRunRequestEvent(log *xlog.Logger, event *github.CheckRunEvent) error {
-	if event.GetAction() != "opened" && event.GetAction() != "reopened" && event.GetAction() != "synchronize" {
+	if event.GetAction() != "opened" && event.GetAction() != "reopened" && event.GetAction() != "synchronize" && event.GetAction() != "rerequested" {
 		log.Debugf("skipping action %s\n", event.GetAction())
 		return nil
 	}
