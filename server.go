@@ -112,7 +112,7 @@ func (s *Server) processCheckRunRequestEvent(log *xlog.Logger, event *github.Che
 	log.Info((event.GetCheckRun().PullRequests[len(event.GetCheckRun().PullRequests)-1].ID))
 	log.Info((event.GetCheckRun().PullRequests[len(event.GetCheckRun().PullRequests)-1].String()))
 
-	pevent.PullRequest.Number = event.GetCheckRun().PullRequests[0].Number
+	//pevent.PullRequest.Number = event.GetCheckRun().PullRequests[0].Number
 	pevent.Repo = event.GetRepo()
 	pevent.PullRequest = event.GetCheckRun().PullRequests[0]
 	return s.handle(log, context.Background(), &pevent)
