@@ -102,17 +102,6 @@ func (s *Server) processCheckRunRequestEvent(log *xlog.Logger, event *github.Che
 		return nil
 	}
 	var pevent = github.PullRequestEvent{}
-	log.Info("zzzzzz checkrun event")
-	log.Info(string(len(event.GetCheckRun().PullRequests)))
-	log.Info((event.GetCheckRun().PullRequests[0].Number))
-	log.Info((event.GetCheckRun().PullRequests[0].ID))
-	log.Info((event.GetCheckRun().PullRequests[0].String()))
-
-	log.Info((event.GetCheckRun().PullRequests[len(event.GetCheckRun().PullRequests)-1].Number))
-	log.Info((event.GetCheckRun().PullRequests[len(event.GetCheckRun().PullRequests)-1].ID))
-	log.Info((event.GetCheckRun().PullRequests[len(event.GetCheckRun().PullRequests)-1].String()))
-
-	//pevent.PullRequest.Number = event.GetCheckRun().PullRequests[0].Number
 	pevent.Repo = event.GetRepo()
 	pevent.PullRequest = event.GetCheckRun().PullRequests[0]
 	pevent.Installation = event.GetInstallation()
