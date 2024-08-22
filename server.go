@@ -76,6 +76,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				log.Errorf("process pull request event: %v", err)
 			}
 		}()
+	case *github.CheckRunEvent:
+		go func() {
+			if err := s.processCheckRunRequestEvent(log, event); err != nil {
+				log.Errorf("process pull request event: %v", err)
+			}
+		}()
+
 	default:
 		log.Debugf("skipping event type %s\n", github.WebHookType(r))
 	}
@@ -88,6 +95,22 @@ func (s *Server) processPullRequestEvent(log *xlog.Logger, event *github.PullReq
 	}
 
 	return s.handle(log, context.Background(), event)
+}
+func (s *Server) processCheckRunRequestEvent(log *xlog.Logger, event *github.CheckRunEvent) error {
+	if event.GetAction() != "opened" && event.GetAction() != "reopened" && event.GetAction() != "synchronize" {
+		log.Debugf("skipping action %s\n", event.GetAction())
+		return nil
+	}
+	var pevent = github.PullRequestEvent{}
+	log.Info("zzzzzz checkrun event")
+	log.Info(string(len(event.GetCheckRun().PullRequests)))
+	log.Info((event.GetCheckRun().PullRequests[0].Number))
+	log.Info((event.GetCheckRun().PullRequests[0].ID))
+	log.Info((event.GetCheckRun().PullRequests[0].String()))
+	pevent.PullRequest.Number = event.GetCheckRun().PullRequests[0].Number
+	pevent.Repo = event.GetRepo()
+	pevent.PullRequest = event.GetCheckRun().PullRequests[0]
+	return s.handle(log, context.Background(), &pevent)
 }
 
 func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.PullRequestEvent) error {
