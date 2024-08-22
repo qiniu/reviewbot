@@ -115,6 +115,7 @@ func (s *Server) processCheckRunRequestEvent(log *xlog.Logger, event *github.Che
 	//pevent.PullRequest.Number = event.GetCheckRun().PullRequests[0].Number
 	pevent.Repo = event.GetRepo()
 	pevent.PullRequest = event.GetCheckRun().PullRequests[0]
+	pevent.Installation = event.GetInstallation()
 	return s.handle(log, context.Background(), &pevent)
 }
 
