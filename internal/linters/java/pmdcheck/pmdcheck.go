@@ -1,6 +1,7 @@
 package pmdcheck
 
 import (
+	"github.com/qiniu/x/log"
 	"io"
 	"net/http"
 	"os"
@@ -48,6 +49,8 @@ func pmdCheckHandler(plog *xlog.Logger, a linters.Agent) error {
 		args = append(args, "-R", checkrulePath)
 		a.LinterConfig.Args = args
 	}
+	log.Info("ttttttttttttt")
+	log.Info(a.LinterConfig.Command)
 	if reflect.DeepEqual(a.LinterConfig.Command, []string{linterName}) {
 		a.LinterConfig.Command = []string{"pmd"}
 	}
