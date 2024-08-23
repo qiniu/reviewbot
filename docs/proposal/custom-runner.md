@@ -1,3 +1,5 @@
+# NOTE：未采纳本方案，如有需要，请移步[最新 Proposal](custom-runner-v2.md)
+
 ## Proposal: 自定义执行节点
 
 ## Background
