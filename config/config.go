@@ -40,6 +40,10 @@ type GlobalConfig struct {
 type Linter struct {
 	// Enable is whether to enable this linter, if false, linter still run but not report.
 	Enable *bool `json:"enable,omitempty"`
+	// DockerAsRunner is the docker image to run the linter.
+	// Optional, if not empty, use the docker image to run the linter.
+	// e.g. "golang:1.23.4"
+	DockerAsRunner string `json:"dockerAsRunner,omitempty"`
 	// WorkDir is the working directory of the linter.
 	WorkDir string `json:"workDir,omitempty"`
 	// Command is the command to run the linter. e.g. "golangci-lint", "staticcheck"
@@ -65,8 +69,8 @@ type Linter struct {
 
 func (l Linter) String() string {
 	return fmt.Sprintf(
-		"Linter{Enable: %v, WorkDir: %v, Command: %v, Args: %v, ReportFormat: %v, ConfigPath: %v}",
-		*l.Enable, l.WorkDir, l.Command, l.Args, l.ReportFormat, l.ConfigPath)
+		"Linter{Enable: %v, DockerAsRunner: %v, WorkDir: %v, Command: %v, Args: %v, ReportFormat: %v, ConfigPath: %v}",
+		*l.Enable, l.DockerAsRunner, l.WorkDir, l.Command, l.Args, l.ReportFormat, l.ConfigPath)
 }
 
 // NewConfig returns a new Config.

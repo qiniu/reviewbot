@@ -145,6 +145,8 @@ func main() {
 		debug:            o.debug,
 	}
 
+	s.initDockerRunner()
+
 	mux := http.NewServeMux()
 	mux.Handle("/", s)
 	mux.Handle("/metrics", promhttp.Handler())
