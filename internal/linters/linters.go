@@ -19,8 +19,8 @@ package linters
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
-	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
@@ -29,6 +29,7 @@ import (
 	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/reviewbot/internal/metric"
+	"github.com/qiniu/reviewbot/internal/runner"
 	"github.com/qiniu/x/log"
 	"github.com/qiniu/x/xlog"
 	gitv2 "sigs.k8s.io/prow/pkg/git/v2"
@@ -38,8 +39,6 @@ var (
 	pullRequestHandlers = map[string]PullRequestHandlerFunc{}
 	linterLanguages     = map[string][]string{}
 )
-
-const artifactDirFlag = "reviewbot"
 
 // PullRequestHandlerFunc knows how to handle a pull request event.
 type PullRequestHandlerFunc func(*xlog.Logger, Agent) error
@@ -100,6 +99,8 @@ type LinterOutput struct {
 
 // Agent knows necessary information in order to run linters.
 type Agent struct {
+	// Runner is the way to run the linter.	like docker, local, etc.
+	Runner runner.Runner
 	// GitHubClient is the GitHub client.
 	GithubClient *github.Client
 	// GitClient is the Git client factory.
@@ -156,62 +157,17 @@ func GeneralHandler(log *xlog.Logger, a Agent, execRun func(a Agent) ([]byte, er
 
 // ExecRun executes a command.
 func ExecRun(a Agent) ([]byte, error) {
-	command := a.LinterConfig.Command
-	executable := command[0]
-	var cmdArgs []string
-	if len(command) > 1 {
-		cmdArgs = command[1:]
-	}
-	cmdArgs = append(cmdArgs, a.LinterConfig.Args...)
-	c := exec.Command(executable, cmdArgs...)
-	c.Dir = a.LinterConfig.WorkDir
-
-	// create a temp dir for the artifact
-	artifact, err := os.MkdirTemp("", artifactDirFlag)
+	reader, err := a.Runner.Run(context.Background(), &a.LinterConfig)
 	if err != nil {
-		return nil, err
+		log.Warnf("failed to run linter: %v, mark and continue", err)
 	}
-	defer os.RemoveAll(artifact)
-	c.Env = append(os.Environ(), fmt.Sprintf("ARTIFACT=%s", artifact))
-	c.Env = append(c.Env, a.LinterConfig.Env...)
+	defer reader.Close()
 
-	log.Infof("run command: %v, workdir: %v", c, c.Dir)
-	output, execErr := c.CombinedOutput()
-
-	// read all files under the artifact dir
-	var fileContent []byte
-	artifactFiles, err := os.ReadDir(artifact)
+	output, err := io.ReadAll(reader)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read linter output: %w", err)
 	}
-
-	var idx int
-	for _, file := range artifactFiles {
-		if file.IsDir() {
-			continue
-		}
-		log.Infof("artifact file: %v", file.Name())
-		content, err := os.ReadFile(fmt.Sprintf("%s/%s", artifact, file.Name()))
-		if err != nil {
-			return nil, err
-		}
-		if len(content) == 0 {
-			continue
-		}
-		if idx > 0 {
-			fileContent = append(fileContent, '\n')
-		}
-		fileContent = append(fileContent, content...)
-		idx++
-	}
-
-	// use the content of the files under Artifact dir as first priority
-	if len(fileContent) > 0 {
-		log.Debugf("artifact files used instead. legacy output:\n%v, now:\n%v", string(output), string(fileContent))
-		output = fileContent
-	}
-
-	return output, execErr
+	return output, nil
 }
 
 // GeneralParse parses the output of a linter command.

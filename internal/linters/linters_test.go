@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/qiniu/reviewbot/config"
+	"github.com/qiniu/reviewbot/internal/runner"
 	"github.com/qiniu/x/xlog"
 )
 
@@ -226,6 +227,7 @@ func TestExecRun(t *testing.T) {
 	}
 	for _, tc := range tcs {
 		t.Run(tc.id, func(t *testing.T) {
+			tc.input.Runner = runner.NewLocalRunner()
 			output, err := ExecRun(tc.input)
 			if !errors.Is(err, tc.err) {
 				t.Errorf("expected: %v, got: %v", tc.err, err)

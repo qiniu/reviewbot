@@ -29,6 +29,7 @@ import (
 	"github.com/gregjones/httpcache"
 	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
+	"github.com/qiniu/reviewbot/internal/runner"
 	"github.com/qiniu/x/log"
 	"github.com/qiniu/x/xlog"
 	gitv2 "sigs.k8s.io/prow/pkg/git/v2"
@@ -37,6 +38,8 @@ import (
 type Server struct {
 	gitClientFactory gitv2.ClientFactory
 	config           config.Config
+
+	dockerRunner runner.Runner
 
 	webhookSecret []byte
 
@@ -47,6 +50,41 @@ type Server struct {
 	appPrivateKey string
 
 	debug bool
+}
+
+func (s *Server) initDockerRunner() {
+	var images []string
+	for _, customConfig := range s.config.CustomConfig {
+		for _, linter := range customConfig {
+			if linter.DockerAsRunner != "" {
+				images = append(images, linter.DockerAsRunner)
+			}
+		}
+	}
+
+	if len(images) > 0 {
+		dockerRunner, err := runner.NewDockerRunner()
+		if err != nil {
+			log.Fatalf("初始化Docker运行器失败: %v", err)
+		}
+
+		s.dockerRunner = dockerRunner
+	}
+
+	if s.dockerRunner == nil {
+		return
+	}
+
+	go func() {
+		ctx := context.Background()
+		for _, image := range images {
+			log.Infof("pulling image %s", image)
+			linterConfig := &config.Linter{DockerAsRunner: image}
+			if err := s.dockerRunner.Prepare(ctx, linterConfig); err != nil {
+				log.Errorf("failed to pull image %s: %v", image, err)
+			}
+		}
+	}()
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -198,6 +236,12 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 			log.Infof("[%s] linter is not related to the PR, skipping", name)
 			continue
 		}
+
+		var runner = runner.NewLocalRunner()
+		if linterConfig.DockerAsRunner != "" {
+			runner = s.dockerRunner
+		}
+		agent.Runner = runner
 
 		if err := fn(log, agent); err != nil {
 			log.Errorf("failed to run linter: %v", err)
