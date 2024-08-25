@@ -180,6 +180,10 @@ func applyCustomConfig(legacy, custom Linter) Linter {
 		legacy.ConfigPath = custom.ConfigPath
 	}
 
+	if custom.DockerAsRunner != "" {
+		legacy.DockerAsRunner = custom.DockerAsRunner
+	}
+
 	return legacy
 }
 
