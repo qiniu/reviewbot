@@ -32,7 +32,6 @@ func TestFormatStaticcheckLine(t *testing.T) {
 		input    string
 		expected *LinterOutput
 	}{
-
 		{"cdn.v1/ratelimit/limiter/memory.go:134: 134-161 lines are duplicate of", &LinterOutput{
 			File:    "cdn.v1/ratelimit/limiter/memory.go",
 			Line:    134,
@@ -253,7 +252,7 @@ func TestParseV2(t *testing.T) {
 			input:   []byte("file.txt:6:7: message\nfile2.txt:6:7: message\nfile2.txt:7:9: message\n"),
 			trainer: nil,
 			expected: map[string][]LinterOutput{
-				"file.txt": []LinterOutput{
+				"file.txt": {
 					{
 						File:    "file.txt",
 						Line:    6,
@@ -261,7 +260,7 @@ func TestParseV2(t *testing.T) {
 						Message: "message",
 					},
 				},
-				"file2.txt": []LinterOutput{
+				"file2.txt": {
 					{
 						File:    "file2.txt",
 						Line:    6,
@@ -290,7 +289,7 @@ golangci_lint.go:17:1: warning: (gochecknoglobals)
 io/upv2/upform/internal/mime/multipart/multipart_test.go:744:7: wrapperFunc: use strings.ReplaceAll method in ` + "`strings.Replace(`--08b84578eabc563dcba96\n7a945cd<...>: application/octet-stream\n\n`, \"\\n\", \"\\r\\n\", -1)` (gocritic)"),
 			trainer: nil,
 			expected: map[string][]LinterOutput{
-				"golangci_lint.go": []LinterOutput{
+				"golangci_lint.go": {
 					{
 						File:    "golangci_lint.go",
 						Line:    16,
@@ -304,7 +303,7 @@ io/upv2/upform/internal/mime/multipart/multipart_test.go:744:7: wrapperFunc: use
 						Message: "warning: (gochecknoglobals)",
 					},
 				},
-				"xxx.go": []LinterOutput{
+				"xxx.go": {
 					{
 						File:    "xxx.go",
 						Line:    18,
@@ -312,7 +311,7 @@ io/upv2/upform/internal/mime/multipart/multipart_test.go:744:7: wrapperFunc: use
 						Message: "warning: xxxx\nxxx.gox (gochecknoglobals)",
 					},
 				},
-				"io/upv2/upform/internal/mime/multipart/multipart_test.go": []LinterOutput{
+				"io/upv2/upform/internal/mime/multipart/multipart_test.go": {
 					{
 						File:    "io/upv2/upform/internal/mime/multipart/multipart_test.go",
 						Line:    744,
@@ -335,7 +334,7 @@ io/upv2/upform/internal/mime/multipart/multipart_test.go:744:7: wrapperFunc: use
 			input:   []byte("file.txt:6:7: message\nfile2.txt:6:7: "),
 			trainer: nil,
 			expected: map[string][]LinterOutput{
-				"file.txt": []LinterOutput{
+				"file.txt": {
 					{
 						File:    "file.txt",
 						Line:    6,
@@ -343,7 +342,7 @@ io/upv2/upform/internal/mime/multipart/multipart_test.go:744:7: wrapperFunc: use
 						Message: "message",
 					},
 				},
-				"file2.txt": []LinterOutput{
+				"file2.txt": {
 					{
 						File:    "file2.txt",
 						Line:    6,
@@ -359,7 +358,7 @@ io/upv2/upform/internal/mime/multipart/multipart_test.go:744:7: wrapperFunc: use
 			input:   []byte("file.txt:6:7: message\nfile.txt:6:7: message\n"),
 			trainer: nil,
 			expected: map[string][]LinterOutput{
-				"file.txt": []LinterOutput{
+				"file.txt": {
 					{
 						File:    "file.txt",
 						Line:    6,
@@ -380,7 +379,7 @@ io/upv2/upform/internal/mime/multipart/multipart_test.go:744:7: wrapperFunc: use
 				return &o, nil
 			},
 			expected: map[string][]LinterOutput{
-				"file2.txt": []LinterOutput{
+				"file2.txt": {
 					{
 						File:    "file2.txt",
 						Line:    7,
@@ -396,7 +395,7 @@ io/upv2/upform/internal/mime/multipart/multipart_test.go:744:7: wrapperFunc: use
 			input:   []byte("file.txt:6: message\nfile2.txt:7: message\n"),
 			trainer: nil,
 			expected: map[string][]LinterOutput{
-				"file.txt": []LinterOutput{
+				"file.txt": {
 					{
 						File:    "file.txt",
 						Line:    6,
@@ -404,7 +403,7 @@ io/upv2/upform/internal/mime/multipart/multipart_test.go:744:7: wrapperFunc: use
 						Message: "message",
 					},
 				},
-				"file2.txt": []LinterOutput{
+				"file2.txt": {
 					{
 						File:    "file2.txt",
 						Line:    7,
@@ -423,7 +422,7 @@ golangci_lint.go:16:1: warning: (gochecknoglobals)
 `),
 			trainer: nil,
 			expected: map[string][]LinterOutput{
-				"golangci_lint.go": []LinterOutput{
+				"golangci_lint.go": {
 					{
 						File:    "golangci_lint.go",
 						Line:    16,

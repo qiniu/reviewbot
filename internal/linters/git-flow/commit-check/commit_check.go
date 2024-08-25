@@ -103,8 +103,10 @@ func listExistedComments(ctx context.Context, agent linters.Agent, org, repo str
 }
 
 // Deprecated: this is old version of commit check, which is not used anymore. Remove this after a while.
-const rebaseSuggestionFlag = "REBASE SUGGESTION"
-const commitCheckFlag = "[Git-flow]"
+const (
+	rebaseSuggestionFlag = "REBASE SUGGESTION"
+	commitCheckFlag      = "[Git-flow]"
+)
 
 const commentTmpl = `**{{.Flag}}** Hi @{{.Author}}, There are some suggestions for your information:
 
@@ -125,7 +127,7 @@ type RebaseSuggestion struct {
 }
 
 func handle(ctx context.Context, log *xlog.Logger, agent linters.Agent, org, repo, author string, number int, comments []string, existedComments []*github.IssueComment) error {
-	var data = struct {
+	data := struct {
 		Flag     string
 		Author   string
 		Comments []string
@@ -224,7 +226,7 @@ var mergeMsgRegex = regexp.MustCompile(pattern)
 func rebaseCheck(log *xlog.Logger, commits []*github.RepositoryCommit) (string, error) {
 	var mergeTypeCommits []string
 	// filter out duplicated commit messages
-	var msgs = make(map[string]int, 0)
+	msgs := make(map[string]int, 0)
 
 	// filter out merge commit messages
 	for _, commit := range commits {
@@ -274,7 +276,7 @@ func rebaseCheck(log *xlog.Logger, commits []*github.RepositoryCommit) (string, 
 	}
 
 	var buf bytes.Buffer
-	var data = struct {
+	data := struct {
 		Header  string
 		Message string
 	}{

@@ -18,18 +18,17 @@ type Runner interface {
 }
 
 // LocalRunner is a runner that runs the linter locally.
-type LocalRunner struct {
-}
+type LocalRunner struct{}
 
 func NewLocalRunner() Runner {
 	return &LocalRunner{}
 }
 
-func (r *LocalRunner) Prepare(ctx context.Context, cfg *config.Linter) error {
+func (*LocalRunner) Prepare(ctx context.Context, cfg *config.Linter) error {
 	return nil
 }
 
-func (r *LocalRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadCloser, error) {
+func (*LocalRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadCloser, error) {
 	command := cfg.Command
 	executable := command[0]
 	var cmdArgs []string

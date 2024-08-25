@@ -20,7 +20,7 @@ func TestNoteCheckFile(t *testing.T) {
 			workdir:  "testdata",
 			filename: "note.go",
 			expected: map[string][]linters.LinterOutput{
-				"note.go": []linters.LinterOutput{
+				"note.go": {
 					{
 						File:    "note.go",
 						Line:    6,
@@ -62,5 +62,4 @@ func TestNoteCheckFile(t *testing.T) {
 			}
 		})
 	}
-
 }

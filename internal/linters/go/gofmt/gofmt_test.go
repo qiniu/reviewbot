@@ -56,7 +56,6 @@ func TestGofmtOutput(t *testing.T) {
 				}
 
 			}
-
 		}
 	}
 }

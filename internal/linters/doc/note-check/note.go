@@ -64,7 +64,7 @@ func noteCheckFile(workdir, filename string) (map[string][]linters.LinterOutput,
 		return nil, err
 	}
 
-	var output = make(map[string][]linters.LinterOutput)
+	output := make(map[string][]linters.LinterOutput)
 	for _, cmts := range file.Comments {
 		for _, cmt := range cmts.List {
 			// comments with "/*" may have multiple lines

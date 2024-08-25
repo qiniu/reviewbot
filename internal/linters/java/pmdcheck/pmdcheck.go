@@ -14,9 +14,11 @@ import (
 )
 
 // refer to https://pmd.github.io/
-const linterName = "pmdcheck"
-const pmdRuleURL = "https://raw.githubusercontent.com/pmd/pmd/master/pmd-java/src/main/resources/category/java/bestpractices.xml"
-const pmdRuleDir = "/var/tmp/linters-config/"
+const (
+	linterName = "pmdcheck"
+	pmdRuleURL = "https://raw.githubusercontent.com/pmd/pmd/master/pmd-java/src/main/resources/category/java/bestpractices.xml"
+	pmdRuleDir = "/var/tmp/linters-config/"
+)
 
 func init() {
 	linters.RegisterPullRequestHandler(linterName, pmdCheckHandler)
@@ -51,7 +53,7 @@ func pmdCheckHandler(plog *xlog.Logger, a linters.Agent) error {
 }
 
 func pmdcheckParser(plog *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, []string) {
-	var lineParse = func(line string) (*linters.LinterOutput, error) {
+	lineParse := func(line string) (*linters.LinterOutput, error) {
 		// pmdcheck will output lines starting with ' [WARN]' or '[ERROR]'  warring/error information
 		// which are no meaningful for the reviewbot scenario, so we discard them
 		if strings.Contains(line, "[WARN]") || strings.Contains(line, "[ERROR]") {

@@ -8,7 +8,6 @@ import (
 )
 
 func TestRebaseCheckRule(t *testing.T) {
-
 	tcs := []struct {
 		title    string
 		commits  []*github.RepositoryCommit

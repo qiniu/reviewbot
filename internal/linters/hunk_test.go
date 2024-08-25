@@ -48,7 +48,6 @@ func TestInHunk(t *testing.T) {
 		line         int
 		expected     bool
 	}{
-
 		{
 			"startline == 0 &&   line < Hunk.StartLine1 < Hunk.EndLine1 < Hunk.StartLine2  <Hunk.EndLine2",
 			"testfilename",

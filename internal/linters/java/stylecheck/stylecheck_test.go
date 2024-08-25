@@ -80,8 +80,9 @@ func TestStyleRuleCheck(t *testing.T) {
 		_ = os.RemoveAll(dir)
 	})
 }
+
 func TestCheckJar(t *testing.T) {
-	var stykejarfilename = "checkstyle-10.17.0-all.jar"
+	stykejarfilename := "checkstyle-10.17.0-all.jar"
 	filePath := "/var/tmp/linters-config/"
 	filename2 := filepath.Join(filePath, stykejarfilename)
 	path, err := stylecheckJar(nil)

@@ -49,7 +49,7 @@ func cleanLintResults(workdir string, lintResults map[string][]LinterOutput) map
 
 // filterByPRChanged filters out the lint errors that are not related to the PR.
 func filterByPRChanged(outputs map[string][]LinterOutput, commitFiles []*github.CommitFile) (map[string][]LinterOutput, error) {
-	var result = make(map[string][]LinterOutput)
+	result := make(map[string][]LinterOutput)
 	hunkChecker, err := NewGithubCommitFileHunkChecker(commitFiles)
 	if err != nil {
 		return nil, err
@@ -155,7 +155,7 @@ func isGoZeroCustomTag(jsonOption string) bool {
 // exts returns the file extensions of the changes.
 // file extensions are used to determine whether the linter is related to the PR.
 func exts(changes []*github.CommitFile) map[string]bool {
-	var exts = make(map[string]bool)
+	exts := make(map[string]bool)
 	for _, change := range changes {
 		ext := filepath.Ext(change.GetFilename())
 		if ext == "" {
