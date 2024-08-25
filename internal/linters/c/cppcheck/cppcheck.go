@@ -23,7 +23,7 @@ func cppcheckHandler(log *xlog.Logger, a linters.Agent) error {
 }
 
 func parser(log *xlog.Logger, input []byte) (map[string][]linters.LinterOutput, []string) {
-	var lineParser = func(line string) (*linters.LinterOutput, error) {
+	lineParser := func(line string) (*linters.LinterOutput, error) {
 		if len(line) <= 2 {
 			return nil, nil
 		}

@@ -22,7 +22,6 @@ func init() {
 }
 
 func gofmtHandler(log *xlog.Logger, a linters.Agent) error {
-
 	if linters.IsEmpty(a.LinterConfig.Args...) {
 		a.LinterConfig.Args = append([]string{}, "-d", "./")
 	}
@@ -107,14 +106,13 @@ func (g *Gofmt) Parse(log *xlog.Logger, output []byte) (map[string][]linters.Lin
 
 // Go Doc Comments Info: https://tip.golang.org/doc/comment
 func formatGofmtOutput(output []byte) (map[string][]linters.LinterOutput, error) {
-
-	var result = make(map[string][]linters.LinterOutput)
+	result := make(map[string][]linters.LinterOutput)
 	lines := strings.Split(string(output), "\n")
-	//map[$filename]map[$diffname][]string
+	// map[$filename]map[$diffname][]string
 	fileErr := make(map[string]map[string][]string)
-	//filename eg. test/test.go
+	// filename eg. test/test.go
 	var filename string
-	//diffname eg. @@ -19,5 +19,5 @@
+	// diffname eg. @@ -19,5 +19,5 @@
 	var diffname string
 	for _, line := range lines {
 		if strings.HasPrefix(line, "diff") {
@@ -164,7 +162,7 @@ func formatGofmtOutput(output []byte) (map[string][]linters.LinterOutput, error)
 					currentInfo.diffLineCount++
 					currentInfo.fixedMessage += strings.TrimLeft(line, "+") + "\n"
 					if strings.TrimLeft(line, "+") == "" && i+1 < len(errmsg) {
-						//If trimLeft line is only a blank line, temporarily store tmpLine.
+						// If trimLeft line is only a blank line, temporarily store tmpLine.
 						currentInfo.tmpLine = errmsg[i+1]
 					}
 				} else {
@@ -188,7 +186,7 @@ func formatGofmtOutput(output []byte) (map[string][]linters.LinterOutput, error)
 
 func addGofmtOutput(result map[string][]linters.LinterOutput, filename string, diffStartLine, firstDiffLine, diffLineCount int64, message string) {
 	var output *linters.LinterOutput
-	//If diffLineCount==1, set a single-line comment on GitHub; otherwise, set a multi-line comment.
+	// If diffLineCount==1, set a single-line comment on GitHub; otherwise, set a multi-line comment.
 	if diffLineCount == 1 {
 		output = &linters.LinterOutput{
 			File:    filename,
@@ -222,5 +220,4 @@ func addGofmtOutput(result map[string][]linters.LinterOutput, filename string, d
 			result[output.File] = append(result[output.File], *output)
 		}
 	}
-
 }

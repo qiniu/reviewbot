@@ -63,7 +63,7 @@ func PullRequestHandler(name string) PullRequestHandlerFunc {
 
 // TotalPullRequestHandlers returns all registered PullRequestHandlerFunc.
 func TotalPullRequestHandlers() map[string]PullRequestHandlerFunc {
-	var handlers = make(map[string]PullRequestHandlerFunc, len(pullRequestHandlers))
+	handlers := make(map[string]PullRequestHandlerFunc, len(pullRequestHandlers))
 	for name, handler := range pullRequestHandlers {
 		handlers[name] = handler
 	}
@@ -93,7 +93,7 @@ type LinterOutput struct {
 	Column int
 	// Message is the staticcheck Message
 	Message string
-	//StartLine required when using multi-line comments
+	// StartLine required when using multi-line comments
 	StartLine int
 }
 
@@ -220,7 +220,7 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 
 		// filter out the comments that are not related to the linter
 		var existedCommentsToKeep []*github.PullRequestComment
-		var linterFlag = linterNamePrefix(linterName)
+		linterFlag := linterNamePrefix(linterName)
 		for _, comment := range existedComments {
 			if strings.HasPrefix(comment.GetBody(), linterFlag) {
 				existedCommentsToKeep = append(existedCommentsToKeep, comment)
@@ -310,7 +310,7 @@ func ParseV2(log *xlog.Logger, output []byte, trainer func(LinterOutput) (*Linte
 		return nil, strings.Split(string(output), "\n")
 	}
 
-	var unexpected = make([]string, 0, len(indices))
+	unexpected := make([]string, 0, len(indices))
 	var prefix string
 	// get the prefix before the first issue which generally is some unexpected message.
 	if len(indices) > 0 && indices[0][0] > 0 {
@@ -320,7 +320,7 @@ func ParseV2(log *xlog.Logger, output []byte, trainer func(LinterOutput) (*Linte
 		}
 	}
 
-	var results = make(map[string][]LinterOutput, len(indices))
+	results := make(map[string][]LinterOutput, len(indices))
 	for i := 0; i < len(indices); i++ {
 		file := strings.TrimSpace(string(output[indices[i][2]:indices[i][3]]))
 		if strings.ContainsAny(file, " :") {
@@ -340,7 +340,7 @@ func ParseV2(log *xlog.Logger, output []byte, trainer func(LinterOutput) (*Linte
 		}
 		issue.Line = int(line)
 
-		var msgStart = indices[i][5] + 1
+		msgStart := indices[i][5] + 1
 
 		// column is optional in some linters' output
 		if indices[i][6] != -1 && indices[i][7] != -1 {

@@ -65,7 +65,7 @@ func (s *Server) initDockerRunner() {
 	if len(images) > 0 {
 		dockerRunner, err := runner.NewDockerRunner()
 		if err != nil {
-			log.Fatalf("初始化Docker运行器失败: %v", err)
+			log.Fatalf("failed to init docker runner: %v", err)
 		}
 
 		s.dockerRunner = dockerRunner
@@ -133,17 +133,19 @@ func (s *Server) processPullRequestEvent(log *xlog.Logger, event *github.PullReq
 
 	return s.handle(log, context.Background(), event)
 }
+
 func (s *Server) processCheckRunRequestEvent(log *xlog.Logger, event *github.CheckRunEvent) error {
 	if event.GetAction() != "rerequested" {
 		log.Debugf("skipping action %s\n", event.GetAction())
 		return nil
 	}
-	var pevent = github.PullRequestEvent{}
+	pevent := github.PullRequestEvent{}
 	pevent.Repo = event.GetRepo()
 	pevent.PullRequest = event.GetCheckRun().PullRequests[0]
 	pevent.Installation = event.GetInstallation()
 	return s.handle(log, context.Background(), &pevent)
 }
+
 func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.PullRequestEvent) error {
 	var (
 		num     = event.GetPullRequest().GetNumber()
@@ -206,7 +208,7 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 	}()
 
 	for name, fn := range linters.TotalPullRequestHandlers() {
-		var linterConfig = s.config.Get(org, repo, name)
+		linterConfig := s.config.Get(org, repo, name)
 
 		// skip linter if it is disabled
 		if linterConfig.Enable != nil && !*linterConfig.Enable {
@@ -237,11 +239,11 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 			continue
 		}
 
-		var runner = runner.NewLocalRunner()
+		r := runner.NewLocalRunner()
 		if linterConfig.DockerAsRunner != "" {
-			runner = s.dockerRunner
+			r = s.dockerRunner
 		}
-		agent.Runner = runner
+		agent.Runner = r
 
 		if err := fn(log, agent); err != nil {
 			log.Errorf("failed to run linter: %v", err)

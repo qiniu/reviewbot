@@ -92,7 +92,6 @@ func CreatePullReviewComments(ctx context.Context, gc *github.Client, owner stri
 			addedComments = append(addedComments, cm)
 			return nil
 		})
-
 		if err != nil {
 			return nil, err
 		}
@@ -117,7 +116,6 @@ func DeletePullReviewComments(ctx context.Context, gc *github.Client, owner, rep
 			}
 			return nil
 		})
-
 		if err != nil {
 			return err
 		}
@@ -183,7 +181,7 @@ func CreateGithubChecks(ctx context.Context, a Agent, lintErrs map[string][]Lint
 
 // RetryWithBackoff retries the function with backoff.
 func RetryWithBackoff(ctx context.Context, f func() error) error {
-	var backoff = time.Second
+	backoff := time.Second
 	for i := 0; i < 5; i++ {
 		err := f()
 		if err == nil {
@@ -255,7 +253,7 @@ func constructPullRequestComments(linterOutputs map[string][]LinterOutput, linte
 func filterLinterOutputs(outputs map[string][]LinterOutput, comments []*github.PullRequestComment) (toAdds map[string][]LinterOutput, toDeletes []*github.PullRequestComment) {
 	toAdds = make(map[string][]LinterOutput)
 
-	var validComments = make(map[int64]struct{})
+	validComments := make(map[int64]struct{})
 	for file, lintFileErrs := range outputs {
 		for _, lintErr := range lintFileErrs {
 			var found bool

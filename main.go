@@ -110,7 +110,7 @@ func main() {
 	log.SetOutputLevel(o.logLevel)
 
 	if o.codeCacheDir != "" {
-		if err := os.MkdirAll(o.codeCacheDir, 0755); err != nil {
+		if err := os.MkdirAll(o.codeCacheDir, 0o755); err != nil {
 			log.Fatalf("failed to create code cache dir: %v", err)
 		}
 	}
@@ -145,7 +145,7 @@ func main() {
 		debug:            o.debug,
 	}
 
-	s.initDockerRunner()
+	go s.initDockerRunner()
 
 	mux := http.NewServeMux()
 	mux.Handle("/", s)

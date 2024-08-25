@@ -12,18 +12,14 @@ import (
 	"github.com/qiniu/x/log"
 )
 
-var (
-	// use WEWORK_WEBHOOK to send alert message to wework group
-	// refer: https://developer.work.weixin.qq.com/document/path/91770
-	WEWORK_WEBHOOK = os.Getenv("WEWORK_WEBHOOK")
-)
+// use WEWORK_WEBHOOK to send alert message to wework group
+// refer: https://developer.work.weixin.qq.com/document/path/91770
+var WEWORK_WEBHOOK = os.Getenv("WEWORK_WEBHOOK")
 
-var (
-	issueCounter = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "reviewbot_issue_found_total",
-		Help: "issue found by linter",
-	}, []string{"repo", "linter", "pull_request", "commit"})
-)
+var issueCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "reviewbot_issue_found_total",
+	Help: "issue found by linter",
+}, []string{"repo", "linter", "pull_request", "commit"})
 
 func IncIssueCounter(repo, linter, pull_request, commit string, count float64) {
 	issueCounter.WithLabelValues(repo, linter, pull_request, commit).Add(count)

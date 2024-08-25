@@ -378,14 +378,14 @@ func TestFindGoModsPaths(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.id, func(t *testing.T) {
-			if err := os.MkdirAll(tc.input.LinterConfig.WorkDir, 0777); err != nil {
+			if err := os.MkdirAll(tc.input.LinterConfig.WorkDir, 0o777); err != nil {
 				t.Errorf("failed to create workdir: %v", err)
 			}
 			defer os.RemoveAll(tc.input.LinterConfig.WorkDir)
 			if tc.isGoMod {
 				for _, goModDir := range tc.createModPath {
 					path := tc.input.LinterConfig.WorkDir + goModDir
-					err := os.MkdirAll(filepath.Dir(path), 0777)
+					err := os.MkdirAll(filepath.Dir(path), 0o777)
 					if err != nil {
 						fmt.Println("Error creating directories:", err)
 						return

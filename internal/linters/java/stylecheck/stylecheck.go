@@ -15,10 +15,12 @@ import (
 
 const linterName = "stylecheck"
 
-const styleJarURL = "https://github.com/checkstyle/checkstyle/releases/download/checkstyle-10.17.0/checkstyle-10.17.0-all.jar"
-const localStyleJar = "/checkstyle.jar"
-const styleRuleURL = "https://raw.githubusercontent.com/checkstyle/checkstyle/master/src/main/resources/sun_checks.xml"
-const styleRuleDir = "/var/tmp/linters-config/"
+const (
+	styleJarURL   = "https://github.com/checkstyle/checkstyle/releases/download/checkstyle-10.17.0/checkstyle-10.17.0-all.jar"
+	localStyleJar = "/checkstyle.jar"
+	styleRuleURL  = "https://raw.githubusercontent.com/checkstyle/checkstyle/master/src/main/resources/sun_checks.xml"
+	styleRuleDir  = "/var/tmp/linters-config/"
+)
 
 func init() {
 	linters.RegisterPullRequestHandler(linterName, stylecheckHandler)
@@ -53,7 +55,7 @@ func stylecheckHandler(slog *xlog.Logger, a linters.Agent) error {
 
 func stylecheckParser(codedir string) func(slog *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, []string) {
 	return func(slog *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, []string) {
-		var lineParse = func(line string) (*linters.LinterOutput, error) {
+		lineParse := func(line string) (*linters.LinterOutput, error) {
 			// stylecheck will output lines starting with ' 开始检查(Starting audit) ' or '检查结束(Audit done) ' or 'stylecheck result(Checkstyle ends with 20 errors.)'
 			// which are no meaningful for the reviewbot scenario, so we discard them Starting audit done.
 			if strings.Contains(strings.ToLower(line), "checkstyle") || strings.HasPrefix(line, "Starting audit") || strings.HasPrefix(line, "Audit done") || strings.HasPrefix(line, "检查") {
@@ -68,7 +70,6 @@ func stylecheckParser(codedir string) func(slog *xlog.Logger, output []byte) (ma
 }
 
 func stylecheckJar(slog *xlog.Logger) (string, error) {
-
 	jarfilepath := filepath.Join(styleRuleDir, localStyleJar)
 	_, exist := lintersutil.FileExists(jarfilepath)
 	if !exist {

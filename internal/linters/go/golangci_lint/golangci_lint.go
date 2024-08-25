@@ -63,7 +63,7 @@ func golangciLintHandler(log *xlog.Logger, a linters.Agent) error {
 
 func parser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, []string) {
 	log.Infof("golangci-lint output: %s", output)
-	var trainer = func(o linters.LinterOutput) (*linters.LinterOutput, []string) {
+	trainer := func(o linters.LinterOutput) (*linters.LinterOutput, []string) {
 		// Perhaps it may not be precise enough？
 		// refer: https://golangci-lint.run/usage/linters/
 		if strings.Contains(o.Message, "(typecheck)") {
@@ -74,7 +74,7 @@ func parser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput,
 		return &o, []string{}
 	}
 
-	var unexpected = make([]string, 0)
+	unexpected := make([]string, 0)
 	rawResults, rawUnexpected := linters.ParseV2(log, output, trainer)
 	for _, ex := range rawUnexpected {
 		// skip the warning level log
@@ -110,7 +110,7 @@ func argsApply(log *xlog.Logger, a linters.Agent) linters.Agent {
 		legacyArgs = legacyArgs[1:]
 	}
 
-	var newArgs = []string{"run"}
+	newArgs := []string{"run"}
 
 	var (
 		timeoutFlag   bool
@@ -168,7 +168,7 @@ func argsApply(log *xlog.Logger, a linters.Agent) linters.Agent {
 func configApply(log *xlog.Logger, a linters.Agent) string {
 	// refer to https://golangci-lint.run/usage/configuration/
 	// the default config file name is .golangci.yml, .golangci.yaml, .golangci.json, .golangci.toml
-	var golangciConfigFiles = []string{".golangci.yml", ".golangci.yaml", ".golangci.json", ".golangci.toml"}
+	golangciConfigFiles := []string{".golangci.yml", ".golangci.yaml", ".golangci.json", ".golangci.toml"}
 
 	// if the config file exists in the current directory, return its absolute path
 	for _, file := range golangciConfigFiles {
@@ -209,7 +209,7 @@ func configApply(log *xlog.Logger, a linters.Agent) string {
 			return ""
 		}
 
-		var targetFile = filepath.Join(currentDir, filepath.Base(path))
+		targetFile := filepath.Join(currentDir, filepath.Base(path))
 		if err := os.WriteFile(targetFile, data, 0o600); err != nil {
 			log.Warnf("failed to write config file: %v ,err: %v", targetFile, err)
 			return ""
