@@ -10,6 +10,7 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/qiniu/reviewbot/config"
+	"github.com/qiniu/x/log"
 )
 
 type DockerRunner struct {
@@ -58,17 +59,25 @@ func (r *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClos
 		return nil, err
 	}
 
-	resp, err := r.cli.ContainerCreate(ctx, &container.Config{
-		Image: cfg.DockerAsRunner,
-		Cmd:   cfg.Command,
-		Env:   cfg.Env,
-	}, &container.HostConfig{
-		Binds: []string{cfg.WorkDir + ":/app"},
-	}, nil, nil, "")
+	var (
+		dockerConfig = &container.Config{
+			Image:      cfg.DockerAsRunner,
+			Cmd:        cfg.Args,
+			Env:        cfg.Env,
+			Entrypoint: cfg.Command,
+			WorkingDir: cfg.WorkDir,
+		}
+		dockerHostConfig = &container.HostConfig{
+			Binds: []string{cfg.WorkDir + ":" + cfg.WorkDir},
+		}
+	)
+
+	resp, err := r.cli.ContainerCreate(ctx, dockerConfig, dockerHostConfig, nil, nil, "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create container: %w", err)
 	}
 
+	log.Infof("container created: %v", resp.ID)
 	if err := r.cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
 		return nil, fmt.Errorf("failed to start container: %w", err)
 	}
