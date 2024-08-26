@@ -23,6 +23,8 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
+	"runtime"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v57/github"
@@ -168,9 +170,13 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 	}
 	log.Infof("found %d files affected by pull request %d\n", len(pullRequestAffectedFiles), num)
 
-	// clone the repo
+	repoPath, err := prepareRepoDir(org, repo, num)
+	if err != nil {
+		return fmt.Errorf("failed to prepare repo dir: %w", err)
+	}
+
 	r, err := s.gitClientFactory.ClientForWithRepoOpts(org, repo, gitv2.RepoOpts{
-		CloneToSubDir: repo, // clone to a sub directory
+		CopyTo: repoPath,
 	})
 	if err != nil {
 		log.Errorf("failed to create git client: %v", err)
@@ -275,4 +281,28 @@ func (s *Server) GithubClient(installationID int64) *github.Client {
 		return s.githubAccessTokenClient()
 	}
 	return s.githubAppClient(installationID)
+}
+
+func prepareRepoDir(org, repo string, num int) (string, error) {
+	var parentDir string
+	if runtime.GOOS == "darwin" {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("failed to get user home dir: %w", err)
+		}
+		parentDir = filepath.Join(homeDir, "reviewbot-code")
+	} else {
+		parentDir = filepath.Join("/tmp", "reviewbot-code")
+	}
+
+	if err := os.MkdirAll(parentDir, 0o755); err != nil {
+		return "", fmt.Errorf("failed to create parent dir: %w", err)
+	}
+
+	repoPath, err := os.MkdirTemp(parentDir, fmt.Sprintf("%s-%s-%d-", org, repo, num))
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp dir: %w", err)
+	}
+
+	return repoPath, nil
 }
