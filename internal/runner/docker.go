@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
@@ -62,15 +63,22 @@ func (r *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClos
 	var (
 		dockerConfig = &container.Config{
 			Image:      cfg.DockerAsRunner,
-			Cmd:        cfg.Args,
 			Env:        cfg.Env,
-			Entrypoint: cfg.Command,
+			Entrypoint: []string{"/bin/sh", "-c"},
 			WorkingDir: cfg.WorkDir,
 		}
 		dockerHostConfig = &container.HostConfig{
 			Binds: []string{cfg.WorkDir + ":" + cfg.WorkDir},
 		}
 	)
+
+	// add git config so that git can work in the container
+	wrapperScript := fmt.Sprintf(`#!/bin/sh
+		git config --global --add safe.directory %s
+		%s %s
+		`, cfg.WorkDir, strings.Join(cfg.Command, " "), strings.Join(cfg.Args, " "))
+
+	dockerConfig.Cmd = []string{wrapperScript}
 
 	resp, err := r.cli.ContainerCreate(ctx, dockerConfig, dockerHostConfig, nil, nil, "")
 	if err != nil {
@@ -82,11 +90,11 @@ func (r *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClos
 		return nil, fmt.Errorf("failed to start container: %w", err)
 	}
 
-	options := container.LogsOptions{
+	logOptions := container.LogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Follow:     true,
-		Timestamps: false,
 	}
-	return r.cli.ContainerLogs(ctx, resp.ID, options)
+
+	return r.cli.ContainerLogs(ctx, resp.ID, logOptions)
 }
