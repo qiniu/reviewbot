@@ -26,10 +26,13 @@ import (
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v57/github"
+	"github.com/google/uuid"
 	"github.com/gregjones/httpcache"
 	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
+	"github.com/qiniu/reviewbot/internal/logagent"
 	"github.com/qiniu/reviewbot/internal/runner"
+	"github.com/qiniu/reviewbot/internal/storage"
 	"github.com/qiniu/x/log"
 	"github.com/qiniu/x/xlog"
 	gitv2 "sigs.k8s.io/prow/pkg/git/v2"
@@ -50,6 +53,7 @@ type Server struct {
 	appPrivateKey string
 
 	debug bool
+	la    *logagent.LogAgent
 }
 
 func (s *Server) initDockerRunner() {
@@ -232,6 +236,7 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 			PullRequestChangedFiles: pullRequestAffectedFiles,
 			LinterName:              name,
 			RepoDir:                 r.Directory(),
+			LogClient:               s.la,
 		}
 
 		if !linters.LinterRelated(name, agent) {
@@ -244,6 +249,24 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 			r = s.dockerRunner
 		}
 		agent.Runner = r
+
+		logStorageConfig := s.config.FullLogConfig
+		logStorageConfig.Enable = true
+		if logStorageConfig.Enable {
+			agent.LogStorages = append(agent.LogStorages, storage.NewLocalStorage())
+			for _, storageType := range logStorageConfig.RemoteName {
+				switch storageType {
+				case "git":
+					agent.LogStorages = append(agent.LogStorages, storage.NewGitubStorage(logStorageConfig.Githubcfg))
+				case "aws":
+					agent.LogStorages = append(agent.LogStorages, storage.NewAWSStorage(logStorageConfig.AWScfg))
+				default:
+					log.Warnf("%s was wrong storageType", storageType)
+				}
+			}
+		}
+		agent.LinterUuid = uuid.New().String()
+		agent.LinterLogStoragePath = "reviewbot-logs/" + agent.LinterName + "/" + agent.LinterUuid + "/log-build.txt"
 
 		if err := fn(log, agent); err != nil {
 			log.Errorf("failed to run linter: %v", err)

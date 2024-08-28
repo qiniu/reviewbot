@@ -29,6 +29,7 @@ import (
 	"github.com/google/go-github/v57/github"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/qiniu/reviewbot/config"
+	"github.com/qiniu/reviewbot/internal/logagent"
 	"github.com/qiniu/reviewbot/internal/version"
 	"github.com/qiniu/x/log"
 	"github.com/sirupsen/logrus"
@@ -143,12 +144,13 @@ func main() {
 		appID:            o.appID,
 		appPrivateKey:    o.appPrivateKey,
 		debug:            o.debug,
+		la:               logagent.NewLogAgent(),
 	}
 
 	go s.initDockerRunner()
-
 	mux := http.NewServeMux()
 	mux.Handle("/", s)
+	mux.Handle("/logs", HandleLog(s.la, logrus.WithField("handler", "/log")))
 	mux.Handle("/metrics", promhttp.Handler())
 	log.Infof("listening on port %d", o.port)
 
@@ -170,4 +172,27 @@ func main() {
 	}()
 	// TODO(CarlJi): graceful shutdown
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", o.port), mux))
+}
+
+type logClient interface {
+	GetLinterLog(linterName, id string) ([]byte, error)
+}
+
+func HandleLog(lc logClient, log *logrus.Entry) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := r.URL.Query().Get("id")
+		linterName := r.URL.Query().Get("linter")
+
+		logger := log.WithFields(logrus.Fields{"linter": linterName, "id": id})
+		linterLog, err := lc.GetLinterLog(linterName, id)
+
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Log not found: %v", err), http.StatusNotFound)
+			return
+		}
+
+		if _, err = w.Write(linterLog); err != nil {
+			logger.WithError(err).Warning("Error writing log.")
+		}
+	}
 }

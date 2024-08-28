@@ -10,6 +10,7 @@ import (
 
 type Config struct {
 	GlobalDefaultConfig GlobalConfig `json:"globalDefaultConfig,omitempty"`
+	FullLogConfig       LogConfig    `json:"fullLogConfig,omitempty"`
 
 	// CustomConfig is the custom linter config.
 	// e.g.
@@ -35,6 +36,20 @@ type GlobalConfig struct {
 	// if not empty, use the config to run javastylecheck-lint.
 	// it can be overridden by linter.ConfigPath.
 	JavaStyleCheckRuleConfig string `json:"javastylecheckruleConfig,omitempty"`
+}
+type LogConfig struct {
+	Enable     bool     `json:"enable"`
+	RemoteName []string `json:"remoteName"`
+
+	// remote 厂商配置可多选
+	Githubcfg GithubConfig `json:"githubcfg,omitempty"`
+	AWScfg    AWSConfig    `json:"awscfgs,omitempty"`
+}
+
+type GithubConfig struct {
+}
+
+type AWSConfig struct {
 }
 
 type Linter struct {

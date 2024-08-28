@@ -51,6 +51,23 @@ func (*LocalRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadCloser,
 	log.Infof("run command: %v, workDir: %v", c, c.Dir)
 	output, execErr := c.CombinedOutput()
 
+	//  todo:
+	// 	stdout, err := cmd.StdoutPipe()
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	stderr, err := cmd.StderrPipe()
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+
+	// 	if err := cmd.Start(); err != nil {
+	// 		return nil, err
+	// 	}
+
+	// 	return io.MultiReader(stdout, stderr), nil
+	// }
+
 	// read all files under the artifact dir
 	var fileContent []byte
 	artifactFiles, err := os.ReadDir(artifact)

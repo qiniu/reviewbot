@@ -28,8 +28,10 @@ import (
 	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/lintersutil"
+	"github.com/qiniu/reviewbot/internal/logagent"
 	"github.com/qiniu/reviewbot/internal/metric"
 	"github.com/qiniu/reviewbot/internal/runner"
+	"github.com/qiniu/reviewbot/internal/storage"
 	"github.com/qiniu/x/log"
 	"github.com/qiniu/x/xlog"
 	gitv2 "sigs.k8s.io/prow/pkg/git/v2"
@@ -99,6 +101,8 @@ type LinterOutput struct {
 
 // Agent knows necessary information in order to run linters.
 type Agent struct {
+	// LogStorages is the way to contral log storage
+	LogStorages []storage.Storage
 	// Runner is the way to run the linter.	like docker, local, etc.
 	Runner runner.Runner
 	// GitHubClient is the GitHub client.
@@ -113,8 +117,14 @@ type Agent struct {
 	PullRequestChangedFiles []*github.CommitFile
 	// LinterName is the linter name.
 	LinterName string
+	// LinterUuid is the uinque id of onece linter exec .
+	LinterUuid string
+	// LinterLogStoragePath is the path of log storage
+	LinterLogStoragePath string
 	// RepoDir is the repo directory.
 	RepoDir string
+	// LogClient is log angnt of onece linter exec.
+	LogClient *logagent.LogAgent
 }
 
 const CommentFooter = `
@@ -163,10 +173,28 @@ func ExecRun(a Agent) ([]byte, error) {
 	}
 	defer reader.Close()
 
+	a.LogClient.IoReaderStatus[a.LinterUuid] = &logagent.Processing
+	defer func() {
+		a.LogClient.IoReaderStatus[a.LinterUuid] = &logagent.Completed
+	}()
+	a.LogClient.UpdateIoMap(a.LinterName, a.LinterUuid, reader)
+
 	output, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read linter output: %w", err)
 	}
+
+	for _, s := range a.LogStorages {
+		ctx := context.Background()
+		err := s.Writer(ctx, a.LinterLogStoragePath, output)
+		if err != nil {
+			log.Errorf("write to storage was failed %v", err)
+		} else {
+			log.Info("write to storage was successful")
+		}
+
+	}
+
 	return output, nil
 }
 

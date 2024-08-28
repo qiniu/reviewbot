@@ -138,6 +138,12 @@ func CreateGithubChecks(ctx context.Context, a Agent, lintErrs map[string][]Lint
 
 	annotations := toGithubCheckRunAnnotations(lintErrs)
 
+	url, err := a.LogClient.GetArchivedLog(a.LogStorages, a.LinterLogStoragePath)
+	if err != nil {
+		log.Errorf("get archived log url filed , err: %v ", err)
+	}
+	urlReference := fmt.Sprintf("All logs: %s \n", url)
+
 	check := github.CreateCheckRunOptions{
 		Name:      linterName,
 		HeadSHA:   headSha,
@@ -148,7 +154,7 @@ func CreateGithubChecks(ctx context.Context, a Agent, lintErrs map[string][]Lint
 		},
 		Output: &github.CheckRunOutput{
 			Title:       github.String(fmt.Sprintf("%s found %d issues related to your changes", linterName, len(annotations))),
-			Summary:     github.String(Reference),
+			Summary:     github.String(urlReference + Reference),
 			Annotations: annotations,
 		},
 	}
@@ -160,7 +166,7 @@ func CreateGithubChecks(ctx context.Context, a Agent, lintErrs map[string][]Lint
 	}
 
 	var ch *github.CheckRun
-	err := RetryWithBackoff(ctx, func() error {
+	err = RetryWithBackoff(ctx, func() error {
 		checkRun, resp, err := a.GithubClient.Checks.CreateCheckRun(ctx, owner, repo, check)
 		if err != nil {
 			log.Errorf("create check run failed: %v", err)
