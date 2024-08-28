@@ -43,22 +43,19 @@ func golangciLintHandler(log *xlog.Logger, a linters.Agent) error {
 		return linters.GeneralHandler(log, a, linters.ExecRun, parser)
 	}
 
-	var outputs []byte
-	runFn := func(a linters.Agent) ([]byte, error) {
-		// run golangci-lint for each go.mod directory
-		for _, goModDir := range goModDirs {
-			a.LinterConfig.WorkDir = goModDir
-			execGoModTidy(log, a.LinterConfig.WorkDir)
-			output, err := linters.ExecRun(a)
-			if err != nil {
-				log.Warnf("golangci-lint run with exit code: %v, mark and continue", err)
-			}
-			outputs = append(outputs, output...)
-		}
-		return outputs, nil
-	}
+	return linters.GeneralHandler(log, wrapGoModTidy(a, goModDirs), linters.ExecRun, parser)
+}
 
-	return linters.GeneralHandler(log, a, runFn, parser)
+func wrapGoModTidy(a linters.Agent, goModDirs []string) linters.Agent {
+	var wrapperScript strings.Builder
+	for _, dir := range goModDirs {
+		wrapperScript.WriteString(fmt.Sprintf("cd %s && go mod tidy && cd - \n", dir))
+	}
+	wrapperScript.WriteString(strings.Join(append(a.LinterConfig.Command, a.LinterConfig.Args...), " "))
+
+	a.LinterConfig.Command = []string{}
+	a.LinterConfig.Args = []string{wrapperScript.String()}
+	return a
 }
 
 func parser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, []string) {

@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -80,6 +81,7 @@ func (r *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClos
 
 	dockerConfig.Cmd = []string{wrapperScript}
 
+	log.Infof("run docker config, entrypoint: %v, cmd: %v, env: %v, working dir: %v", dockerConfig.Entrypoint, dockerConfig.Cmd, dockerConfig.Env, dockerConfig.WorkingDir)
 	resp, err := r.cli.ContainerCreate(ctx, dockerConfig, dockerHostConfig, nil, nil, "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create container: %w", err)
@@ -94,7 +96,48 @@ func (r *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClos
 		ShowStdout: true,
 		ShowStderr: true,
 		Follow:     true,
+		Timestamps: false,
+		Details:    false,
+		Tail:       "all",
 	}
 
-	return r.cli.ContainerLogs(ctx, resp.ID, logOptions)
+	logReader, err := r.cli.ContainerLogs(ctx, resp.ID, logOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	// remove docker log header
+	cleanReader := NewCleanLogReader(logReader)
+	return cleanReader, nil
+}
+
+type CleanLogReader struct {
+	reader io.ReadCloser
+	buffer *bufio.Reader
+}
+
+func NewCleanLogReader(reader io.ReadCloser) *CleanLogReader {
+	return &CleanLogReader{
+		reader: reader,
+		buffer: bufio.NewReader(reader),
+	}
+}
+
+func (c *CleanLogReader) Read(p []byte) (int, error) {
+	line, err := c.buffer.ReadBytes('\n')
+	if err != nil && err != io.EOF {
+		return 0, err
+	}
+
+	if len(line) > 8 {
+		line = line[8:]
+	}
+
+	n := copy(p, line)
+	return n, err
+}
+
+func (c *CleanLogReader) Close() error {
+	c.buffer = nil
+	return c.reader.Close()
 }

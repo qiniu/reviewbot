@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/x/log"
@@ -29,14 +30,8 @@ func (*LocalRunner) Prepare(ctx context.Context, cfg *config.Linter) error {
 }
 
 func (*LocalRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadCloser, error) {
-	command := cfg.Command
-	executable := command[0]
-	var cmdArgs []string
-	if len(command) > 1 {
-		cmdArgs = command[1:]
-	}
-	cmdArgs = append(cmdArgs, cfg.Args...)
-	c := exec.Command(executable, cmdArgs...)
+	fullCommand := strings.Join(append(cfg.Command, cfg.Args...), " ")
+	c := exec.Command("/bin/sh", "-c", fullCommand)
 	c.Dir = cfg.WorkDir
 
 	// create a temp dir for the artifact

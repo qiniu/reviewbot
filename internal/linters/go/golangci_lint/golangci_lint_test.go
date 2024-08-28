@@ -465,3 +465,38 @@ func TestExtractDirs(t *testing.T) {
 		})
 	}
 }
+
+func TestWrapGoModTidy(t *testing.T) {
+	tcs := []struct {
+		id          string
+		input       linters.Agent
+		goModDirs   []string
+		wantCommand []string
+		wantArgs    []string
+	}{
+		{
+			id: "case1 - single mod",
+			input: linters.Agent{
+				LinterConfig: config.Linter{
+					Command: []string{"golangci-lint"},
+					Args:    []string{"run"},
+				},
+			},
+			goModDirs:   []string{"a", "b"},
+			wantCommand: []string{},
+			wantArgs:    []string{"cd a && go mod tidy && cd - \ncd b && go mod tidy && cd - \ngolangci-lint run"},
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.id, func(t *testing.T) {
+			got := wrapGoModTidy(tc.input, tc.goModDirs)
+			if !reflect.DeepEqual(got.LinterConfig.Command, tc.wantCommand) {
+				t.Errorf("wrapGoModTidy() = %v, want %v", got.LinterConfig.Command, tc.wantCommand)
+			}
+			if !reflect.DeepEqual(got.LinterConfig.Args, tc.wantArgs) {
+				t.Errorf("wrapGoModTidy() = %v, want %v", got.LinterConfig.Args, tc.wantArgs)
+			}
+		})
+	}
+}
