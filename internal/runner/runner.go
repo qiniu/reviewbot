@@ -30,8 +30,32 @@ func (*LocalRunner) Prepare(ctx context.Context, cfg *config.Linter) error {
 }
 
 func (*LocalRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadCloser, error) {
-	fullCommand := strings.Join(append(cfg.Command, cfg.Args...), " ")
-	c := exec.Command("/bin/sh", "-c", fullCommand)
+	cfg, err := cfg.Modifier.Modify(cfg)
+	if err != nil {
+		return nil, err
+	}
+	log.Infof("final config: %+v", cfg)
+
+	// construct the script content
+	scriptContent := "set -e\n"
+
+	// handle command
+	var shell []string
+	if len(cfg.Command) > 0 && (cfg.Command[0] == "/bin/bash" || cfg.Command[0] == "/bin/sh") {
+		shell = cfg.Command
+	} else {
+		shell = []string{"/bin/sh", "-c"}
+		if len(cfg.Command) > 0 {
+			scriptContent += strings.Join(cfg.Command, " ") + "\n"
+		}
+	}
+
+	// handle args
+	scriptContent += strings.Join(cfg.Args, " ")
+
+	log.Infof("Script content: \n%s", scriptContent)
+
+	c := exec.CommandContext(ctx, shell[0], append(shell[1:], scriptContent)...)
 	c.Dir = cfg.WorkDir
 
 	// create a temp dir for the artifact

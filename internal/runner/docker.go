@@ -61,11 +61,36 @@ func (r *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClos
 		return nil, err
 	}
 
+	cfg.Modifier = newGitConfigSafeDirModifier(cfg.Modifier)
+	cfg, err := cfg.Modifier.Modify(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	// construct the script content
+	scriptContent := "set -e\n"
+
+	// determine the entrypoint
+	var entrypoint []string
+	if len(cfg.Command) > 0 && (cfg.Command[0] == "/bin/bash" || cfg.Command[0] == "/bin/sh") {
+		entrypoint = cfg.Command // 使用 cfg 中指定的 shell
+	} else {
+		entrypoint = []string{"/bin/sh", "-c"}
+		if len(cfg.Command) > 0 {
+			scriptContent += strings.Join(cfg.Command, " ") + "\n"
+		}
+	}
+
+	// handle args
+	scriptContent += strings.Join(cfg.Args, " ")
+	log.Infof("Script content: \n%s", scriptContent)
+
 	var (
 		dockerConfig = &container.Config{
 			Image:      cfg.DockerAsRunner,
 			Env:        cfg.Env,
-			Entrypoint: []string{"/bin/sh", "-c"},
+			Entrypoint: entrypoint,
+			Cmd:        []string{scriptContent},
 			WorkingDir: cfg.WorkDir,
 		}
 		dockerHostConfig = &container.HostConfig{
@@ -73,15 +98,9 @@ func (r *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClos
 		}
 	)
 
-	// add git config so that git can work in the container
-	wrapperScript := fmt.Sprintf(`#!/bin/sh
-		git config --global --add safe.directory %s
-		%s %s
-		`, cfg.WorkDir, strings.Join(cfg.Command, " "), strings.Join(cfg.Args, " "))
+	log.Infof("Docker config: entrypoint: %v, cmd: %v, env: %v, working dir: %v",
+		dockerConfig.Entrypoint, dockerConfig.Cmd, dockerConfig.Env, dockerConfig.WorkingDir)
 
-	dockerConfig.Cmd = []string{wrapperScript}
-
-	log.Infof("run docker config, entrypoint: %v, cmd: %v, env: %v, working dir: %v", dockerConfig.Entrypoint, dockerConfig.Cmd, dockerConfig.Env, dockerConfig.WorkingDir)
 	resp, err := r.cli.ContainerCreate(ctx, dockerConfig, dockerHostConfig, nil, nil, "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create container: %w", err)
@@ -140,4 +159,27 @@ func (c *CleanLogReader) Read(p []byte) (int, error) {
 func (c *CleanLogReader) Close() error {
 	c.buffer = nil
 	return c.reader.Close()
+}
+
+type gitConfigSafeDirModifier struct {
+	next config.Modifier
+}
+
+func newGitConfigSafeDirModifier(next config.Modifier) config.Modifier {
+	return &gitConfigSafeDirModifier{next: next}
+}
+
+func (g *gitConfigSafeDirModifier) Modify(cfg *config.Linter) (*config.Linter, error) {
+	base, err := g.next.Modify(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	newCfg := base
+	args := []string{}
+	// add safe.directory to git config
+	args = append(args, fmt.Sprintf("git config --global --add safe.directory %s \n", cfg.WorkDir))
+	args = append(args, base.Args...)
+	newCfg.Args = args
+	return newCfg, nil
 }

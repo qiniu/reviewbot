@@ -65,6 +65,9 @@ type Linter struct {
 	// ConfigPath is the path of the linter config file.
 	// If not empty, use the config to run the linter.
 	ConfigPath string `json:"configPath,omitempty"`
+
+	// Modifier knowns how to modify the linter command.
+	Modifier Modifier
 }
 
 func (l Linter) String() string {
@@ -114,6 +117,7 @@ func NewConfig(conf string) (Config, error) {
 			return c, fmt.Errorf("java style check config file not found: %v", c.GlobalDefaultConfig.JavaStyleCheckRuleConfig)
 		}
 	}
+
 	return c, nil
 }
 
@@ -121,6 +125,7 @@ func (c Config) Get(org, repo, ln string) Linter {
 	linter := Linter{
 		Enable:       boolPtr(true),
 		ReportFormat: c.GlobalDefaultConfig.GithubReportType,
+		Modifier:     NewBaseModifier(),
 	}
 
 	// set golangci-lint config path if exists
@@ -200,4 +205,33 @@ const (
 
 func boolPtr(b bool) *bool {
 	return &b
+}
+
+// Modifier defines the interface for modifying the linter command.
+type Modifier interface {
+	Modify(cfg *Linter) (*Linter, error)
+}
+
+type baseModifier struct{}
+
+// NewBaseModifier returns a base modifier.
+func NewBaseModifier() Modifier {
+	return &baseModifier{}
+}
+
+func (*baseModifier) Modify(cfg *Linter) (*Linter, error) {
+	// type: /bin/sh -c --
+	if len(cfg.Command) > 0 {
+		if cfg.Command[0] == "/bin/bash" || cfg.Command[0] == "/bin/sh" {
+			return cfg, nil
+		}
+	}
+
+	// TODO(CarlJi): other scenarios?
+
+	newCfg := *cfg
+	newCfg.Args = append(cfg.Command, cfg.Args...)
+	newCfg.Command = []string{"/bin/sh", "-c", "--"}
+
+	return &newCfg, nil
 }
