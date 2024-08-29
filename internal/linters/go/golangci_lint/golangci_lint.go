@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/google/go-github/v57/github"
+	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/x/xlog"
@@ -43,22 +44,36 @@ func golangciLintHandler(log *xlog.Logger, a linters.Agent) error {
 		return linters.GeneralHandler(log, a, linters.ExecRun, parser)
 	}
 
-	var outputs []byte
-	runFn := func(a linters.Agent) ([]byte, error) {
-		// run golangci-lint for each go.mod directory
-		for _, goModDir := range goModDirs {
-			a.LinterConfig.WorkDir = goModDir
-			execGoModTidy(log, a.LinterConfig.WorkDir)
-			output, err := linters.ExecRun(a)
-			if err != nil {
-				log.Warnf("golangci-lint run with exit code: %v, mark and continue", err)
-			}
-			outputs = append(outputs, output...)
-		}
-		return outputs, nil
+	a.LinterConfig.Modifier = newGoModTidyBuilder(a.LinterConfig.Modifier, goModDirs)
+	return linters.GeneralHandler(log, a, linters.ExecRun, parser)
+}
+
+type goModTidyModifier struct {
+	next      config.Modifier
+	goModDirs []string
+}
+
+func newGoModTidyBuilder(next config.Modifier, goModDirs []string) config.Modifier {
+	return &goModTidyModifier{
+		next:      next,
+		goModDirs: goModDirs,
+	}
+}
+
+func (b *goModTidyModifier) Modify(cfg *config.Linter) (*config.Linter, error) {
+	base, err := b.next.Modify(cfg)
+	if err != nil {
+		return nil, err
 	}
 
-	return linters.GeneralHandler(log, a, runFn, parser)
+	newCfg := base
+	args := []string{}
+	for _, dir := range b.goModDirs {
+		args = append(args, fmt.Sprintf("cd %s && go mod tidy && cd - \n", dir))
+	}
+
+	newCfg.Args = append(args, base.Args...)
+	return newCfg, nil
 }
 
 func parser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, []string) {

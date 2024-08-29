@@ -227,6 +227,7 @@ func TestExecRun(t *testing.T) {
 	for _, tc := range tcs {
 		t.Run(tc.id, func(t *testing.T) {
 			tc.input.Runner = runner.NewLocalRunner()
+			tc.input.LinterConfig.Modifier = config.NewBaseModifier()
 			output, err := ExecRun(tc.input)
 			if !errors.Is(err, tc.err) {
 				t.Errorf("expected: %v, got: %v", tc.err, err)

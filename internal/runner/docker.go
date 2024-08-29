@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -15,13 +16,16 @@ import (
 )
 
 type DockerRunner struct {
-	cli *client.Client
+	cli DockerClientInterface
 }
 
-func NewDockerRunner() (Runner, error) {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	if err != nil {
-		return nil, err
+func NewDockerRunner(cli DockerClientInterface) (Runner, error) {
+	if cli == nil {
+		var err error
+		cli, err = client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+		if err != nil {
+			return nil, err
+		}
 	}
 	return &DockerRunner{cli: cli}, nil
 }
@@ -60,11 +64,36 @@ func (r *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClos
 		return nil, err
 	}
 
+	cfg.Modifier = newGitConfigSafeDirModifier(cfg.Modifier)
+	cfg, err := cfg.Modifier.Modify(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	// construct the script content
+	scriptContent := "set -e\n"
+
+	// determine the entrypoint
+	var entrypoint []string
+	if len(cfg.Command) > 0 && (cfg.Command[0] == "/bin/bash" || cfg.Command[0] == "/bin/sh") {
+		entrypoint = cfg.Command // 使用 cfg 中指定的 shell
+	} else {
+		entrypoint = []string{"/bin/sh", "-c"}
+		if len(cfg.Command) > 0 {
+			scriptContent += strings.Join(cfg.Command, " ") + "\n"
+		}
+	}
+
+	// handle args
+	scriptContent += strings.Join(cfg.Args, " ")
+	log.Infof("Script content: \n%s", scriptContent)
+
 	var (
 		dockerConfig = &container.Config{
 			Image:      cfg.DockerAsRunner,
 			Env:        cfg.Env,
-			Entrypoint: []string{"/bin/sh", "-c"},
+			Entrypoint: entrypoint,
+			Cmd:        []string{scriptContent},
 			WorkingDir: cfg.WorkDir,
 		}
 		dockerHostConfig = &container.HostConfig{
@@ -72,14 +101,10 @@ func (r *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClos
 		}
 	)
 
-	// add git config so that git can work in the container
-	wrapperScript := fmt.Sprintf(`#!/bin/sh
-		git config --global --add safe.directory %s
-		%s %s
-		`, cfg.WorkDir, strings.Join(cfg.Command, " "), strings.Join(cfg.Args, " "))
+	log.Infof("Docker config: entrypoint: %v, cmd: %v, env: %v, working dir: %v",
+		dockerConfig.Entrypoint, dockerConfig.Cmd, dockerConfig.Env, dockerConfig.WorkingDir)
 
-	dockerConfig.Cmd = []string{wrapperScript}
-
+	// TODO(Carl): support artifact env?
 	resp, err := r.cli.ContainerCreate(ctx, dockerConfig, dockerHostConfig, nil, nil, "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create container: %w", err)
@@ -94,7 +119,71 @@ func (r *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClos
 		ShowStdout: true,
 		ShowStderr: true,
 		Follow:     true,
+		Timestamps: false,
+		Details:    false,
+		Tail:       "all",
 	}
 
-	return r.cli.ContainerLogs(ctx, resp.ID, logOptions)
+	logReader, err := r.cli.ContainerLogs(ctx, resp.ID, logOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	// remove docker log header
+	cleanReader := NewCleanLogReader(logReader)
+	return cleanReader, nil
+}
+
+type CleanLogReader struct {
+	reader io.ReadCloser
+	buffer *bufio.Reader
+}
+
+func NewCleanLogReader(reader io.ReadCloser) *CleanLogReader {
+	return &CleanLogReader{
+		reader: reader,
+		buffer: bufio.NewReader(reader),
+	}
+}
+
+func (c *CleanLogReader) Read(p []byte) (int, error) {
+	line, err := c.buffer.ReadBytes('\n')
+	if err != nil && err != io.EOF {
+		return 0, err
+	}
+
+	if len(line) > 8 {
+		line = line[8:]
+	}
+
+	n := copy(p, line)
+	return n, err
+}
+
+func (c *CleanLogReader) Close() error {
+	c.buffer = nil
+	return c.reader.Close()
+}
+
+type gitConfigSafeDirModifier struct {
+	next config.Modifier
+}
+
+func newGitConfigSafeDirModifier(next config.Modifier) config.Modifier {
+	return &gitConfigSafeDirModifier{next: next}
+}
+
+func (g *gitConfigSafeDirModifier) Modify(cfg *config.Linter) (*config.Linter, error) {
+	base, err := g.next.Modify(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	newCfg := base
+	args := []string{}
+	// add safe.directory to git config
+	args = append(args, fmt.Sprintf("git config --global --add safe.directory %s \n", cfg.WorkDir))
+	args = append(args, base.Args...)
+	newCfg.Args = args
+	return newCfg, nil
 }
