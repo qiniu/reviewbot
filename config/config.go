@@ -224,6 +224,12 @@ func (*baseModifier) Modify(cfg *Linter) (*Linter, error) {
 	if len(cfg.Command) > 0 {
 		if cfg.Command[0] == "/bin/bash" || cfg.Command[0] == "/bin/sh" {
 			return cfg, nil
+		} else if cfg.Command[0] == "sh" {
+			cfg.Command[0] = "/bin/sh"
+			return cfg, nil
+		} else if cfg.Command[0] == "bash" {
+			cfg.Command[0] = "/bin/bash"
+			return cfg, nil
 		}
 	}
 

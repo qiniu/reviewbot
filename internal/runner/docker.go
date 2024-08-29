@@ -16,13 +16,16 @@ import (
 )
 
 type DockerRunner struct {
-	cli *client.Client
+	cli DockerClientInterface
 }
 
-func NewDockerRunner() (Runner, error) {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	if err != nil {
-		return nil, err
+func NewDockerRunner(cli DockerClientInterface) (Runner, error) {
+	if cli == nil {
+		var err error
+		cli, err = client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+		if err != nil {
+			return nil, err
+		}
 	}
 	return &DockerRunner{cli: cli}, nil
 }
@@ -101,6 +104,7 @@ func (r *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClos
 	log.Infof("Docker config: entrypoint: %v, cmd: %v, env: %v, working dir: %v",
 		dockerConfig.Entrypoint, dockerConfig.Cmd, dockerConfig.Env, dockerConfig.WorkingDir)
 
+	// TODO(Carl): support artifact env?
 	resp, err := r.cli.ContainerCreate(ctx, dockerConfig, dockerHostConfig, nil, nil, "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create container: %w", err)

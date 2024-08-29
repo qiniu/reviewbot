@@ -65,7 +65,7 @@ func (s *Server) initDockerRunner() {
 	}
 
 	if len(images) > 0 {
-		dockerRunner, err := runner.NewDockerRunner()
+		dockerRunner, err := runner.NewDockerRunner(nil)
 		if err != nil {
 			log.Fatalf("failed to init docker runner: %v", err)
 		}

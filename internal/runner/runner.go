@@ -9,6 +9,11 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/api/types/network"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/x/log"
 )
@@ -30,33 +35,33 @@ func (*LocalRunner) Prepare(ctx context.Context, cfg *config.Linter) error {
 }
 
 func (*LocalRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadCloser, error) {
-	cfg, err := cfg.Modifier.Modify(cfg)
+	newCfg, err := cfg.Modifier.Modify(cfg)
 	if err != nil {
 		return nil, err
 	}
-	log.Infof("final config: %+v", cfg)
+	log.Infof("final config: %v", newCfg)
 
 	// construct the script content
 	scriptContent := "set -e\n"
 
 	// handle command
 	var shell []string
-	if len(cfg.Command) > 0 && (cfg.Command[0] == "/bin/bash" || cfg.Command[0] == "/bin/sh") {
-		shell = cfg.Command
+	if len(newCfg.Command) > 0 && (newCfg.Command[0] == "/bin/bash" || newCfg.Command[0] == "/bin/sh") {
+		shell = newCfg.Command
 	} else {
 		shell = []string{"/bin/sh", "-c"}
-		if len(cfg.Command) > 0 {
-			scriptContent += strings.Join(cfg.Command, " ") + "\n"
+		if len(newCfg.Command) > 0 {
+			scriptContent += strings.Join(newCfg.Command, " ") + "\n"
 		}
 	}
 
 	// handle args
-	scriptContent += strings.Join(cfg.Args, " ")
+	scriptContent += strings.Join(newCfg.Args, " ")
 
 	log.Infof("Script content: \n%s", scriptContent)
 
 	c := exec.CommandContext(ctx, shell[0], append(shell[1:], scriptContent)...)
-	c.Dir = cfg.WorkDir
+	c.Dir = newCfg.WorkDir
 
 	// create a temp dir for the artifact
 	artifact, err := os.MkdirTemp("", "artifact")
@@ -65,7 +70,7 @@ func (*LocalRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadCloser,
 	}
 	defer os.RemoveAll(artifact)
 	c.Env = append(os.Environ(), fmt.Sprintf("ARTIFACT=%s", artifact))
-	c.Env = append(c.Env, cfg.Env...)
+	c.Env = append(c.Env, newCfg.Env...)
 
 	log.Infof("run command: %v, workDir: %v", c, c.Dir)
 	output, execErr := c.CombinedOutput()
@@ -105,4 +110,13 @@ func (*LocalRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadCloser,
 
 	// wrap the output to io.ReadCloser
 	return io.NopCloser(bytes.NewReader(output)), execErr
+}
+
+// for easy mock
+type DockerClientInterface interface {
+	ImageInspectWithRaw(ctx context.Context, imageID string) (types.ImageInspect, []byte, error)
+	ImagePull(ctx context.Context, refStr string, options image.PullOptions) (io.ReadCloser, error)
+	ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *ocispec.Platform, containerName string) (container.CreateResponse, error)
+	ContainerStart(ctx context.Context, containerID string, options container.StartOptions) error
+	ContainerLogs(ctx context.Context, container string, options container.LogsOptions) (io.ReadCloser, error)
 }
