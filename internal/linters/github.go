@@ -137,6 +137,11 @@ func CreateGithubChecks(ctx context.Context, a Agent, lintErrs map[string][]Lint
 	)
 
 	annotations := toGithubCheckRunAnnotations(lintErrs)
+	// limit the number of annotations to 50
+	// see: https://github.com/qiniu/reviewbot/issues/258
+	if len(annotations) > 50 {
+		annotations = annotations[:50]
+	}
 
 	check := github.CreateCheckRunOptions{
 		Name:      linterName,

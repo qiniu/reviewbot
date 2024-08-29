@@ -112,7 +112,7 @@ func (*LocalRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadCloser,
 	return io.NopCloser(bytes.NewReader(output)), execErr
 }
 
-// for easy mock
+// for easy mock.
 type DockerClientInterface interface {
 	ImageInspectWithRaw(ctx context.Context, imageID string) (types.ImageInspect, []byte, error)
 	ImagePull(ctx context.Context, refStr string, options image.PullOptions) (io.ReadCloser, error)
