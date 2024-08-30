@@ -6,6 +6,7 @@ require (
 	github.com/bradleyfalzon/ghinstallation/v2 v2.8.0
 	github.com/docker/docker v27.1.2+incompatible
 	github.com/google/go-github/v57 v57.0.0
+	github.com/google/uuid v1.6.0
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79
 	github.com/opencontainers/image-spec v1.1.0
 	github.com/prometheus/client_golang v1.19.0
