@@ -149,6 +149,9 @@ func GeneralHandler(log *xlog.Logger, a Agent, execRun func(a Agent) ([]byte, er
 	lintResults, unexpected := linterParser(log, output)
 	if len(unexpected) > 0 {
 		msg := lintersutil.LimitJoin(unexpected, 1000)
+		if msg == "" {
+			return nil
+		}
 		// just log the unexpected lines and notify the webhook, no need to return error
 		log.Warnf("unexpected lines: %v", msg)
 		metric.NotifyWebhookByText(ConstructUnknownMsg(linterName, a.PullRequestEvent.Repo.GetFullName(), a.PullRequestEvent.PullRequest.GetHTMLURL(), log.ReqId, msg))
