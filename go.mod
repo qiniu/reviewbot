@@ -9,7 +9,7 @@ require (
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79
 	github.com/opencontainers/image-spec v1.1.0
 	github.com/prometheus/client_golang v1.19.0
-	github.com/qiniu/x v1.13.2
+	github.com/qiniu/x v1.13.10
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
 	sigs.k8s.io/prow v0.0.0-20230209194617-a36077c30491
