@@ -1,8 +1,10 @@
 package luacheck
 
 import (
+	"context"
 	"strings"
 
+	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/x/xlog"
 )
@@ -15,7 +17,8 @@ func init() {
 	linters.RegisterLinterLanguages(linterName, []string{".lua"})
 }
 
-func luacheckHandler(log *xlog.Logger, a linters.Agent) error {
+func luacheckHandler(ctx context.Context, a linters.Agent) error {
+	log := xlog.New(ctx.Value(config.EventGUIDKey).(string))
 	if linters.IsEmpty(a.LinterConfig.Args...) {
 		// identify global variables for Redis and Nginx modules.
 		// disable the maximum line length check, which is no need.

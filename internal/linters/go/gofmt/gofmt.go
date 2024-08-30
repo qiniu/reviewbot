@@ -2,6 +2,7 @@ package gofmt
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"os/exec"
 	"regexp"
@@ -21,7 +22,8 @@ func init() {
 	linters.RegisterLinterLanguages(lintName, []string{".go"})
 }
 
-func gofmtHandler(log *xlog.Logger, a linters.Agent) error {
+func gofmtHandler(ctx context.Context, a linters.Agent) error {
+	log := xlog.New(ctx.Value(config.EventGUIDKey).(string))
 	if linters.IsEmpty(a.LinterConfig.Args...) {
 		a.LinterConfig.Args = append([]string{}, "-d", "./")
 	}

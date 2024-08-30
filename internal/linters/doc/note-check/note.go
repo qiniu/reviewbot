@@ -1,12 +1,14 @@
 package notecheck
 
 import (
+	"context"
 	"go/parser"
 	"go/token"
 	"path/filepath"
 	"regexp"
 	"strings"
 
+	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/x/log"
 	"github.com/qiniu/x/xlog"
@@ -25,7 +27,8 @@ func init() {
 // noteCheckHandler is the handler of the linter
 // Check the notes in the code to see if they comply with the standard rules from
 // https://pkg.go.dev/go/doc#Note
-func noteCheckHandler(log *xlog.Logger, a linters.Agent) error {
+func noteCheckHandler(ctx context.Context, a linters.Agent) error {
+	log := xlog.New(ctx.Value(config.EventGUIDKey).(string))
 	outputs := make(map[string][]linters.LinterOutput)
 
 	for _, file := range a.PullRequestChangedFiles {

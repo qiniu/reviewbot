@@ -15,7 +15,7 @@ import (
 	"github.com/docker/docker/api/types/network"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/qiniu/reviewbot/config"
-	"github.com/qiniu/x/log"
+	"github.com/qiniu/x/xlog"
 )
 
 type Runner interface {
@@ -24,7 +24,8 @@ type Runner interface {
 }
 
 // LocalRunner is a runner that runs the linter locally.
-type LocalRunner struct{}
+type LocalRunner struct {
+}
 
 func NewLocalRunner() Runner {
 	return &LocalRunner{}
@@ -34,7 +35,8 @@ func (*LocalRunner) Prepare(ctx context.Context, cfg *config.Linter) error {
 	return nil
 }
 
-func (*LocalRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadCloser, error) {
+func (l *LocalRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadCloser, error) {
+	log := xlog.New(ctx.Value(config.EventGUIDKey).(string))
 	newCfg, err := cfg.Modifier.Modify(cfg)
 	if err != nil {
 		return nil, err

@@ -241,3 +241,8 @@ func (*baseModifier) Modify(cfg *Linter) (*Linter, error) {
 
 	return &newCfg, nil
 }
+
+type contextKey string
+
+// EventGUIDKey is the key for the event GUID in the context.
+const EventGUIDKey contextKey = "event_guid"

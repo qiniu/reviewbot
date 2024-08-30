@@ -1,12 +1,14 @@
 package pmdcheck
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/x/errors"
@@ -25,7 +27,8 @@ func init() {
 	linters.RegisterLinterLanguages(linterName, []string{".java"})
 }
 
-func pmdCheckHandler(plog *xlog.Logger, a linters.Agent) error {
+func pmdCheckHandler(ctx context.Context, a linters.Agent) error {
+	plog := xlog.New(ctx.Value(config.EventGUIDKey).(string))
 	var javaFiles []string
 	rulePath := a.LinterConfig.ConfigPath
 	for _, arg := range a.PullRequestChangedFiles {
