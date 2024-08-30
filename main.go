@@ -17,6 +17,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"expvar"
 	"flag"
@@ -29,6 +30,7 @@ import (
 	"github.com/google/go-github/v57/github"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/qiniu/reviewbot/config"
+	"github.com/qiniu/reviewbot/internal/storage"
 	"github.com/qiniu/reviewbot/internal/version"
 	"github.com/qiniu/x/log"
 	"github.com/sirupsen/logrus"
@@ -150,6 +152,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.Handle("/", s)
+	mux.Handle("/view/", HandleView(storage.NewLocalStorage()))
 	mux.Handle("/metrics", promhttp.Handler())
 	log.Infof("listening on port %d", o.port)
 
@@ -171,4 +174,21 @@ func main() {
 	}()
 	// TODO(CarlJi): graceful shutdown
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", o.port), mux))
+}
+
+func HandleView(ls storage.Storage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		uri := r.URL.Path[len("/view/"):]
+		ctx := context.Background()
+		linterLog, err := ls.Reader(ctx, uri)
+
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Log not found: %v", err), http.StatusNotFound)
+			return
+		}
+
+		if _, err = w.Write(linterLog); err != nil {
+			log.Warnf("Error writing log, %v", err)
+		}
+	}
 }

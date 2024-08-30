@@ -28,10 +28,12 @@ import (
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v57/github"
+	"github.com/google/uuid"
 	"github.com/gregjones/httpcache"
 	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/reviewbot/internal/runner"
+	"github.com/qiniu/reviewbot/internal/storage"
 	"github.com/qiniu/x/log"
 	"github.com/qiniu/x/xlog"
 	gitv2 "sigs.k8s.io/prow/pkg/git/v2"
@@ -275,6 +277,27 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 			r = s.dockerRunner
 		}
 		agent.Runner = r
+
+		logStorageConfig := s.config.LogStorageConfig
+		if len(logStorageConfig.CustomRemoteConfigs) == 0 {
+			agent.LogStorage = storage.NewLocalStorage()
+		} else {
+			for remoteName, storageConfig := range logStorageConfig.CustomRemoteConfigs {
+				switch remoteName {
+				case "github":
+					agent.LogStorage = storage.NewGitubStorage(storageConfig.(config.GithubConfig))
+				default:
+					log.Warnf("%s was wrong storageType", remoteName)
+				}
+			}
+		}
+
+		agent.LinterUuid = uuid.New().String()
+		agent.LinterLogStoragePath = fmt.Sprintf("linter-logs/%s/%d/%s/log-build.txt", *agent.PullRequestEvent.Repo.Name, *agent.PullRequestEvent.Number, agent.LinterUuid)
+		agent.LinterLogViewUrl = "http://" + s.config.ServerAddr + "/view/" + agent.LinterLogStoragePath
+
+		// s.config.ServerAddr = "localhost:8888"
+		// log.Debugf("---------LinterLogViewUrl---------   : %s", agent.LinterLogViewUrl)
 
 		if err := fn(ctx, agent); err != nil {
 			log.Errorf("failed to run linter: %v", err)
