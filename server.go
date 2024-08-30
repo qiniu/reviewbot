@@ -126,6 +126,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				log.Errorf("process check run request event: %v", err)
 			}
 		}()
+	case *github.CheckSuiteEvent:
+		go func() {
+			if err := s.processCheckSuitEvent(log, event); err != nil {
+				log.Errorf("process check run request event: %v", err)
+			}
+		}()
 	default:
 		log.Debugf("skipping event type %s\n", github.WebHookType(r))
 	}
@@ -148,6 +154,18 @@ func (s *Server) processCheckRunRequestEvent(log *xlog.Logger, event *github.Che
 	pevent := github.PullRequestEvent{}
 	pevent.Repo = event.GetRepo()
 	pevent.PullRequest = event.GetCheckRun().PullRequests[0]
+	pevent.Installation = event.GetInstallation()
+	return s.handle(log, context.Background(), &pevent)
+}
+
+func (s *Server) processCheckSuitEvent(log *xlog.Logger, event *github.CheckSuiteEvent) error {
+	if event.GetAction() != "rerequested" {
+		log.Debugf("skipping action %s\n", event.GetAction())
+		return nil
+	}
+	pevent := github.PullRequestEvent{}
+	pevent.Repo = event.GetRepo()
+	pevent.PullRequest = event.GetCheckSuite().PullRequests[0]
 	pevent.Installation = event.GetInstallation()
 	return s.handle(log, context.Background(), &pevent)
 }
