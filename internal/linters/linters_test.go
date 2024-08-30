@@ -17,6 +17,7 @@
 package linters
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -228,6 +229,7 @@ func TestExecRun(t *testing.T) {
 		t.Run(tc.id, func(t *testing.T) {
 			tc.input.Runner = runner.NewLocalRunner()
 			tc.input.LinterConfig.Modifier = config.NewBaseModifier()
+			tc.input.Context = context.WithValue(context.Background(), config.EventGUIDKey, "test")
 			output, err := ExecRun(tc.input)
 			if !errors.Is(err, tc.err) {
 				t.Errorf("expected: %v, got: %v", tc.err, err)

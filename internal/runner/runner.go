@@ -27,7 +27,7 @@ type Runner interface {
 type LocalRunner struct {
 }
 
-func NewLocalRunner(l *xlog.Logger) Runner {
+func NewLocalRunner() Runner {
 	return &LocalRunner{}
 }
 

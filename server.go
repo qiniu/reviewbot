@@ -251,7 +251,7 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 			continue
 		}
 
-		r := runner.NewLocalRunner(log)
+		r := runner.NewLocalRunner()
 		if linterConfig.DockerAsRunner != "" {
 			r = s.dockerRunner
 		}
