@@ -96,6 +96,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		eventGUID = eventGUID[len(eventGUID)-12:]
 	}
 	ctx := context.WithValue(context.Background(), config.EventGUIDKey, eventGUID)
+	log := xlog.New(ctx.Value(config.EventGUIDKey).(string))
 
 	payload, err := github.ValidatePayload(r, s.webhookSecret)
 	if err != nil {
