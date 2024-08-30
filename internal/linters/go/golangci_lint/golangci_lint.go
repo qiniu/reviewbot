@@ -71,7 +71,7 @@ func (b *goModTidyModifier) Modify(cfg *config.Linter) (*config.Linter, error) {
 	newCfg := base
 	args := []string{}
 	for _, dir := range b.goModDirs {
-		args = append(args, fmt.Sprintf("pushd %s > /dev/null && go mod tidy && popd > /dev/null \n", dir))
+		args = append(args, fmt.Sprintf("cd %s > /dev/null && go mod tidy && cd - > /dev/null \n", dir))
 	}
 
 	newCfg.Args = append(args, base.Args...)
