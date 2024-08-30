@@ -12,7 +12,7 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/qiniu/reviewbot/config"
-	"github.com/qiniu/x/log"
+	"github.com/qiniu/x/xlog"
 )
 
 type DockerRunner struct {
@@ -56,6 +56,7 @@ func (r *DockerRunner) Prepare(ctx context.Context, cfg *config.Linter) error {
 }
 
 func (r *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadCloser, error) {
+	log := xlog.New(ctx.Value(config.EventGUIDKey).(string))
 	if cfg.DockerAsRunner == "" {
 		return nil, fmt.Errorf("docker image is not set")
 	}

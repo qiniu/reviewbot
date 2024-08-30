@@ -16,8 +16,10 @@ limitations under the License.
 package shellcheck
 
 import (
+	"context"
 	"strings"
 
+	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/reviewbot/internal/metric"
@@ -32,7 +34,8 @@ func init() {
 	linters.RegisterLinterLanguages(linterName, []string{".sh"})
 }
 
-func shellcheck(log *xlog.Logger, a linters.Agent) error {
+func shellcheck(ctx context.Context, a linters.Agent) error {
+	log := xlog.New(ctx.Value(config.EventGUIDKey).(string))
 	var shellFiles []string
 	for _, arg := range a.PullRequestChangedFiles {
 		if strings.HasSuffix(arg.GetFilename(), ".sh") {

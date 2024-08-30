@@ -2,6 +2,7 @@ package golangcilint
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -23,7 +24,8 @@ func init() {
 	linters.RegisterLinterLanguages(lintName, []string{".go"})
 }
 
-func golangciLintHandler(log *xlog.Logger, a linters.Agent) error {
+func golangciLintHandler(ctx context.Context, a linters.Agent) error {
+	log := xlog.New(ctx.Value(config.EventGUIDKey).(string))
 	var goModDirs []string
 	if len(a.LinterConfig.Command) == 0 || (len(a.LinterConfig.Command) == 1 && a.LinterConfig.Command[0] == lintName) {
 		// Default mode, automatically find the go.mod path in current repo
@@ -96,10 +98,10 @@ func parser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput,
 		// example: level=warning msg="[linters_context] copyloopvar: this linter is disabled because the Go version (1.18) of your project is lower than Go 1.22"
 		// the warning level log is not a real lint error, so we need to skip it
 		if strings.Contains(ex, "level=warning") {
-			log.Warnf("skip golangci-lint warning: %s", ex)
 			continue
 		}
 
+		// skip the go download log
 		if strings.Contains(ex, "go: downloading") {
 			continue
 		}

@@ -25,6 +25,7 @@ import (
 	"text/template"
 
 	"github.com/google/go-github/v57/github"
+	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/x/log"
 	"github.com/qiniu/x/xlog"
@@ -38,7 +39,7 @@ func init() {
 	linters.RegisterLinterLanguages(lintName, []string{"*"})
 }
 
-func commitMessageCheckHandler(log *xlog.Logger, a linters.Agent) error {
+func commitMessageCheckHandler(ctx context.Context, a linters.Agent) error {
 	var (
 		org    = a.PullRequestEvent.GetRepo().GetOwner().GetLogin()
 		repo   = a.PullRequestEvent.GetRepo().GetName()
@@ -59,7 +60,7 @@ func commitMessageCheckHandler(log *xlog.Logger, a linters.Agent) error {
 	var toComments []string
 	for _, rule := range rulers {
 		var cmt string
-		cmt, err := rule(log, commits)
+		cmt, err := rule(ctx, commits)
 		if err != nil {
 			return err
 		}
@@ -69,7 +70,7 @@ func commitMessageCheckHandler(log *xlog.Logger, a linters.Agent) error {
 		}
 	}
 
-	return handle(context.Background(), log, a, org, repo, author, number, toComments, existedComments)
+	return handle(ctx, a, org, repo, author, number, toComments, existedComments)
 }
 
 func listCommits(ctx context.Context, agent linters.Agent, org, repo string, number int) ([]*github.RepositoryCommit, error) {
@@ -126,7 +127,8 @@ type RebaseSuggestion struct {
 	TargetCommits []string
 }
 
-func handle(ctx context.Context, log *xlog.Logger, agent linters.Agent, org, repo, author string, number int, comments []string, existedComments []*github.IssueComment) error {
+func handle(ctx context.Context, agent linters.Agent, org, repo, author string, number int, comments []string, existedComments []*github.IssueComment) error {
+	log := xlog.New(ctx.Value(config.EventGUIDKey).(string))
 	data := struct {
 		Flag     string
 		Author   string
@@ -204,7 +206,7 @@ func handle(ctx context.Context, log *xlog.Logger, agent linters.Agent, org, rep
 // Ruler is a function to check if commit messages match some rules
 // The message returned via Ruler will be added as part of the comment
 // so, It's recommended to use template rulerTmpl to generate a unified format message
-type Ruler func(log *xlog.Logger, commits []*github.RepositoryCommit) (string, error)
+type Ruler func(ctx context.Context, commits []*github.RepositoryCommit) (string, error)
 
 const rulerTmpl = `
 ### {{.Header}}
@@ -223,7 +225,7 @@ var mergeMsgRegex = regexp.MustCompile(pattern)
 
 // RebaseCheckRule checks if there are merge commit messages or duplicate messages in the PR
 // If there are, it will return a suggestion message to do git rebase
-func rebaseCheck(log *xlog.Logger, commits []*github.RepositoryCommit) (string, error) {
+func rebaseCheck(ctx context.Context, commits []*github.RepositoryCommit) (string, error) {
 	var mergeTypeCommits []string
 	// filter out duplicated commit messages
 	msgs := make(map[string]int, 0)

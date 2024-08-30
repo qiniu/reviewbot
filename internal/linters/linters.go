@@ -41,7 +41,7 @@ var (
 )
 
 // PullRequestHandlerFunc knows how to handle a pull request event.
-type PullRequestHandlerFunc func(*xlog.Logger, Agent) error
+type PullRequestHandlerFunc func(context.Context, Agent) error
 
 // RegisterPullRequestHandler registers a PullRequestHandlerFunc for the given linter name.
 func RegisterPullRequestHandler(name string, handler PullRequestHandlerFunc) {
@@ -99,6 +99,8 @@ type LinterOutput struct {
 
 // Agent knows necessary information in order to run linters.
 type Agent struct {
+	// Context is the context of the agent.
+	Context context.Context
 	// Runner is the way to run the linter.	like docker, local, etc.
 	Runner runner.Runner
 	// GitHubClient is the GitHub client.
@@ -157,7 +159,7 @@ func GeneralHandler(log *xlog.Logger, a Agent, execRun func(a Agent) ([]byte, er
 
 // ExecRun executes a command.
 func ExecRun(a Agent) ([]byte, error) {
-	reader, err := a.Runner.Run(context.Background(), &a.LinterConfig)
+	reader, err := a.Runner.Run(a.Context, &a.LinterConfig)
 	if err != nil {
 		log.Warnf("failed to run linter: %v, mark and continue", err)
 	}

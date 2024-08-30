@@ -18,6 +18,9 @@
 package staticcheck
 
 import (
+	"context"
+
+	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/x/xlog"
 )
@@ -30,7 +33,8 @@ func init() {
 	linters.RegisterLinterLanguages(linterName, []string{".go"})
 }
 
-func staticcheckHandler(log *xlog.Logger, a linters.Agent) error {
+func staticcheckHandler(ctx context.Context, a linters.Agent) error {
+	log := xlog.New(ctx.Value(config.EventGUIDKey).(string))
 	if linters.IsEmpty(a.LinterConfig.Args...) {
 		// turn off compile errors by default
 		a.LinterConfig.Args = append([]string{}, "-debug.no-compile-errors=true", "./...")

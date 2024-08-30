@@ -1,6 +1,9 @@
 package cppcheck
 
 import (
+	"context"
+
+	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/x/xlog"
 )
@@ -14,7 +17,8 @@ func init() {
 	linters.RegisterLinterLanguages(linterName, []string{".c", ".cpp", ".h", ".hpp", ".cc", ".cxx", ".hxx", ".c++"})
 }
 
-func cppcheckHandler(log *xlog.Logger, a linters.Agent) error {
+func cppcheckHandler(ctx context.Context, a linters.Agent) error {
+	log := xlog.New(ctx.Value(config.EventGUIDKey).(string))
 	if linters.IsEmpty(a.LinterConfig.Args...) {
 		a.LinterConfig.Args = append([]string{}, "--quiet", "--template='{file}:{line}:{column}: {message}'", ".")
 	}

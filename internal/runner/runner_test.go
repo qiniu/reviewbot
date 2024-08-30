@@ -13,6 +13,7 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/runner"
+	"github.com/qiniu/x/xlog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -99,7 +100,7 @@ func TestLocalRunner(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			lr := runner.NewLocalRunner()
+			lr := runner.NewLocalRunner(xlog.New("test"))
 			output, err := lr.Run(context.Background(), tt.cfg)
 			if tt.wantErr {
 				assert.Error(t, err)

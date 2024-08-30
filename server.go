@@ -95,7 +95,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// limit the length of eventGUID to 12
 		eventGUID = eventGUID[len(eventGUID)-12:]
 	}
-	log := xlog.New(eventGUID)
+	ctx := context.WithValue(context.Background(), config.EventGUIDKey, eventGUID)
 
 	payload, err := github.ValidatePayload(r, s.webhookSecret)
 	if err != nil {
@@ -116,13 +116,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch event := event.(type) {
 	case *github.PullRequestEvent:
 		go func() {
-			if err := s.processPullRequestEvent(log, event); err != nil {
+			if err := s.processPullRequestEvent(ctx, event); err != nil {
 				log.Errorf("process pull request event: %v", err)
 			}
 		}()
 	case *github.CheckRunEvent:
 		go func() {
-			if err := s.processCheckRunRequestEvent(log, event); err != nil {
+			if err := s.processCheckRunRequestEvent(ctx, event); err != nil {
 				log.Errorf("process check run request event: %v", err)
 			}
 		}()
@@ -131,16 +131,16 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) processPullRequestEvent(log *xlog.Logger, event *github.PullRequestEvent) error {
+func (s *Server) processPullRequestEvent(ctx context.Context, event *github.PullRequestEvent) error {
 	if event.GetAction() != "opened" && event.GetAction() != "reopened" && event.GetAction() != "synchronize" {
 		log.Debugf("skipping action %s\n", event.GetAction())
 		return nil
 	}
 
-	return s.handle(log, context.Background(), event)
+	return s.handle(ctx, event)
 }
 
-func (s *Server) processCheckRunRequestEvent(log *xlog.Logger, event *github.CheckRunEvent) error {
+func (s *Server) processCheckRunRequestEvent(ctx context.Context, event *github.CheckRunEvent) error {
 	if event.GetAction() != "rerequested" {
 		log.Debugf("skipping action %s\n", event.GetAction())
 		return nil
@@ -149,16 +149,17 @@ func (s *Server) processCheckRunRequestEvent(log *xlog.Logger, event *github.Che
 	pevent.Repo = event.GetRepo()
 	pevent.PullRequest = event.GetCheckRun().PullRequests[0]
 	pevent.Installation = event.GetInstallation()
-	return s.handle(log, context.Background(), &pevent)
+	return s.handle(ctx, &pevent)
 }
 
-func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.PullRequestEvent) error {
+func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) error {
 	var (
 		num     = event.GetPullRequest().GetNumber()
 		org     = event.GetRepo().GetOwner().GetLogin()
 		repo    = event.GetRepo().GetName()
 		orgRepo = org + "/" + repo
 	)
+	log := xlog.New(ctx.Value(config.EventGUIDKey).(string))
 
 	installationID := event.GetInstallation().GetID()
 	log.Infof("processing pull request %d, (%v/%v), installationID: %d\n", num, org, repo, installationID)
@@ -242,6 +243,7 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 			PullRequestChangedFiles: pullRequestAffectedFiles,
 			LinterName:              name,
 			RepoDir:                 r.Directory(),
+			Context:                 ctx,
 		}
 
 		if !linters.LinterRelated(name, agent) {
@@ -249,13 +251,13 @@ func (s *Server) handle(log *xlog.Logger, ctx context.Context, event *github.Pul
 			continue
 		}
 
-		r := runner.NewLocalRunner()
+		r := runner.NewLocalRunner(log)
 		if linterConfig.DockerAsRunner != "" {
 			r = s.dockerRunner
 		}
 		agent.Runner = r
 
-		if err := fn(log, agent); err != nil {
+		if err := fn(ctx, agent); err != nil {
 			log.Errorf("failed to run linter: %v", err)
 			// continue to run other linters
 			continue
