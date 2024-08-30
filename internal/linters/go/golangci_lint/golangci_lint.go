@@ -100,6 +100,10 @@ func parser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput,
 			continue
 		}
 
+		if strings.Contains(ex, "go: downloading") {
+			continue
+		}
+
 		unexpected = append(unexpected, strings.TrimSpace(ex))
 	}
 

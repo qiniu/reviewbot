@@ -93,7 +93,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	eventGUID := github.DeliveryID(r)
 	if len(eventGUID) > 12 {
 		// limit the length of eventGUID to 12
-		eventGUID = eventGUID[:12]
+		eventGUID = eventGUID[len(eventGUID)-12:]
 	}
 	log := xlog.New(eventGUID)
 
