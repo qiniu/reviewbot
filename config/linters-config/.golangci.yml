@@ -1,5 +1,9 @@
 # 这是我们当前内部使用的配置文件，会基于实际的变化和我们的认知而迭代，仅供参考
 
+run:
+  # control the resource usage of golangci-lint to avoid OOM
+  concurrency: 4
+
 linters-settings:
   paralleltest:
     # Ignore missing calls to `t.Parallel()` and only report incorrect uses of it.
