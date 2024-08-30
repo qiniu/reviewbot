@@ -3,6 +3,7 @@ package lintersutil
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/qiniu/x/log"
 )
@@ -11,6 +12,10 @@ import (
 func LimitJoin(str []string, length int) string {
 	var result string
 	for _, s := range str {
+		if strings.TrimSpace(s) == "" {
+			continue
+		}
+
 		if len(result)+len(s) > length {
 			break
 		}
