@@ -102,7 +102,7 @@ func parser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput,
 		}
 
 		// skip the go download log
-		if strings.Contains(ex, "go: downloading") {
+		if strings.Contains(ex, "go: downloading") || strings.Contains(ex, "go: finding") {
 			continue
 		}
 
