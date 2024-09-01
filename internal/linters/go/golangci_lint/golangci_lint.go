@@ -102,7 +102,7 @@ func parser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput,
 		}
 
 		// skip the go download log
-		if strings.Contains(ex, "go: downloading") {
+		if strings.Contains(ex, "go: downloading") || strings.Contains(ex, "go: finding") {
 			continue
 		}
 
@@ -134,11 +134,12 @@ func argsApply(log *xlog.Logger, a linters.Agent) linters.Agent {
 	newArgs := []string{"run"}
 
 	var (
-		timeoutFlag   bool
-		parallelFlag  bool
-		outFormatFlag bool
-		printFlag     bool
-		configFlag    bool
+		timeoutFlag     bool
+		parallelFlag    bool
+		outFormatFlag   bool
+		printFlag       bool
+		configFlag      bool
+		concurrencyFlag bool
 	)
 
 	for _, arg := range legacyArgs {
@@ -154,13 +155,15 @@ func argsApply(log *xlog.Logger, a linters.Agent) linters.Agent {
 			printFlag = true
 		case strings.HasPrefix(arg, "--config"):
 			configFlag = true
+		case strings.HasPrefix(arg, "--concurrency"):
+			concurrencyFlag = true
 		}
 
 		newArgs = append(newArgs, arg)
 	}
 
 	if !timeoutFlag {
-		newArgs = append(newArgs, "--timeout=5m0s")
+		newArgs = append(newArgs, "--timeout=15m0s")
 	}
 	if !parallelFlag {
 		newArgs = append(newArgs, "--allow-parallel-runners=true")
@@ -170,6 +173,9 @@ func argsApply(log *xlog.Logger, a linters.Agent) linters.Agent {
 	}
 	if !printFlag {
 		newArgs = append(newArgs, "--print-issued-lines=false")
+	}
+	if !concurrencyFlag {
+		newArgs = append(newArgs, "--concurrency=8")
 	}
 	if !configFlag && config.ConfigPath != "" {
 		config.ConfigPath = configApply(log, a)

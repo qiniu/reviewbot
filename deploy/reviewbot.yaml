@@ -45,8 +45,8 @@ spec:
           imagePullPolicy: Always
           resources:
             requests:
-              memory: "8Gi"
-              cpu: "4"
+              memory: "10Gi"
+              cpu: "8"
           name: reviewbot
           ports:
             - containerPort: 8888

@@ -118,7 +118,7 @@ func TestArgs(t *testing.T) {
 				LinterConfig: config.Linter{
 					Enable:  &tp,
 					Command: []string{"golangci-lint"},
-					Args:    []string{"run", "--timeout=5m0s", "--allow-parallel-runners=true", "--out-format=line-number", "--print-issued-lines=false"},
+					Args:    []string{"run", "--timeout=15m0s", "--allow-parallel-runners=true", "--out-format=line-number", "--print-issued-lines=false", "--concurrency=8"},
 				},
 			},
 		},
@@ -135,7 +135,7 @@ func TestArgs(t *testing.T) {
 				LinterConfig: config.Linter{
 					Enable:  &tp,
 					Command: []string{"golangci-lint"},
-					Args:    []string{"run", "--timeout=10m", "--out-format=tab", "--config", "golangci-lint.yml", "--allow-parallel-runners=true", "--print-issued-lines=false"},
+					Args:    []string{"run", "--timeout=10m", "--out-format=tab", "--config", "golangci-lint.yml", "--allow-parallel-runners=true", "--print-issued-lines=false", "--concurrency=8"},
 				},
 			},
 		},
@@ -198,7 +198,7 @@ func TestArgs(t *testing.T) {
 				LinterConfig: config.Linter{
 					Enable:     &tp,
 					Command:    []string{"golangci-lint"},
-					Args:       []string{"run", "--timeout=5m0s", "--allow-parallel-runners=true", "--out-format=line-number", "--print-issued-lines=false", "--config", "config/golangci-lint.yml"},
+					Args:       []string{"run", "--timeout=15m0s", "--allow-parallel-runners=true", "--out-format=line-number", "--print-issued-lines=false", "--concurrency=8", "--config", "config/golangci-lint.yml"},
 					ConfigPath: "config/golangci-lint.yml",
 				},
 			},
