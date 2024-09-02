@@ -1,18 +1,15 @@
 package gomodcheck
 
 import (
-	"bufio"
 	"context"
 	"os"
-	"regexp"
-
 	"path/filepath"
 	"strings"
 
 	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
-
 	"github.com/qiniu/x/xlog"
+	"golang.org/x/mod/modfile"
 )
 
 var lintName = "gomodcheck"
@@ -36,45 +33,34 @@ func goModCheckHandler(ctx context.Context, a linters.Agent) error {
 func goModCheckOutput(log *xlog.Logger, a linters.Agent) (map[string][]linters.LinterOutput, error) {
 	output := make(map[string][]linters.LinterOutput)
 	for _, file := range a.PullRequestChangedFiles {
-		if filepath.Ext(file.GetFilename()) != ".mod" {
+		fName := file.GetFilename()
+		if !strings.HasSuffix(fName, "go.mod") {
 			continue
 		}
 
-		replaceRegex := regexp.MustCompile(`^replace\s+([^\s]+)\s+=>\s+([^\s]+)`)
-		goModPath := filepath.Join(a.RepoDir, file.GetFilename())
-		file, err := os.Open(goModPath)
+		goModPath := filepath.Join(a.RepoDir, fName)
+		file, err := os.ReadFile(goModPath)
 		if err != nil {
 			log.Errorf("Error opening %s: %s", goModPath, err)
-			continue
+			return output, err
 		}
-		defer file.Close()
 
-		scanner := bufio.NewScanner(file)
-		lineNumber := 0
-		filename := strings.TrimPrefix(goModPath, a.RepoDir+"/")
-		msg := "It is not recommended to use `replace ../xxx` to specify dependency "
+		mod, err := modfile.Parse("go.mod", file, nil)
+		if err != nil {
+			log.Errorf("Error parsing %s: %s", goModPath, err)
+			return output, err
+		}
 
-		for scanner.Scan() {
-			lineNumber++
-			line := scanner.Text()
-			if matches := replaceRegex.FindStringSubmatch(line); len(matches) > 0 {
-				replacementPath := matches[2]
-				if strings.HasPrefix(replacementPath, "../") {
-					output[filename] = append(output[filename], linters.LinterOutput{
-						File:    filename,
-						Line:    lineNumber,
-						Column:  1,
-						Message: msg,
-					})
-				}
+		for _, replace := range mod.Replace {
+			if strings.HasPrefix(replace.New.Path, "../") {
+				output[fName] = append(output[fName], linters.LinterOutput{
+					File:    fName,
+					Line:    replace.Syntax.Start.Line,
+					Column:  replace.Syntax.Start.LineRune,
+					Message: "cross-repository local replacement are not allowed[reviewbot]\nfor more information see https://github.com/qiniu/reviewbot/issues/275",
+				})
 			}
 		}
-
-		if err := scanner.Err(); err != nil {
-			log.Errorf("Error reading go.mod: %s", err)
-			continue
-		}
-
 	}
 
 	return output, nil

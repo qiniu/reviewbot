@@ -12,6 +12,7 @@ require (
 	github.com/qiniu/x v1.13.10
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
+	golang.org/x/mod v0.10.0
 	sigs.k8s.io/prow v0.0.0-20230209194617-a36077c30491
 	sigs.k8s.io/yaml v1.4.0
 )
@@ -48,7 +49,6 @@ require (
 	go.opentelemetry.io/otel/metric v1.29.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.29.0 // indirect
 	go.opentelemetry.io/otel/trace v1.29.0 // indirect
-	golang.org/x/mod v0.10.0 // indirect
 	golang.org/x/sys v0.24.0 // indirect
 	golang.org/x/tools v0.9.3 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
