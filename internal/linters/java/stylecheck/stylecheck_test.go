@@ -47,7 +47,7 @@ func TestArgs(t *testing.T) {
 				LinterConfig: config.Linter{
 					Enable:  &tp,
 					Command: []string{"java"},
-					Args:    []string{"-f", "plain"},
+					Args:    []string{""},
 				},
 			},
 		},
@@ -63,7 +63,7 @@ func TestArgs(t *testing.T) {
 				LinterConfig: config.Linter{
 					Enable:  &tp,
 					Command: []string{"/usr/java"},
-					Args:    []string{"-f", "plain"},
+					Args:    []string{""},
 				},
 			},
 		},
