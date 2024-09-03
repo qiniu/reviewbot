@@ -23,6 +23,8 @@ linters-settings:
         arguments: [30]
       - name: add-constant
         disabled: true
+      - name: max-public-structs
+        disabled: true
 
 issues:
   exclude-rules:
@@ -58,4 +60,4 @@ linters:
     - ireturn # seems too arbitrary. also see: https://github.com/go-proverbs/go-proverbs.github.io/issues/37
     - godox # seems too arbitrary
     - err113 # seems too arbitrary
-
+    - gochecknoinits # see too many false positives
