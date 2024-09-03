@@ -166,7 +166,7 @@ func (s *Server) processCheckSuiteEvent(ctx context.Context, event *github.Check
 	}
 	pevent := github.PullRequestEvent{}
 	pevent.Repo = event.GetRepo()
-	log.Debugf("PullRequests length:%s,HeadSha: %s,checksuite id:%s\n", len(event.GetCheckSuite().PullRequests), event.GetCheckSuite().HeadSHA, event.GetCheckSuite().ID)
+	log.Debugf("PullRequests length:%d,HeadSha: %v,checksuite id:%d,checksuit url: %v\n", len(event.GetCheckSuite().PullRequests), event.GetCheckSuite().HeadSHA, event.GetCheckSuite().ID, event.GetCheckSuite().URL)
 	pevent.PullRequest = event.GetCheckSuite().PullRequests[0]
 	pevent.Installation = event.GetInstallation()
 	return s.handle(ctx, &pevent)
