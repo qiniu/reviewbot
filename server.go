@@ -162,9 +162,23 @@ func (s *Server) processCheckRunRequestEvent(ctx context.Context, event *github.
 		log.Debugf("skipping action %s\n", event.GetAction())
 		return nil
 	}
+	headSha := event.GetCheckRun().GetHeadSHA()
+	org := event.GetRepo().GetOwner().GetLogin()
+	repo := event.GetRepo().GetName()
+	installationID := event.GetInstallation().GetID()
+	plist, err := linters.FilterPullRequestsWithCommit(ctx, s.GithubClient(installationID), org, repo, headSha)
+	if err != nil {
+		log.Errorf("Filter pullreqeust fail  %v\n", err)
+		return nil
+	}
+	if len(plist) == 0 {
+		log.Errorf("Filter pullreqeust emmpty  ")
+		return nil
+	}
 	pevent := github.PullRequestEvent{}
 	pevent.Repo = event.GetRepo()
-	pevent.PullRequest = event.GetCheckRun().PullRequests[0]
+	pevent.PullRequest = plist[0]
+	pevent.Number = plist[0].Number
 	pevent.Installation = event.GetInstallation()
 	return s.handle(ctx, &pevent)
 }
@@ -174,9 +188,20 @@ func (s *Server) processCheckSuiteEvent(ctx context.Context, event *github.Check
 		log.Debugf("skipping action %s\n", event.GetAction())
 		return nil
 	}
+	headSha := event.GetCheckSuite().GetHeadSHA()
+	event.GetCheckSuite()
+	org := event.GetRepo().GetOwner().GetLogin()
+	repo := event.GetRepo().GetName()
+	installationID := event.GetInstallation().GetID()
+	plist, err := linters.FilterPullRequestsWithCommit(ctx, s.GithubClient(installationID), org, repo, headSha)
+	if err != nil {
+		log.Errorf("Filter pullreqeust fail  %v\n", err)
+		return nil
+	}
 	pevent := github.PullRequestEvent{}
 	pevent.Repo = event.GetRepo()
-	pevent.PullRequest = event.GetCheckSuite().PullRequests[0]
+	pevent.Number = plist[0].Number
+	pevent.PullRequest = plist[0]
 	pevent.Installation = event.GetInstallation()
 	return s.handle(ctx, &pevent)
 }
