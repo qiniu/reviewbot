@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/qiniu/reviewbot/config"
@@ -49,9 +50,19 @@ func goModCheckOutput(log *xlog.Logger, a linters.Agent) (map[string][]linters.L
 			log.Errorf("Error parsing %s: %s", goModPath, err)
 			return output, err
 		}
+		re := regexp.MustCompile(`^(?:\.\./)+`)
 
 		for _, replace := range mod.Replace {
-			if strings.HasPrefix(replace.New.Path, "../") {
+			var parsePath string
+			matches := re.FindString(replace.New.Path)
+			if matches != "" {
+				parsePath = filepath.Join(filepath.Dir(goModPath), matches)
+			}
+			isSub, err := isSubdirectory(a.RepoDir, parsePath)
+			if err != nil {
+				log.Errorf("failed to compare whether A is a subdirectory of B : %v", err)
+			}
+			if !isSub {
 				output[fName] = append(output[fName], linters.LinterOutput{
 					File:    fName,
 					Line:    replace.Syntax.Start.Line,
@@ -63,4 +74,18 @@ func goModCheckOutput(log *xlog.Logger, a linters.Agent) (map[string][]linters.L
 	}
 
 	return output, nil
+}
+
+// isSubdirectory reports whether the string b is subdirectory of a.
+func isSubdirectory(a, b string) (bool, error) {
+	absA, err := filepath.Abs(a)
+	if err != nil {
+		return false, err
+	}
+	absB, err := filepath.Abs(b)
+	if err != nil {
+		return false, err
+	}
+
+	return strings.HasPrefix(absB, absA), nil
 }
