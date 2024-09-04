@@ -38,13 +38,23 @@ type GlobalConfig struct {
 	JavaStyleCheckRuleConfig string `json:"javastylecheckruleConfig,omitempty"`
 }
 
+type LogStorageConfig struct {
+	CustomRemoteConfigs map[string]any `json:"customRemoteConfigs"`
+}
+
+type GithubConfig struct{}
+
+type DockerAsRunner struct {
+	Image                string `json:"image,omitempty"`
+	CopyLinterFromOrigin bool   `json:"copylinterFromOrigin,omitempty"`
+}
 type Linter struct {
 	// Enable is whether to enable this linter, if false, linter still run but not report.
 	Enable *bool `json:"enable,omitempty"`
 	// DockerAsRunner is the docker image to run the linter.
 	// Optional, if not empty, use the docker image to run the linter.
 	// e.g. "golang:1.23.4"
-	DockerAsRunner string `json:"dockerAsRunner,omitempty"`
+	DockerAsRunner DockerAsRunner `json:"dockerAsRunner,omitempty"`
 	// WorkDir is the working directory of the linter.
 	WorkDir string `json:"workDir,omitempty"`
 	// Command is the command to run the linter. e.g. "golangci-lint", "staticcheck"
@@ -186,7 +196,7 @@ func applyCustomConfig(legacy, custom Linter) Linter {
 		legacy.ConfigPath = custom.ConfigPath
 	}
 
-	if custom.DockerAsRunner != "" {
+	if custom.DockerAsRunner != (DockerAsRunner{}) {
 		legacy.DockerAsRunner = custom.DockerAsRunner
 	}
 
