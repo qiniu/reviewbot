@@ -100,10 +100,12 @@ type LinterOutput struct {
 
 // Agent knows necessary information in order to run linters.
 type Agent struct {
+	// ID each linter execution has a unique id.
+	ID string
 	// Context is the context of the agent.
 	Context context.Context
-	// LogStorages is the way to contral log storage
-	LogStorage storage.Storage
+	// Storage knows how to store and retrieve the linter logs.
+	Storage storage.Storage
 	// Runner is the way to run the linter.	like docker, local, etc.
 	Runner runner.Runner
 	// GitHubClient is the GitHub client.
@@ -120,12 +122,11 @@ type Agent struct {
 	LinterName string
 	// RepoDir is the repo directory.
 	RepoDir string
-	// LinterUuid is the uinque id of onece linter exec .
-	LinterUuid string
-	// LinterLogStoragePath is the path of log storage
-	LinterLogStoragePath string
-	// LinterLogStoragePath is the path of log storage
-	LinterLogViewUrl string
+
+	// GenLogKey generates the log key.
+	GenLogKey func() string
+	// GenLogViewUrl generates the log view url.
+	GenLogViewUrl func() string
 }
 
 const CommentFooter = `
@@ -181,12 +182,9 @@ func ExecRun(a Agent) ([]byte, error) {
 		return nil, fmt.Errorf("failed to read linter output: %w", err)
 	}
 
-	ctx := context.Background()
-	err = a.LogStorage.Writer(ctx, a.LinterLogStoragePath, output)
+	err = a.Storage.Write(a.Context, a.GenLogKey(), output)
 	if err != nil {
 		log.Errorf("write to storage was failed %v", err)
-	} else {
-		log.Info("write to storage was successful")
 	}
 
 	return output, nil

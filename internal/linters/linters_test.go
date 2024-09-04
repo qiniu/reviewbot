@@ -20,11 +20,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"testing"
 
 	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/runner"
+	"github.com/qiniu/reviewbot/internal/storage"
 	"github.com/qiniu/x/xlog"
 )
 
@@ -227,6 +229,12 @@ func TestExecRun(t *testing.T) {
 	}
 	for _, tc := range tcs {
 		t.Run(tc.id, func(t *testing.T) {
+			storage, err := storage.NewLocalStorage(os.TempDir())
+			if err != nil {
+				t.Errorf("failed to create local storage: %v", err)
+			}
+			tc.input.Storage = storage
+			tc.input.GenLogKey = func() string { return "test" }
 			tc.input.Runner = runner.NewLocalRunner()
 			tc.input.LinterConfig.Modifier = config.NewBaseModifier()
 			tc.input.Context = context.WithValue(context.Background(), config.EventGUIDKey, "test")

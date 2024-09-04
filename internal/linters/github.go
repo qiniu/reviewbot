@@ -153,9 +153,15 @@ func CreateGithubChecks(ctx context.Context, a Agent, lintErrs map[string][]Lint
 		},
 		Output: &github.CheckRunOutput{
 			Title:       github.String(fmt.Sprintf("%s found %d issues related to your changes", linterName, len(annotations))),
-			Summary:     github.String(fmt.Sprintf("[full log ](%s)\n", a.LinterLogViewUrl) + Reference),
 			Annotations: annotations,
 		},
+	}
+
+	logURL := a.GenLogViewUrl()
+	if logURL == "" {
+		check.Output.Summary = github.String(Reference)
+	} else {
+		check.Output.Summary = github.String(fmt.Sprintf("[full log ](%s)\n", logURL) + Reference)
 	}
 
 	if len(annotations) > 0 {
