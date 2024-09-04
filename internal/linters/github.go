@@ -52,6 +52,30 @@ func ListPullRequestsFiles(ctx context.Context, gc *github.Client, owner string,
 	}
 }
 
+// FilterPullRequests filter full request by commit.
+func FilterPullRequestsWithCommit(ctx context.Context, gc *github.Client, owner string, repo string, headSha string) ([]*github.PullRequest, error) {
+	plopt := github.PullRequestListOptions{
+		ListOptions: github.ListOptions{
+			PerPage: 60,
+		},
+	}
+	var repullRequests []*github.PullRequest
+	pullRequests, response, err := gc.PullRequests.List(ctx, owner, repo, &plopt)
+	defer response.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+	if response.StatusCode != 200 {
+		return nil, fmt.Errorf("Filter pull request failed: %v", github.Stringify(response.Body))
+	}
+	for _, pullRequest := range pullRequests {
+		if *pullRequest.Head.SHA == headSha {
+			repullRequests = append(repullRequests, pullRequest)
+		}
+	}
+	return repullRequests, nil
+}
+
 // ListPullRequestsComments lists all comments on the specified pull request.
 // TODO(CarlJi): add pagination support.
 func ListPullRequestsComments(ctx context.Context, gc *github.Client, owner string, repo string, number int) ([]*github.PullRequestComment, error) {
@@ -142,7 +166,6 @@ func CreateGithubChecks(ctx context.Context, a Agent, lintErrs map[string][]Lint
 	if len(annotations) > 50 {
 		annotations = annotations[:50]
 	}
-
 	check := github.CreateCheckRunOptions{
 		Name:      linterName,
 		HeadSHA:   headSha,
