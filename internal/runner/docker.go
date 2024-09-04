@@ -2,10 +2,12 @@ package runner
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/docker/docker/api/types/container"
@@ -37,11 +39,11 @@ func (r *DockerRunner) GetFinalScript() string {
 
 // Prepare will pull the docker image if it is not exist.
 func (r *DockerRunner) Prepare(ctx context.Context, cfg *config.Linter) error {
-	if cfg.DockerAsRunner == "" {
+	if cfg.DockerAsRunner.Image == "" {
 		return nil
 	}
 
-	_, _, err := r.cli.ImageInspectWithRaw(ctx, cfg.DockerAsRunner)
+	_, _, err := r.cli.ImageInspectWithRaw(ctx, cfg.DockerAsRunner.Image)
 	if err == nil {
 		return nil
 	}
@@ -49,7 +51,7 @@ func (r *DockerRunner) Prepare(ctx context.Context, cfg *config.Linter) error {
 		return fmt.Errorf("failed to inspect image: %w", err)
 	}
 
-	reader, err := r.cli.ImagePull(ctx, cfg.DockerAsRunner, image.PullOptions{})
+	reader, err := r.cli.ImagePull(ctx, cfg.DockerAsRunner.Image, image.PullOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to pull image: %w", err)
 	}
@@ -62,7 +64,7 @@ func (r *DockerRunner) Prepare(ctx context.Context, cfg *config.Linter) error {
 
 func (r *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadCloser, error) {
 	log := xlog.New(ctx.Value(config.EventGUIDKey).(string))
-	if cfg.DockerAsRunner == "" {
+	if cfg.DockerAsRunner.Image == "" {
 		return nil, fmt.Errorf("docker image is not set")
 	}
 
@@ -97,7 +99,7 @@ func (r *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClos
 
 	var (
 		dockerConfig = &container.Config{
-			Image:      cfg.DockerAsRunner,
+			Image:      cfg.DockerAsRunner.Image,
 			Env:        cfg.Env,
 			Entrypoint: entrypoint,
 			Cmd:        []string{scriptContent},
@@ -116,8 +118,24 @@ func (r *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClos
 	if err != nil {
 		return nil, fmt.Errorf("failed to create container: %w", err)
 	}
-
 	log.Infof("container created: %v", resp.ID)
+
+	cmd := exec.Command("which", lintername)
+	output, err := cmd.Output()
+	linterOrignPath := string(output)
+	if err != nil {
+		log.Errorf("failed to find %s :%v", lintername, err)
+	}
+	binaryData, err := os.ReadFile(linterOrignPath)
+	if err != nil {
+		log.Errorf("%v", err)
+	}
+	reader := bytes.NewReader(binaryData)
+	err = r.cli.CopyToContainer(context.Background(), resp.ID, linterOrignPath, reader, container.CopyToContainerOptions{})
+	if err != nil {
+		log.Errorf("%v", err)
+	}
+
 	if err := r.cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
 		return nil, fmt.Errorf("failed to start container: %w", err)
 	}
