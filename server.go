@@ -65,8 +65,8 @@ func (s *Server) initDockerRunner() {
 	var images []string
 	for _, customConfig := range s.config.CustomConfig {
 		for _, linter := range customConfig {
-			if linter.DockerAsRunner != "" {
-				images = append(images, linter.DockerAsRunner)
+			if linter.DockerAsRunner.Image != "" {
+				images = append(images, linter.DockerAsRunner.Image)
 			}
 		}
 	}
@@ -88,7 +88,11 @@ func (s *Server) initDockerRunner() {
 		ctx := context.Background()
 		for _, image := range images {
 			log.Infof("pulling image %s", image)
-			linterConfig := &config.Linter{DockerAsRunner: image}
+			linterConfig := &config.Linter{
+				DockerAsRunner: config.DockerAsRunner{
+					Image: image,
+				},
+			}
 			if err := s.dockerRunner.Prepare(ctx, linterConfig); err != nil {
 				log.Errorf("failed to pull image %s: %v", image, err)
 			}
@@ -278,7 +282,7 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 		}
 
 		r := runner.NewLocalRunner()
-		if linterConfig.DockerAsRunner != "" {
+		if linterConfig.DockerAsRunner.Image != "" {
 			r = s.dockerRunner
 		}
 		agent.Runner = r
