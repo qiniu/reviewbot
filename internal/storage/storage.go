@@ -3,7 +3,13 @@ package storage
 import "context"
 
 type Storage interface {
-	Writer(ctx context.Context, path string, content []byte) error
+	// Write writes the content to the specified key.
+	Write(ctx context.Context, key string, content []byte) error
 
-	Reader(ctx context.Context, path string) ([]byte, error)
+	// Read reads the content from the specified key.
+	Read(ctx context.Context, key string) ([]byte, error)
 }
+
+const (
+	DefaultLogName = "log.txt"
+)

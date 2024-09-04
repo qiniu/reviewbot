@@ -18,14 +18,17 @@ import (
 	"github.com/qiniu/x/xlog"
 )
 
+// Runner defines the interface for how to run the linter.
 type Runner interface {
+	// Prepare prepares the linter for running.
 	Prepare(ctx context.Context, cfg *config.Linter) error
+
+	// Run runs the linter and returns the output.
 	Run(ctx context.Context, cfg *config.Linter) (io.ReadCloser, error)
 }
 
 // LocalRunner is a runner that runs the linter locally.
-type LocalRunner struct {
-}
+type LocalRunner struct{}
 
 func NewLocalRunner() Runner {
 	return &LocalRunner{}

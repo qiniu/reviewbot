@@ -43,7 +43,12 @@ type Server struct {
 	gitClientFactory gitv2.ClientFactory
 	config           config.Config
 
+	// server addr which is used to generate the log view url
+	// e.g. https://domain
+	serverAddr string
+
 	dockerRunner runner.Runner
+	storage      storage.Storage
 
 	webhookSecret []byte
 
@@ -102,7 +107,6 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	payload, err := github.ValidatePayload(r, s.webhookSecret)
 	if err != nil {
-		log.Errorf("validate payload failed: %v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -265,6 +269,7 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 			LinterName:              name,
 			RepoDir:                 r.Directory(),
 			Context:                 ctx,
+			ID:                      uuid.New().String(),
 		}
 
 		if !linters.LinterRelated(name, agent) {
@@ -277,27 +282,17 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 			r = s.dockerRunner
 		}
 		agent.Runner = r
-
-		logStorageConfig := s.config.LogStorageConfig
-		if len(logStorageConfig.CustomRemoteConfigs) == 0 {
-			agent.LogStorage = storage.NewLocalStorage()
-		} else {
-			for remoteName, storageConfig := range logStorageConfig.CustomRemoteConfigs {
-				switch remoteName {
-				case "github":
-					agent.LogStorage = storage.NewGitubStorage(storageConfig.(config.GithubConfig))
-				default:
-					log.Warnf("%s was wrong storageType", remoteName)
-				}
-			}
+		agent.Storage = s.storage
+		agent.GenLogKey = func() string {
+			return fmt.Sprintf("%s/%s/%s", agent.LinterName, agent.PullRequestEvent.Repo.GetFullName(), agent.ID)
 		}
-
-		agent.LinterUuid = uuid.New().String()
-		agent.LinterLogStoragePath = fmt.Sprintf("linter-logs/%s/%d/%s/log-build.txt", *agent.PullRequestEvent.Repo.Name, *agent.PullRequestEvent.Number, agent.LinterUuid)
-		agent.LinterLogViewUrl = "http://" + s.config.ServerAddr + "/view/" + agent.LinterLogStoragePath
-
-		// s.config.ServerAddr = "localhost:8888"
-		// log.Debugf("---------LinterLogViewUrl---------   : %s", agent.LinterLogViewUrl)
+		agent.GenLogViewUrl = func() string {
+			// if serverAddr is not provided, return empty string
+			if s.serverAddr == "" {
+				return ""
+			}
+			return s.serverAddr + "/view/" + agent.GenLogKey()
+		}
 
 		if err := fn(ctx, agent); err != nil {
 			log.Errorf("failed to run linter: %v", err)

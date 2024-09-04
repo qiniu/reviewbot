@@ -8,10 +8,9 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+// Config is the config for the using of reviewbot.
 type Config struct {
-	GlobalDefaultConfig GlobalConfig     `json:"globalDefaultConfig,omitempty"`
-	LogStorageConfig    LogStorageConfig `json:"logStorageConfig,omitempty"`
-	ServerAddr          string           `json:"serverAddr,omitempty"`
+	GlobalDefaultConfig GlobalConfig `json:"globalDefaultConfig,omitempty"`
 
 	// CustomConfig is the custom linter config.
 	// e.g.
@@ -38,12 +37,6 @@ type GlobalConfig struct {
 	// it can be overridden by linter.ConfigPath.
 	JavaStyleCheckRuleConfig string `json:"javastylecheckruleConfig,omitempty"`
 }
-
-type LogStorageConfig struct {
-	CustomRemoteConfigs map[string]any `json:"customRemoteConfigs"`
-}
-
-type GithubConfig struct{}
 
 type Linter struct {
 	// Enable is whether to enable this linter, if false, linter still run but not report.

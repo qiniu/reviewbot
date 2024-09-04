@@ -27,7 +27,6 @@ func goModCheckHandler(ctx context.Context, a linters.Agent) error {
 		return err
 	}
 	return linters.Report(log, a, parsedOutput)
-
 }
 
 func goModCheckOutput(log *xlog.Logger, a linters.Agent) (map[string][]linters.LinterOutput, error) {
