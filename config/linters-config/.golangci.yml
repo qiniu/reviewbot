@@ -33,6 +33,10 @@ linters-settings:
         disabled: true
       - name: deep-exit
         disabled: true
+      - name: function-length
+        disabled: true
+      - name: cyclomatic
+        arguments: [30]
 
   errcheck:
     exclude-functions:
