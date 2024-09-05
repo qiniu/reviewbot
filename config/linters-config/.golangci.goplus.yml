@@ -82,4 +82,5 @@ linters:
     - godox # seems too arbitrary
     - err113 # seems too arbitrary
     - gochecknoinits # see too many false positives
+    - gofumpt # see too many false positives
 
