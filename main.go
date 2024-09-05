@@ -21,9 +21,11 @@ import (
 	"expvar"
 	"flag"
 	"fmt"
+	"html/template"
 	"net"
 	"net/http"
 	"net/http/pprof"
+	"net/url"
 	"os"
 
 	"github.com/google/go-github/v57/github"
@@ -109,6 +111,72 @@ func gatherOptions() options {
 		log.Fatalf("failed to parse flags: %v", err)
 	}
 	return o
+}
+
+var viewTemplate = template.Must(template.New("view").Parse(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: monospace;
+            line-height: 1.4;
+            margin: 0;
+            padding: 0;
+        }
+        pre {
+            margin: 0;
+            padding: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .container {
+            max-width: 100%;
+            margin: 0;
+            padding: 0 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <pre>{{.Content}}</pre>
+    </div>
+</body>
+</html>
+`))
+
+func (s *Server) HandleView(w http.ResponseWriter, r *http.Request) {
+	path, err := url.PathUnescape(r.URL.Path[len("/view/"):])
+	if err != nil {
+		http.Error(w, "Invalid URL", http.StatusBadRequest)
+		return
+	}
+
+	contents, err := s.storage.Read(r.Context(), path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			http.Error(w, "Log not found", http.StatusNotFound)
+		} else {
+			log.Printf("Error reading file: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+	data := struct {
+		Content string
+	}{
+		Content: string(contents),
+	}
+
+	if err := viewTemplate.Execute(w, data); err != nil {
+		log.Printf("Error executing template: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
 }
 
 func main() {
@@ -201,18 +269,4 @@ func main() {
 	}()
 	// TODO(CarlJi): graceful shutdown
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", o.port), mux))
-}
-
-func (s *Server) HandleView(w http.ResponseWriter, r *http.Request) {
-	path := r.URL.Path[len("/view/"):]
-	// TODO(CarlJi): url decode
-	contents, err := s.storage.Read(r.Context(), path)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Log not found: %v", err), http.StatusNotFound)
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/html")
-	w.WriteHeader(http.StatusOK)
-	w.Write(contents)
 }
