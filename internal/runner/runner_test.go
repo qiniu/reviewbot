@@ -3,6 +3,7 @@ package runner_test
 import (
 	"context"
 	"io"
+	"os"
 	"strings"
 	"testing"
 
@@ -46,6 +47,10 @@ func (m *MockDockerClient) ContainerStart(ctx context.Context, containerID strin
 func (m *MockDockerClient) ContainerLogs(ctx context.Context, container string, options container.LogsOptions) (io.ReadCloser, error) {
 	args := m.Called(ctx, container, options)
 	return args.Get(0).(io.ReadCloser), args.Error(1)
+}
+func (m *MockDockerClient) CopyToContainer(ctx context.Context, containerID, dstPath string, content io.Reader, options container.CopyToContainerOptions) error {
+	m.Called(ctx, containerID, dstPath, content, options)
+	return nil
 }
 
 func TestLocalRunner(t *testing.T) {
@@ -123,14 +128,19 @@ func TestDockerRunner(t *testing.T) {
 		cfg        *config.Linter
 		wantErr    bool
 		wantOutput string
+		testCopy   bool
 	}{
 		{
 			name: "basic command execution",
 			cfg: &config.Linter{
-				DockerAsRunner: "alpine:latest",
-				Command:        []string{"echo"},
-				Args:           []string{"hello"},
-				Modifier:       config.NewBaseModifier(),
+				DockerAsRunner: config.DockerAsRunner{
+					Image:                "alpine:latest",
+					CopyLinterFromOrigin: false,
+				},
+
+				Command:  []string{"echo"},
+				Args:     []string{"hello"},
+				Modifier: config.NewBaseModifier(),
 			},
 			wantErr:    false,
 			wantOutput: "hello\n",
@@ -138,10 +148,13 @@ func TestDockerRunner(t *testing.T) {
 		{
 			name: "custom command execution",
 			cfg: &config.Linter{
-				DockerAsRunner: "alpine:latest",
-				Command:        []string{"/bin/sh", "-c"},
-				Args:           []string{"echo hello"},
-				Modifier:       config.NewBaseModifier(),
+				DockerAsRunner: config.DockerAsRunner{
+					Image:                "alpine:latest",
+					CopyLinterFromOrigin: false,
+				},
+				Command:  []string{"/bin/sh", "-c"},
+				Args:     []string{"echo hello"},
+				Modifier: config.NewBaseModifier(),
 			},
 			wantErr:    false,
 			wantOutput: "hello\n",
@@ -149,13 +162,32 @@ func TestDockerRunner(t *testing.T) {
 		{
 			name: "sh command execution",
 			cfg: &config.Linter{
-				DockerAsRunner: "alpine:latest",
-				Command:        []string{"sh", "-c"},
-				Args:           []string{"echo hello"},
-				Modifier:       config.NewBaseModifier(),
+				DockerAsRunner: config.DockerAsRunner{
+					Image:                "alpine:latest",
+					CopyLinterFromOrigin: false,
+				},
+				Command:  []string{"sh", "-c"},
+				Args:     []string{"echo hello"},
+				Modifier: config.NewBaseModifier(),
 			},
 			wantErr:    false,
 			wantOutput: "hello\n",
+		},
+		{
+			name: "copy func test",
+			cfg: &config.Linter{
+				DockerAsRunner: config.DockerAsRunner{
+					Image:                "alpine:latest",
+					CopyLinterFromOrigin: true,
+				},
+				Command:  []string{"sh", "-c"},
+				Args:     []string{"echo hello"},
+				Modifier: config.NewBaseModifier(),
+				Name:     "golangci-lint-1",
+			},
+			wantErr:    false,
+			wantOutput: "hello\n",
+			testCopy:   true,
 		},
 	}
 
@@ -171,7 +203,22 @@ func TestDockerRunner(t *testing.T) {
 				Reader: strings.NewReader(tc.wantOutput),
 			}
 			mockCli.On("ContainerLogs", mock.Anything, "test-container-id", mock.Anything).Return(mockLogs, nil)
+			if tc.testCopy {
+				err := os.WriteFile("/usr/local/bin/golangci-lint-1", []byte("test"), 0755)
+				if err != nil {
+					t.Errorf("Error writing to file: %v", err)
+					return
+				}
 
+				defer func() {
+					err = os.RemoveAll("/usr/local/bin/a.txt")
+					if err != nil {
+						t.Errorf("Error writing to file: %v", err)
+						return
+					}
+				}()
+				mockCli.On("CopyToContainer", mock.Anything, "test-container-id", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			}
 			dr, err := runner.NewDockerRunner(mockCli)
 			assert.NoError(t, err)
 			ctx := context.WithValue(context.Background(), config.EventGUIDKey, "test")
