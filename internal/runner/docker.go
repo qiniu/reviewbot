@@ -16,7 +16,8 @@ import (
 )
 
 type DockerRunner struct {
-	cli DockerClientInterface
+	cli    DockerClientInterface
+	script string
 }
 
 func NewDockerRunner(cli DockerClientInterface) (Runner, error) {
@@ -28,6 +29,10 @@ func NewDockerRunner(cli DockerClientInterface) (Runner, error) {
 		}
 	}
 	return &DockerRunner{cli: cli}, nil
+}
+
+func (r *DockerRunner) GetFinalScript() string {
+	return r.script
 }
 
 // Prepare will pull the docker image if it is not exist.
@@ -88,6 +93,7 @@ func (r *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClos
 	// handle args
 	scriptContent += strings.Join(cfg.Args, " ")
 	log.Infof("Script content: \n%s", scriptContent)
+	r.script = scriptContent
 
 	var (
 		dockerConfig = &container.Config{

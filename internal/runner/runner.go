@@ -22,19 +22,27 @@ import (
 type Runner interface {
 	// Prepare prepares the linter for running.
 	Prepare(ctx context.Context, cfg *config.Linter) error
-
 	// Run runs the linter and returns the output.
 	Run(ctx context.Context, cfg *config.Linter) (io.ReadCloser, error)
+	// GetFinalScript returns the final script to be executed.
+	// It should be called after Run function. and it's used for logging and debugging.
+	GetFinalScript() string
 }
 
 // LocalRunner is a runner that runs the linter locally.
-type LocalRunner struct{}
+type LocalRunner struct {
+	script string
+}
 
 func NewLocalRunner() Runner {
 	return &LocalRunner{}
 }
 
-func (*LocalRunner) Prepare(ctx context.Context, cfg *config.Linter) error {
+func (l *LocalRunner) GetFinalScript() string {
+	return l.script
+}
+
+func (l *LocalRunner) Prepare(ctx context.Context, cfg *config.Linter) error {
 	return nil
 }
 
@@ -64,7 +72,9 @@ func (l *LocalRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClose
 	scriptContent += strings.Join(newCfg.Args, " ")
 
 	log.Infof("Script content: \n%s", scriptContent)
+	l.script = scriptContent
 
+	//nolint:gosec
 	c := exec.CommandContext(ctx, shell[0], append(shell[1:], scriptContent)...)
 	c.Dir = newCfg.WorkDir
 
