@@ -24,6 +24,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/reviewbot/config"
@@ -171,6 +172,8 @@ func GeneralHandler(log *xlog.Logger, a Agent, execRun func(a Agent) ([]byte, er
 
 // ExecRun executes a command.
 func ExecRun(a Agent) ([]byte, error) {
+	eventGuid := a.Context.Value(config.EventGUIDKey).(string)
+	start := time.Now()
 	reader, err := a.Runner.Run(a.Context, &a.LinterConfig)
 	if err != nil {
 		log.Warnf("failed to run linter: %v, mark and continue", err)
@@ -182,7 +185,12 @@ func ExecRun(a Agent) ([]byte, error) {
 		return nil, fmt.Errorf("failed to read linter output: %w", err)
 	}
 
-	err = a.Storage.Write(a.Context, a.GenLogKey(), output)
+	end := time.Now()
+	toLog := []byte(fmt.Sprintf("[%s][%s] run script:\n%s\n",
+		start.Format(time.RFC3339), eventGuid, a.Runner.GetFinalScript()))
+	toLog = append(toLog, []byte(fmt.Sprintf("[%s][%s] output:\n%s\n",
+		end.Format(time.RFC3339), eventGuid, string(output)))...)
+	err = a.Storage.Write(a.Context, a.GenLogKey(), toLog)
 	if err != nil {
 		log.Errorf("write to storage was failed %v", err)
 	}

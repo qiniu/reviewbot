@@ -268,5 +268,6 @@ func main() {
 		log.Fatal(http.Serve(listener, debugMux))
 	}()
 	// TODO(CarlJi): graceful shutdown
+	//nolint:gocritic
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", o.port), mux))
 }
