@@ -38,17 +38,13 @@ type GlobalConfig struct {
 	JavaStyleCheckRuleConfig string `json:"javastylecheckruleConfig,omitempty"`
 }
 
-type LogStorageConfig struct {
-	CustomRemoteConfigs map[string]any `json:"customRemoteConfigs"`
-}
-
-type GithubConfig struct{}
-
 type DockerAsRunner struct {
-	Image                string `json:"image,omitempty"`
+	Image                string `json:"image"`
 	CopyLinterFromOrigin bool   `json:"copylinterFromOrigin,omitempty"`
 }
 type Linter struct {
+	// Name is the linter name.
+	Name string
 	// Enable is whether to enable this linter, if false, linter still run but not report.
 	Enable *bool `json:"enable,omitempty"`
 	// DockerAsRunner is the docker image to run the linter.
@@ -137,6 +133,7 @@ func (c Config) Get(org, repo, ln string) Linter {
 		Enable:       boolPtr(true),
 		ReportFormat: c.GlobalDefaultConfig.GithubReportType,
 		Modifier:     NewBaseModifier(),
+		Name:         ln,
 	}
 
 	// set golangci-lint config path if exists
@@ -196,8 +193,11 @@ func applyCustomConfig(legacy, custom Linter) Linter {
 		legacy.ConfigPath = custom.ConfigPath
 	}
 
-	if custom.DockerAsRunner != (DockerAsRunner{}) {
-		legacy.DockerAsRunner = custom.DockerAsRunner
+	if custom.DockerAsRunner.Image != "" {
+		legacy.DockerAsRunner.Image = custom.DockerAsRunner.Image
+	}
+	if custom.DockerAsRunner.CopyLinterFromOrigin {
+		legacy.DockerAsRunner.CopyLinterFromOrigin = custom.DockerAsRunner.CopyLinterFromOrigin
 	}
 
 	return legacy
