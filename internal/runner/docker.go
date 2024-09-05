@@ -2,7 +2,6 @@ package runner
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -13,6 +12,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/archive"
 	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/x/xlog"
 )
@@ -120,25 +120,27 @@ func (r *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClos
 	}
 	log.Infof("container created: %v", resp.ID)
 
-	cmd := exec.Command("which", lintername)
-	output, err := cmd.Output()
-	linterOrignPath := string(output)
-	if err != nil {
-		log.Errorf("failed to find %s :%v", lintername, err)
-	}
-	binaryData, err := os.ReadFile(linterOrignPath)
-	if err != nil {
-		log.Errorf("%v", err)
-	}
-	reader := bytes.NewReader(binaryData)
-	err = r.cli.CopyToContainer(context.Background(), resp.ID, linterOrignPath, reader, container.CopyToContainerOptions{})
-	if err != nil {
-		log.Errorf("%v", err)
+	if cfg.DockerAsRunner.CopyLinterFromOrigin {
+		linterOrignPath, err := exec.LookPath(cfg.Name)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find %s :%w", cfg.Name, err)
+		}
+
+		reader, err := archive.Tar(linterOrignPath, archive.Uncompressed)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create tar reader: %w", err)
+		}
+
+		err = r.cli.CopyToContainer(ctx, resp.ID, "/usr/local/bin/", reader, container.CopyToContainerOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("copy to containner was failed : %w", err)
+		}
 	}
 
 	if err := r.cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
 		return nil, fmt.Errorf("failed to start container: %w", err)
 	}
+	log.Infof("container started: %v", resp.ID)
 
 	logOptions := container.LogsOptions{
 		ShowStdout: true,
