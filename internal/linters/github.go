@@ -53,27 +53,37 @@ func ListPullRequestsFiles(ctx context.Context, gc *github.Client, owner string,
 }
 
 // FilterPullRequests filter full request by commit.
-func FilterPullRequestsWithCommit(ctx context.Context, gc *github.Client, owner string, repo string, headSha string) ([]*github.PullRequest, error) {
-	plopt := github.PullRequestListOptions{
+func FilterPullRequestsWithCommit(ctx context.Context, gc *github.Client, owner, repo, headSha string) ([]*github.PullRequest, error) {
+	var allPRs []*github.PullRequest
+	opt := &github.PullRequestListOptions{
+		State: "open",
 		ListOptions: github.ListOptions{
-			PerPage: 60,
+			PerPage: 100,
 		},
 	}
-	var repullRequests []*github.PullRequest
-	pullRequests, response, err := gc.PullRequests.List(ctx, owner, repo, &plopt)
-	defer response.Body.Close()
-	if err != nil {
-		return nil, err
-	}
-	if response.StatusCode != 200 {
-		return nil, fmt.Errorf("Filter pull request failed: %v", github.Stringify(response.Body))
-	}
-	for _, pullRequest := range pullRequests {
-		if *pullRequest.Head.SHA == headSha {
-			repullRequests = append(repullRequests, pullRequest)
+
+	for {
+		prs, resp, err := gc.PullRequests.List(ctx, owner, repo, opt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list pull requests: %w", err)
 		}
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("failed to list pull requests: %v", github.Stringify(resp.Body))
+		}
+
+		for _, pr := range prs {
+			if pr.GetHead().GetSHA() == headSha {
+				allPRs = append(allPRs, pr)
+			}
+		}
+
+		if resp.NextPage == 0 {
+			break
+		}
+		opt.Page = resp.NextPage
 	}
-	return repullRequests, nil
+
+	return allPRs, nil
 }
 
 // ListPullRequestsComments lists all comments on the specified pull request.

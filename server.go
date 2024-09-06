@@ -149,6 +149,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) processPullRequestEvent(ctx context.Context, event *github.PullRequestEvent) error {
+	log := xlog.New(ctx.Value(config.EventGUIDKey).(string))
 	if event.GetAction() != "opened" && event.GetAction() != "reopened" && event.GetAction() != "synchronize" {
 		log.Debugf("skipping action %s\n", event.GetAction())
 		return nil
@@ -158,52 +159,83 @@ func (s *Server) processPullRequestEvent(ctx context.Context, event *github.Pull
 }
 
 func (s *Server) processCheckRunRequestEvent(ctx context.Context, event *github.CheckRunEvent) error {
+	log := xlog.New(ctx.Value(config.EventGUIDKey).(string))
 	if event.GetAction() != "rerequested" {
-		log.Debugf("skipping action %s\n", event.GetAction())
+		log.Debugf("Skipping action %s for check run event", event.GetAction())
 		return nil
 	}
-	headSha := event.GetCheckRun().GetHeadSHA()
-	org := event.GetRepo().GetOwner().GetLogin()
-	repo := event.GetRepo().GetName()
+
+	headSHA := event.GetCheckRun().GetHeadSHA()
+	repo := event.GetRepo()
+	org := repo.GetOwner().GetLogin()
+	repoName := repo.GetName()
 	installationID := event.GetInstallation().GetID()
-	plist, err := linters.FilterPullRequestsWithCommit(ctx, s.GithubClient(installationID), org, repo, headSha)
+
+	client := s.GithubClient(installationID)
+	prs, err := linters.FilterPullRequestsWithCommit(ctx, client, org, repoName, headSHA)
 	if err != nil {
-		log.Errorf("Filter pullreqeust fail  %v\n", err)
+		log.Errorf("failed to filter pull requests: %v", err)
 		return nil
 	}
-	if len(plist) == 0 {
-		log.Errorf("Filter pullreqeust emmpty  ")
+
+	if len(prs) == 0 {
+		log.Errorf("No pull requests found for commit SHA: %s", headSHA)
 		return nil
 	}
-	pevent := github.PullRequestEvent{}
-	pevent.Repo = event.GetRepo()
-	pevent.PullRequest = plist[0]
-	pevent.Number = plist[0].Number
-	pevent.Installation = event.GetInstallation()
-	return s.handle(ctx, &pevent)
+
+	for _, pr := range prs {
+		log.Infof("try to reprocessing pull request %d, (%v/%v), installationID: %d\n", pr.GetNumber(), org, repo, installationID)
+		event := &github.PullRequestEvent{
+			Repo:         repo,
+			PullRequest:  pr,
+			Number:       pr.Number,
+			Installation: event.GetInstallation(),
+		}
+
+		if err := s.handle(ctx, event); err != nil {
+			log.Errorf("failed to handle pull request event: %v", err)
+			// continue to handle other pull requests
+		}
+	}
+
+	return nil
 }
 
 func (s *Server) processCheckSuiteEvent(ctx context.Context, event *github.CheckSuiteEvent) error {
+	log := xlog.New(ctx.Value(config.EventGUIDKey).(string))
 	if event.GetAction() != "rerequested" {
 		log.Debugf("skipping action %s\n", event.GetAction())
 		return nil
 	}
+
 	headSha := event.GetCheckSuite().GetHeadSHA()
-	event.GetCheckSuite()
 	org := event.GetRepo().GetOwner().GetLogin()
 	repo := event.GetRepo().GetName()
 	installationID := event.GetInstallation().GetID()
 	plist, err := linters.FilterPullRequestsWithCommit(ctx, s.GithubClient(installationID), org, repo, headSha)
 	if err != nil {
-		log.Errorf("Filter pullreqeust fail  %v\n", err)
+		log.Errorf("failed to filter pull requests: %v", err)
 		return nil
 	}
-	pevent := github.PullRequestEvent{}
-	pevent.Repo = event.GetRepo()
-	pevent.Number = plist[0].Number
-	pevent.PullRequest = plist[0]
-	pevent.Installation = event.GetInstallation()
-	return s.handle(ctx, &pevent)
+
+	if len(plist) == 0 {
+		log.Errorf("No pull requests found for commit SHA: %s", headSha)
+		return nil
+	}
+	for _, pr := range plist {
+		log.Infof("try to reprocessing pull request %d, (%v/%v), installationID: %d\n", pr.GetNumber(), org, repo, installationID)
+		event := github.PullRequestEvent{
+			Repo:         event.GetRepo(),
+			Number:       pr.Number,
+			PullRequest:  pr,
+			Installation: event.GetInstallation(),
+		}
+		if err := s.handle(ctx, &event); err != nil {
+			log.Errorf("failed to handle pull request event: %v", err)
+			// continue to handle other pull requests
+		}
+	}
+	return nil
 }
 
 func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) error {
