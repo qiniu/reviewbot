@@ -200,6 +200,10 @@ func applyCustomConfig(legacy, custom Linter) Linter {
 		legacy.DockerAsRunner.CopyLinterFromOrigin = custom.DockerAsRunner.CopyLinterFromOrigin
 	}
 
+	if custom.Name != "" {
+		legacy.Name = custom.Name
+	}
+
 	return legacy
 }
 

@@ -270,7 +270,6 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 			GitClient:               s.gitClientFactory,
 			PullRequestEvent:        *event,
 			PullRequestChangedFiles: pullRequestAffectedFiles,
-			LinterName:              name,
 			RepoDir:                 r.Directory(),
 			Context:                 ctx,
 			ID:                      uuid.New().String(),
@@ -288,7 +287,7 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 		agent.Runner = r
 		agent.Storage = s.storage
 		agent.GenLogKey = func() string {
-			return fmt.Sprintf("%s/%s/%s", agent.LinterName, agent.PullRequestEvent.Repo.GetFullName(), agent.ID)
+			return fmt.Sprintf("%s/%s/%s", agent.LinterConfig.Name, agent.PullRequestEvent.Repo.GetFullName(), agent.ID)
 		}
 		agent.GenLogViewUrl = func() string {
 			// if serverAddr is not provided, return empty string
