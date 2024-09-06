@@ -119,8 +119,6 @@ type Agent struct {
 	PullRequestEvent github.PullRequestEvent
 	// PullRequestChangedFiles is the changed files of a pull request.
 	PullRequestChangedFiles []*github.CommitFile
-	// LinterName is the linter name.
-	LinterName string
 	// RepoDir is the repo directory.
 	RepoDir string
 
@@ -147,7 +145,7 @@ If you have any questions about this comment, feel free to raise an issue here:
 type LinterParser func(*xlog.Logger, []byte) (map[string][]LinterOutput, []string)
 
 func GeneralHandler(log *xlog.Logger, a Agent, execRun func(a Agent) ([]byte, error), linterParser func(*xlog.Logger, []byte) (map[string][]LinterOutput, []string)) error {
-	linterName := a.LinterName
+	linterName := a.LinterConfig.Name
 	output, err := execRun(a)
 	if err != nil {
 		// NOTE(CarlJi): the error is *ExitError, it seems to have little information and needs to be handled in a better way.
@@ -212,7 +210,7 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 		org        = a.PullRequestEvent.Repo.GetOwner().GetLogin()
 		repo       = a.PullRequestEvent.Repo.GetName()
 		orgRepo    = a.PullRequestEvent.Repo.GetFullName()
-		linterName = a.LinterName
+		linterName = a.LinterConfig.Name
 	)
 
 	log.Infof("[%s] found total %d files with %d lint errors on repo %v", linterName, len(lintResults), countLinterErrors(lintResults), orgRepo)

@@ -187,7 +187,6 @@ func TestExecRun(t *testing.T) {
 		{
 			id: "case1 - without ARTIFACT",
 			input: Agent{
-				LinterName: "ut",
 				LinterConfig: config.Linter{
 					Enable:       &tp,
 					Command:      []string{"/bin/bash", "-c", "--"},
@@ -201,7 +200,6 @@ func TestExecRun(t *testing.T) {
 		{
 			id: "case2 - with ARTIFACT",
 			input: Agent{
-				LinterName: "ut",
 				LinterConfig: config.Linter{
 					Enable:       &tp,
 					Command:      []string{"/bin/bash", "-c", "--"},
@@ -215,7 +213,6 @@ func TestExecRun(t *testing.T) {
 		{
 			id: "case2 - with multi files under ARTIFACT",
 			input: Agent{
-				LinterName: "ut",
 				LinterConfig: config.Linter{
 					Enable:       &tp,
 					Command:      []string{"/bin/bash", "-c", "--"},
