@@ -59,17 +59,11 @@ func TestGoModCheck(t *testing.T) {
 	for _, tc := range tcs {
 		t.Run(tc.id, func(t *testing.T) {
 			filename := filepath.Join(tc.input.RepoDir, modDir)
-			err := os.MkdirAll(filepath.Dir(filename), 0755)
+			err := os.MkdirAll(filepath.Dir(filename), 0o755)
 			if err != nil {
 				t.Errorf("Error creating directories:%v", err)
 				return
 			}
-			err = os.WriteFile(filename, tc.content, 0644)
-			if err != nil {
-				t.Errorf("Error writing to file: %v", err)
-				return
-			}
-
 			defer func() {
 				err = os.RemoveAll(filename)
 				if err != nil {
@@ -77,6 +71,11 @@ func TestGoModCheck(t *testing.T) {
 					return
 				}
 			}()
+			err = os.WriteFile(filename, tc.content, 0o644)
+			if err != nil {
+				t.Errorf("Error writing to file: %v", err)
+				return
+			}
 
 			output, err := goModCheckOutput(&xlog.Logger{}, tc.input)
 			if err != nil {
@@ -85,7 +84,6 @@ func TestGoModCheck(t *testing.T) {
 			if !reflect.DeepEqual(output, tc.want) {
 				t.Errorf("got output = %v, want = %v", output, tc.want)
 			}
-
 		})
 	}
 }

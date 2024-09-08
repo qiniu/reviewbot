@@ -15,7 +15,7 @@ import (
 	"github.com/docker/docker/api/types/network"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/qiniu/reviewbot/config"
-	"github.com/qiniu/x/xlog"
+	"github.com/qiniu/reviewbot/internal/lintersutil"
 )
 
 // Runner defines the interface for how to run the linter.
@@ -47,7 +47,7 @@ func (l *LocalRunner) Prepare(ctx context.Context, cfg *config.Linter) error {
 }
 
 func (l *LocalRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadCloser, error) {
-	log := xlog.New(ctx.Value(config.EventGUIDKey).(string))
+	log := lintersutil.FromContext(ctx)
 	newCfg, err := cfg.Modifier.Modify(cfg)
 	if err != nil {
 		return nil, err

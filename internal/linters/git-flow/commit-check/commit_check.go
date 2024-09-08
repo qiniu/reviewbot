@@ -25,10 +25,9 @@ import (
 	"text/template"
 
 	"github.com/google/go-github/v57/github"
-	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
+	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/x/log"
-	"github.com/qiniu/x/xlog"
 )
 
 const lintName = "commit-check"
@@ -128,7 +127,7 @@ type RebaseSuggestion struct {
 }
 
 func handle(ctx context.Context, agent linters.Agent, org, repo, author string, number int, comments []string, existedComments []*github.IssueComment) error {
-	log := xlog.New(ctx.Value(config.EventGUIDKey).(string))
+	log := lintersutil.FromContext(ctx)
 	data := struct {
 		Flag     string
 		Author   string
