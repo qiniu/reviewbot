@@ -8,10 +8,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
+	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/x/log"
-	"github.com/qiniu/x/xlog"
 )
 
 // refer to https://pkg.go.dev/go/doc#Note
@@ -28,7 +27,7 @@ func init() {
 // Check the notes in the code to see if they comply with the standard rules from
 // https://pkg.go.dev/go/doc#Note
 func noteCheckHandler(ctx context.Context, a linters.Agent) error {
-	log := xlog.New(ctx.Value(config.EventGUIDKey).(string))
+	log := lintersutil.FromContext(ctx)
 	outputs := make(map[string][]linters.LinterOutput)
 
 	for _, file := range a.PullRequestChangedFiles {

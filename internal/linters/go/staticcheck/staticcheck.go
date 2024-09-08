@@ -20,9 +20,8 @@ package staticcheck
 import (
 	"context"
 
-	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
-	"github.com/qiniu/x/xlog"
+	"github.com/qiniu/reviewbot/internal/lintersutil"
 )
 
 // refer to https://staticcheck.io/docs/
@@ -34,7 +33,7 @@ func init() {
 }
 
 func staticcheckHandler(ctx context.Context, a linters.Agent) error {
-	log := xlog.New(ctx.Value(config.EventGUIDKey).(string))
+	log := lintersutil.FromContext(ctx)
 	if linters.IsEmpty(a.LinterConfig.Args...) {
 		// turn off compile errors by default
 		a.LinterConfig.Args = append([]string{}, "-debug.no-compile-errors=true", "./...")

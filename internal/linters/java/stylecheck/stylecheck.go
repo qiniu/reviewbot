@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/x/errors"
@@ -30,7 +29,7 @@ func init() {
 }
 
 func stylecheckHandler(ctx context.Context, a linters.Agent) error {
-	slog := xlog.New(ctx.Value(config.EventGUIDKey).(string))
+	slog := lintersutil.FromContext(ctx)
 	var javaFiles []string
 	rulePath := a.LinterConfig.ConfigPath
 	for _, arg := range a.PullRequestChangedFiles {

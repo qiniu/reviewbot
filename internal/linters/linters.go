@@ -170,7 +170,7 @@ func GeneralHandler(log *xlog.Logger, a Agent, execRun func(a Agent) ([]byte, er
 
 // ExecRun executes a command.
 func ExecRun(a Agent) ([]byte, error) {
-	eventGuid := a.Context.Value(config.EventGUIDKey).(string)
+	eventGuid := lintersutil.FromContext(a.Context).ReqId
 	start := time.Now()
 	reader, err := a.Runner.Run(a.Context, &a.LinterConfig)
 	if err != nil {
