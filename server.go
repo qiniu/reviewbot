@@ -28,7 +28,6 @@ import (
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v57/github"
-	"github.com/google/uuid"
 	"github.com/gregjones/httpcache"
 	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
@@ -329,7 +328,7 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 			PullRequestChangedFiles: pullRequestAffectedFiles,
 			RepoDir:                 r.Directory(),
 			Context:                 ctx,
-			ID:                      uuid.New().String(),
+			ID:                      lintersutil.GetEventGUID(ctx),
 		}
 
 		if !linters.LinterRelated(name, agent) {

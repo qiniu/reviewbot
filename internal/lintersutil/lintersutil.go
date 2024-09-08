@@ -56,3 +56,12 @@ func FromContext(ctx context.Context) *xlog.Logger {
 	}
 	return xlog.New(eventGUID)
 }
+
+// GetEventGUID returns the event GUID from the context.
+func GetEventGUID(ctx context.Context) string {
+	eventGUID, ok := ctx.Value(EventGUIDKey).(string)
+	if !ok {
+		return "default"
+	}
+	return eventGUID
+}
