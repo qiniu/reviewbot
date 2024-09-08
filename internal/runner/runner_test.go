@@ -13,6 +13,7 @@ import (
 	"github.com/docker/docker/api/types/network"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/qiniu/reviewbot/config"
+	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/reviewbot/internal/runner"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -48,6 +49,7 @@ func (m *MockDockerClient) ContainerLogs(ctx context.Context, container string, 
 	args := m.Called(ctx, container, options)
 	return args.Get(0).(io.ReadCloser), args.Error(1)
 }
+
 func (m *MockDockerClient) CopyToContainer(ctx context.Context, containerID, dstPath string, content io.Reader, options container.CopyToContainerOptions) error {
 	m.Called(ctx, containerID, dstPath, content, options)
 	return nil
@@ -105,7 +107,7 @@ func TestLocalRunner(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			lr := runner.NewLocalRunner()
-			ctx := context.WithValue(context.Background(), config.EventGUIDKey, "test")
+			ctx := context.WithValue(context.Background(), lintersutil.EventGUIDKey, "test")
 			output, err := lr.Run(ctx, tt.cfg)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -204,7 +206,7 @@ func TestDockerRunner(t *testing.T) {
 			}
 			mockCli.On("ContainerLogs", mock.Anything, "test-container-id", mock.Anything).Return(mockLogs, nil)
 			if tc.testCopy {
-				err := os.WriteFile("/usr/local/bin/golangci-lint-1", []byte("test"), 0755)
+				err := os.WriteFile("/usr/local/bin/golangci-lint-1", []byte("test"), 0o755)
 				if err != nil {
 					t.Errorf("Error writing to file: %v", err)
 					return
@@ -221,7 +223,7 @@ func TestDockerRunner(t *testing.T) {
 			}
 			dr, err := runner.NewDockerRunner(mockCli)
 			assert.NoError(t, err)
-			ctx := context.WithValue(context.Background(), config.EventGUIDKey, "test")
+			ctx := context.WithValue(context.Background(), lintersutil.EventGUIDKey, "test")
 			output, err := dr.Run(ctx, tc.cfg)
 
 			if tc.wantErr {

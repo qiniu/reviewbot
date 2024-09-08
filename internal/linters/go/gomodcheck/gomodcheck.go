@@ -7,8 +7,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
+	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/x/xlog"
 	"golang.org/x/mod/modfile"
 )
@@ -21,7 +21,7 @@ func init() {
 }
 
 func goModCheckHandler(ctx context.Context, a linters.Agent) error {
-	log := xlog.New(ctx.Value(config.EventGUIDKey).(string))
+	log := lintersutil.FromContext(ctx)
 	parsedOutput, err := goModCheckOutput(log, a)
 	if err != nil {
 		log.Errorf("gomodchecks parse output failed: %v", err)

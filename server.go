@@ -32,10 +32,10 @@ import (
 	"github.com/gregjones/httpcache"
 	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
+	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/reviewbot/internal/runner"
 	"github.com/qiniu/reviewbot/internal/storage"
 	"github.com/qiniu/x/log"
-	"github.com/qiniu/x/xlog"
 	gitv2 "sigs.k8s.io/prow/pkg/git/v2"
 )
 
@@ -106,8 +106,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// limit the length of eventGUID to 12
 		eventGUID = eventGUID[len(eventGUID)-12:]
 	}
-	ctx := context.WithValue(context.Background(), config.EventGUIDKey, eventGUID)
-	log := xlog.New(ctx.Value(config.EventGUIDKey).(string))
+	ctx := context.WithValue(context.Background(), lintersutil.EventGUIDKey, eventGUID)
+	log := lintersutil.FromContext(ctx)
 
 	payload, err := github.ValidatePayload(r, s.webhookSecret)
 	if err != nil {
@@ -149,7 +149,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) processPullRequestEvent(ctx context.Context, event *github.PullRequestEvent) error {
-	log := xlog.New(ctx.Value(config.EventGUIDKey).(string))
+	log := lintersutil.FromContext(ctx)
 	if event.GetAction() != "opened" && event.GetAction() != "reopened" && event.GetAction() != "synchronize" {
 		log.Debugf("skipping action %s\n", event.GetAction())
 		return nil
@@ -159,7 +159,7 @@ func (s *Server) processPullRequestEvent(ctx context.Context, event *github.Pull
 }
 
 func (s *Server) processCheckRunRequestEvent(ctx context.Context, event *github.CheckRunEvent) error {
-	log := xlog.New(ctx.Value(config.EventGUIDKey).(string))
+	log := lintersutil.FromContext(ctx)
 	if event.GetAction() != "rerequested" {
 		log.Debugf("Skipping action %s for check run event", event.GetAction())
 		return nil
@@ -202,7 +202,7 @@ func (s *Server) processCheckRunRequestEvent(ctx context.Context, event *github.
 }
 
 func (s *Server) processCheckSuiteEvent(ctx context.Context, event *github.CheckSuiteEvent) error {
-	log := xlog.New(ctx.Value(config.EventGUIDKey).(string))
+	log := lintersutil.FromContext(ctx)
 	if event.GetAction() != "rerequested" {
 		log.Debugf("skipping action %s\n", event.GetAction())
 		return nil
@@ -245,7 +245,7 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 		repo    = event.GetRepo().GetName()
 		orgRepo = org + "/" + repo
 	)
-	log := xlog.New(ctx.Value(config.EventGUIDKey).(string))
+	log := lintersutil.FromContext(ctx)
 
 	installationID := event.GetInstallation().GetID()
 	log.Infof("processing pull request %d, (%v/%v), installationID: %d\n", num, org, repo, installationID)

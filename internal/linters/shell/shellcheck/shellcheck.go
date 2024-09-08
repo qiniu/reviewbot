@@ -19,11 +19,9 @@ import (
 	"context"
 	"strings"
 
-	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/reviewbot/internal/metric"
-	"github.com/qiniu/x/xlog"
 )
 
 // refer to https://github.com/koalaman/shellcheck
@@ -35,7 +33,7 @@ func init() {
 }
 
 func shellcheck(ctx context.Context, a linters.Agent) error {
-	log := xlog.New(ctx.Value(config.EventGUIDKey).(string))
+	log := lintersutil.FromContext(ctx)
 	var shellFiles []string
 	for _, arg := range a.PullRequestChangedFiles {
 		if strings.HasSuffix(arg.GetFilename(), ".sh") {
