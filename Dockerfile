@@ -21,6 +21,9 @@ RUN cppcheck --version \
     && golangci-lint --version \
     && go version
 
+# install docker
+RUN apk add --no-cache docker docker-cli
+
 RUN java -version
 #install pmd
 ENV PMD_DOWNLOAD_URL https://github.com/pmd/pmd/releases/download/pmd_releases%2F7.4.0/pmd-dist-7.4.0-bin.zip

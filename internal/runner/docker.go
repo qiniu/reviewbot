@@ -106,12 +106,13 @@ func (r *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClos
 			WorkingDir: cfg.WorkDir,
 		}
 		dockerHostConfig = &container.HostConfig{
-			Binds: []string{cfg.WorkDir + ":" + cfg.WorkDir},
+			Binds:      []string{cfg.WorkDir + ":" + cfg.WorkDir},
+			AutoRemove: false, // do not remove container after it exits
 		}
 	)
 
-	log.Infof("Docker config: entrypoint: %v, cmd: %v, env: %v, working dir: %v",
-		dockerConfig.Entrypoint, dockerConfig.Cmd, dockerConfig.Env, dockerConfig.WorkingDir)
+	log.Infof("Docker config: entrypoint: %v, cmd: %v, env: %v, working dir: %v, volume: %v",
+		dockerConfig.Entrypoint, dockerConfig.Cmd, dockerConfig.Env, dockerConfig.WorkingDir, dockerHostConfig.Binds)
 
 	// TODO(Carl): support artifact env?
 	resp, err := r.cli.ContainerCreate(ctx, dockerConfig, dockerHostConfig, nil, nil, "")

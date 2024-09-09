@@ -17,7 +17,8 @@ spec:
         app: reviewbot
     spec:
       containers:
-        - command:
+        - name: reviewbot
+          command:
             - /reviewbot
           args:
             - -log-level=0
@@ -25,6 +26,7 @@ spec:
             - -config=/etc/config/config.yaml
             - -app-id=$(GITHUB_APP_ID)
             - -app-private-key=/secrets/github_app_key
+            - -debug=true
           env:
             - name: GITHUB_WEBHOOK_SECRET
               valueFrom:
@@ -41,13 +43,14 @@ spec:
                 secretKeyRef:
                   key: webhook
                   name: wework
+            - name: DOCKER_HOST
+              value: tcp://localhost:2375
           image: aslan-spock-register.qiniu.io/qa/reviewbot:latest # use your own built image instead
           imagePullPolicy: Always
           resources:
             requests:
               memory: "10Gi"
               cpu: "8"
-          name: reviewbot
           ports:
             - containerPort: 8888
               name: http
@@ -72,6 +75,26 @@ spec:
               subPath: .golangci.goplus.yml
               name: golangci-config-goplus
               readOnly: true
+        - name: dind
+          image: aslan-spock-register.qiniu.io/qa/docker:27.2.0-dind
+          securityContext:
+            privileged: true
+          command:
+            - dockerd
+            - --host=tcp://0.0.0.0:2375
+            - --host=unix:///var/run/docker.sock
+            - --tls=false
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+          volumeMounts:
+            - name: dind-storage
+              mountPath: /var/lib/docker
+          ports:
+            - containerPort: 2375
+              name: docker
+              protocol: TCP
       volumes:
         - configMap:
             defaultMode: 420
@@ -99,6 +122,9 @@ spec:
             defaultMode: 420
             name: golangci-config-goplus
           name: golangci-config-goplus
+        - name: dind-storage
+          emptyDir: {}
+
 ---
 apiVersion: v1
 kind: Service
