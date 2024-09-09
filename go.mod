@@ -20,6 +20,7 @@ require (
 require (
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20240806141605-e8a1dd7889d6 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
+	github.com/aws/aws-sdk-go v1.55.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
@@ -34,6 +35,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/google/go-github/v56 v56.0.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
+	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/klauspost/compress v1.17.9 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/patternmatcher v0.6.0 // indirect
