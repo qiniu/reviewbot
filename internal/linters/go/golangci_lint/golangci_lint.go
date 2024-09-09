@@ -106,6 +106,11 @@ func parser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput,
 			continue
 		}
 
+		// skip the docker artifact log flag
+		if strings.Contains(ex, "---artifacts-") {
+			continue
+		}
+
 		unexpected = append(unexpected, strings.TrimSpace(ex))
 	}
 

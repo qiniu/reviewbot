@@ -1,11 +1,14 @@
 package runner_test
 
 import (
+	"archive/tar"
+	"bytes"
 	"context"
 	"io"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -17,6 +20,7 @@ import (
 	"github.com/qiniu/reviewbot/internal/runner"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type MockDockerClient struct {
@@ -24,6 +28,16 @@ type MockDockerClient struct {
 }
 
 var _ runner.DockerClientInterface = (*MockDockerClient)(nil)
+
+func (m *MockDockerClient) CopyFromContainer(ctx context.Context, containerID, srcPath string) (io.ReadCloser, container.PathStat, error) {
+	args := m.Called(ctx, containerID, srcPath)
+	return args.Get(0).(io.ReadCloser), args.Get(1).(container.PathStat), args.Error(2)
+}
+
+func (m *MockDockerClient) ContainerWait(ctx context.Context, containerID string, condition container.WaitCondition) (<-chan container.WaitResponse, <-chan error) {
+	args := m.Called(ctx, containerID, condition)
+	return args.Get(0).(chan container.WaitResponse), args.Get(1).(chan error)
+}
 
 func (m *MockDockerClient) ImageInspectWithRaw(ctx context.Context, imageID string) (types.ImageInspect, []byte, error) {
 	args := m.Called(ctx, imageID)
@@ -126,11 +140,12 @@ func TestLocalRunner(t *testing.T) {
 
 func TestDockerRunner(t *testing.T) {
 	tcs := []struct {
-		name       string
-		cfg        *config.Linter
-		wantErr    bool
-		wantOutput string
-		testCopy   bool
+		name         string
+		cfg          *config.Linter
+		wantErr      bool
+		wantOutput   string
+		testCopy     bool
+		withArtifact bool
 	}{
 		{
 			name: "basic command execution",
@@ -191,6 +206,23 @@ func TestDockerRunner(t *testing.T) {
 			wantOutput: "hello\n",
 			testCopy:   true,
 		},
+		{
+			name: "with artifact",
+			cfg: &config.Linter{
+				DockerAsRunner: config.DockerAsRunner{
+					Image:                "alpine:latest",
+					CopyLinterFromOrigin: true,
+				},
+				Command:  []string{"sh", "-c"},
+				Args:     []string{"echo hello_world > $ARTIFACT/output.txt"},
+				Modifier: config.NewBaseModifier(),
+				Name:     "golangci-lint-1",
+			},
+			wantErr:      false,
+			testCopy:     true,
+			wantOutput:   "---output.txt---\nhello_world\n",
+			withArtifact: true,
+		},
 	}
 
 	for _, tc := range tcs {
@@ -204,7 +236,13 @@ func TestDockerRunner(t *testing.T) {
 			mockLogs := &mockReadCloser{
 				Reader: strings.NewReader(tc.wantOutput),
 			}
-			mockCli.On("ContainerLogs", mock.Anything, "test-container-id", mock.Anything).Return(mockLogs, nil)
+			waitRespCh := make(chan container.WaitResponse, 1)
+			errCh := make(chan error, 1)
+			mockCli.On("ContainerWait", mock.Anything, "test-container-id", mock.Anything).Return(waitRespCh, errCh)
+			go func() {
+				waitRespCh <- container.WaitResponse{StatusCode: 0}
+			}()
+			mockCli.On("CopyToContainer", mock.Anything, "test-container-id", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			if tc.testCopy {
 				err := os.WriteFile("/usr/local/bin/golangci-lint-1", []byte("test"), 0o755)
 				if err != nil {
@@ -219,23 +257,47 @@ func TestDockerRunner(t *testing.T) {
 						return
 					}
 				}()
-				mockCli.On("CopyToContainer", mock.Anything, "test-container-id", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			}
+			if tc.withArtifact {
+				var buf bytes.Buffer
+				tarWriter := tar.NewWriter(&buf)
+				content := []byte("hello_world")
+				hdr := &tar.Header{
+					Name:     "output.txt",
+					Mode:     0600,
+					Size:     int64(len(content)),
+					ModTime:  time.Now(),
+					Typeflag: tar.TypeReg,
+				}
+				if err := tarWriter.WriteHeader(hdr); err != nil {
+					t.Fatalf("Could not write tar header: %v", err)
+				}
+				if _, err := tarWriter.Write(content); err != nil {
+					t.Fatalf("Could not write tar content: %v", err)
+				}
+				if err := tarWriter.Close(); err != nil {
+					t.Fatalf("Could not close tar writer: %v", err)
+				}
+				mockReader := io.NopCloser(bytes.NewReader(buf.Bytes()))
+				mockCli.On("CopyFromContainer", mock.Anything, "test-container-id", mock.Anything).Return(mockReader, container.PathStat{}, nil)
+			} else {
+				mockCli.On("ContainerLogs", mock.Anything, "test-container-id", mock.Anything).Return(mockLogs, nil)
+			}
+
 			dr, err := runner.NewDockerRunner(mockCli)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			ctx := context.WithValue(context.Background(), lintersutil.EventGUIDKey, "test")
 			output, err := dr.Run(ctx, tc.cfg)
-
 			if tc.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
-				assert.NotNil(t, output)
+				require.NoError(t, err)
+				require.NotNil(t, output)
 				defer output.Close()
 
 				content, err := io.ReadAll(output)
-				assert.NoError(t, err)
-				assert.Equal(t, tc.wantOutput, string(content))
+				require.NoError(t, err)
+				require.Equal(t, tc.wantOutput, string(content))
 			}
 
 			// assert docker client expectations

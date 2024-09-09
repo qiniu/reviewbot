@@ -128,6 +128,7 @@ func (l *LocalRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClose
 }
 
 // for easy mock.
+// copy from github.com/docker/docker/client/client.go.
 type DockerClientInterface interface {
 	ImageInspectWithRaw(ctx context.Context, imageID string) (types.ImageInspect, []byte, error)
 	ImagePull(ctx context.Context, refStr string, options image.PullOptions) (io.ReadCloser, error)
@@ -135,4 +136,6 @@ type DockerClientInterface interface {
 	ContainerStart(ctx context.Context, containerID string, options container.StartOptions) error
 	ContainerLogs(ctx context.Context, container string, options container.LogsOptions) (io.ReadCloser, error)
 	CopyToContainer(ctx context.Context, containerID, dstPath string, content io.Reader, options container.CopyToContainerOptions) error
+	ContainerWait(ctx context.Context, containerID string, condition container.WaitCondition) (<-chan container.WaitResponse, <-chan error)
+	CopyFromContainer(ctx context.Context, containerID, srcPath string) (io.ReadCloser, container.PathStat, error)
 }
