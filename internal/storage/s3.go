@@ -31,7 +31,7 @@ type s3Credentials struct {
 func NewS3Storage(credFilePath string) (Storage, error) {
 	credential, err := os.ReadFile(credFilePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open S3CredentialsFile: %w", err)
+		return nil, fmt.Errorf("failed to open S3CredentialsFile: %v", err)
 	}
 	s3Creds := &s3Credentials{}
 	if err := json.Unmarshal(credential, s3Creds); err != nil {
