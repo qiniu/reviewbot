@@ -27,6 +27,8 @@ spec:
             - -app-id=$(GITHUB_APP_ID)
             - -app-private-key=/secrets/github_app_key
             - -debug=true
+            - -s3-credentials-file=/root/.aws/credentials.json
+            - -server-addr=http://qiniu-x.jfcs-k8s-qa1.qiniu.io   # this is an intranet domain of qiniu.
           env:
             - name: GITHUB_WEBHOOK_SECRET
               valueFrom:
@@ -75,6 +77,11 @@ spec:
               subPath: .golangci.goplus.yml
               name: golangci-config-goplus
               readOnly: true
+            - mountPath: /tmp
+              name: reviewbot-pvc
+            - name: aws-credentials-volume
+              mountPath: /root/.aws/credentials.json 
+              subPath: credentials.json 
         - name: dind
           image: aslan-spock-register.qiniu.io/qa/docker:27.2.0-dind
           securityContext:
@@ -124,6 +131,13 @@ spec:
           name: golangci-config-goplus
         - name: dind-storage
           emptyDir: {}
+        - name: reviewbot-pvc
+          persistentVolumeClaim:
+            claimName: reviewbot-pvc
+        - name: aws-credentials-volume
+          configMap:
+            name: s3credentials-cm
+
 
 ---
 apiVersion: v1
@@ -174,5 +188,28 @@ spec:
                   number: 8888
             path: /hook
             pathType: Prefix
+    - host: qiniu-x.jfcs-k8s-qa1.qiniu.io 
+      http:
+        paths:
+          - backend:
+              service:
+                name: reviewbot
+                port:
+                  number: 8888
+            path: /view
+            pathType: Prefix
 ---
 
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: reviewbot-pvc
+  namespace: reviewbot
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+
+---
