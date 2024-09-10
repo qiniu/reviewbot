@@ -18,8 +18,7 @@
 > mergerequest 页面的comment 展示总结果
 > 代码 discussion 中 展示详细信息，定位到异常代码行
 - 尽量保持与其他平台接入方式大致一致
-- 节点的选择是基于 repo/linter 粒度的
-  > 当然，如果后续有需要，可以做更灵活的配置，比如基于 repo 粒度，基于 org 粒度，或者基于 linter 粒度
+
 ## 整体设计
 
 不破坏现有部署架构，请求路径仍然是 webhook ->MergeRequestEvent->LinterCommand> Report,但是 由于gitlab 与github 功能上，API提供上都有些差异，在细节上又些许区别
@@ -35,7 +34,36 @@ webhook ->MergeRequestEvent→ gitpull代码-> DiffFile → lineter command-> co
 
 根据变动文件，执行对应的Linter，与github保持一致
 
+
 报告
+### Agent
+```go
+type Agent struct {
+
+	GitLabClient             *gitlab.Client
+	MergeRequestEvent        *gitlab.MergeEvent
+	MergeRequestChangedFiles []*gitlab.MergeRequestDiff
+	Report       report.Report
+}
+```
+### Report
+```go
+type Report interface {
+
+Repot(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput)   error
+}
+
+func (l *gitlabreport) Reprot(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput)
+
+func (l *githubreport) Reprot(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput)
+```
+
+
+
+
+
+
+
 根据检查结果，创建MergeRequesDiscussion，传入指定行信息，检查结果信息。
 根据检查结果，创建MergeRequestComments，在MergeRequest中增加对应的comment信息
 
