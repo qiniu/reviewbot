@@ -234,11 +234,7 @@ func main() {
 	go s.initDockerRunner()
 
 	if o.S3CredentialsFile != "" {
-		s3Credentials, err := os.ReadFile(o.S3CredentialsFile)
-		if err != nil {
-			log.Fatalf("failed to open S3CredentialsFile: %v", err)
-		}
-		s.storage, err = storage.NewS3Storage(s3Credentials)
+		s.storage, err = storage.NewS3Storage(o.S3CredentialsFile)
 		if err != nil {
 			log.Fatalf("failed to create s3 storage: %v", err)
 		}

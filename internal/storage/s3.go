@@ -6,16 +6,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 type S3Storage struct {
-	s3     *s3.S3
+	s3     *s3.Client
 	bucket string
 }
 type s3Credentials struct {
@@ -28,23 +28,22 @@ type s3Credentials struct {
 	Bucket           string `json:"bucket"`
 }
 
-func NewS3Storage(credential []byte) (Storage, error) {
+func NewS3Storage(credFilePath string) (Storage, error) {
+	credential, err := os.ReadFile(credFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open S3CredentialsFile: %w", err)
+	}
 	s3Creds := &s3Credentials{}
 	if err := json.Unmarshal(credential, s3Creds); err != nil {
 		return nil, fmt.Errorf("error getting S3 credentials from JSON: %w", err)
 	}
-	sess, err := session.NewSession(&aws.Config{
-		Region:           aws.String(s3Creds.Region),
-		Endpoint:         aws.String(s3Creds.Endpoint),
-		S3ForcePathStyle: aws.Bool(s3Creds.S3ForcePathStyle),
-		Credentials:      credentials.NewStaticCredentials(s3Creds.AccessKey, s3Creds.SecretKey, ""),
+
+	svc := s3.NewFromConfig(aws.Config{}, func(o *s3.Options) {
+		o.Credentials = credentials.NewStaticCredentialsProvider(s3Creds.AccessKey, s3Creds.SecretKey, "")
+		o.Region = s3Creds.Region
+		o.BaseEndpoint = &s3Creds.Endpoint
+		o.UsePathStyle = s3Creds.S3ForcePathStyle
 	})
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to create session: %w", err)
-	}
-	svc := s3.New(sess)
-
 	return &S3Storage{
 		s3:     svc,
 		bucket: s3Creds.Bucket,
@@ -54,10 +53,10 @@ func NewS3Storage(credential []byte) (Storage, error) {
 func (s *S3Storage) Write(ctx context.Context, key string, content []byte) error {
 	reader := bytes.NewReader(content)
 	objectKey := filepath.Join(key, DefaultLogName)
-	_, err := s.s3.PutObject(&s3.PutObjectInput{
+	_, err := s.s3.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(objectKey),
-		Body:   aws.ReadSeekCloser(reader),
+		Body:   reader,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to upload file: %w", err)
@@ -67,7 +66,7 @@ func (s *S3Storage) Write(ctx context.Context, key string, content []byte) error
 
 func (s *S3Storage) Read(ctx context.Context, key string) ([]byte, error) {
 	objectKey := filepath.Join(key, DefaultLogName)
-	result, err := s.s3.GetObject(&s3.GetObjectInput{
+	result, err := s.s3.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(objectKey),
 	})
