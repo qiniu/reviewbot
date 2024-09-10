@@ -191,11 +191,11 @@ func CreateGithubChecks(ctx context.Context, a Agent, lintErrs map[string][]Lint
 	}
 
 	logURL := a.GenLogViewUrl()
-	log.Debugf("Log view :%s", logURL)
 	if logURL == "" {
 		check.Output.Summary = github.String(Reference)
 	} else {
-		check.Output.Summary = github.String(fmt.Sprintf("[full log ](%s)\n", logURL) + Reference)
+		log.Debugf("Log view :%s", logURL)
+		check.Output.Summary = github.String(fmt.Sprintf("This is [the detailed log](%s).\n\n%s", logURL, Reference))
 	}
 
 	if len(annotations) > 0 {
