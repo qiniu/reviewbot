@@ -6,7 +6,6 @@ require (
 	github.com/bradleyfalzon/ghinstallation/v2 v2.8.0
 	github.com/docker/docker v27.2.0+incompatible
 	github.com/google/go-github/v57 v57.0.0
-	github.com/google/uuid v1.6.0
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79
 	github.com/opencontainers/image-spec v1.1.0
 	github.com/prometheus/client_golang v1.19.0
@@ -19,6 +18,7 @@ require (
 )
 
 require (
+	github.com/AdaLogics/go-fuzz-headers v0.0.0-20240806141605-e8a1dd7889d6 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect

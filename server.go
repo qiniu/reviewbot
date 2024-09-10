@@ -19,12 +19,15 @@ package main
 import (
 	"context"
 	"fmt"
+	"math"
+	"math/rand"
 	"net/http"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v57/github"
@@ -86,17 +89,45 @@ func (s *Server) initDockerRunner() {
 	go func() {
 		ctx := context.Background()
 		for _, image := range images {
-			log.Infof("pulling image %s", image)
-			linterConfig := &config.Linter{
-				DockerAsRunner: config.DockerAsRunner{
-					Image: image,
-				},
-			}
-			if err := s.dockerRunner.Prepare(ctx, linterConfig); err != nil {
-				log.Errorf("failed to pull image %s: %v", image, err)
-			}
+			s.pullImageWithRetry(ctx, image)
 		}
 	}()
+}
+
+func (s *Server) pullImageWithRetry(ctx context.Context, image string) {
+	maxRetries := 5
+	baseDelay := time.Second * 2
+	maxDelay := time.Minute * 2
+
+	for attempt := 0; ; attempt++ {
+		log.Infof("Attempting to pull image %s (attempt %d)", image, attempt+1)
+
+		linterConfig := &config.Linter{
+			DockerAsRunner: config.DockerAsRunner{
+				Image: image,
+			},
+		}
+
+		err := s.dockerRunner.Prepare(ctx, linterConfig)
+		if err == nil {
+			log.Infof("Successfully pulled image %s", image)
+			return
+		}
+
+		if attempt >= maxRetries {
+			log.Errorf("Failed to pull image %s after %d attempts: %v", image, maxRetries, err)
+			return
+		}
+
+		delay := time.Duration(float64(baseDelay) * math.Pow(2, float64(attempt)))
+		delay += time.Duration(rand.Int63n(int64(delay) / 2))
+		if delay > maxDelay {
+			delay = maxDelay
+		}
+
+		log.Warnf("Failed to pull image %s: %v. Retrying in %v...", image, err, delay)
+		time.Sleep(delay)
+	}
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
