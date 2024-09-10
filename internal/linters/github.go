@@ -191,6 +191,7 @@ func CreateGithubChecks(ctx context.Context, a Agent, lintErrs map[string][]Lint
 	}
 
 	logURL := a.GenLogViewUrl()
+	log.Debugf("Log view :%s", logURL)
 	if logURL == "" {
 		check.Output.Summary = github.String(Reference)
 	} else {

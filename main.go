@@ -68,7 +68,7 @@ type options struct {
 	// log storage dir for local storage
 	logDir string
 	// s3 credential config
-	s3Credential string
+	S3CredentialsFile string
 	// server addr which is used to generate the log view url
 	// e.g. https://domain
 	serverAddr string
@@ -106,6 +106,8 @@ func gatherOptions() options {
 	fs.StringVar(&o.appPrivateKey, "app-private-key", "", "github app private key")
 	fs.StringVar(&o.logDir, "log-dir", "/tmp", "log storage dir for local storage")
 	fs.StringVar(&o.serverAddr, "server-addr", "", "server addr which is used to generate the log view url")
+	fs.StringVar(&o.S3CredentialsFile, "s3-credentials-file", "", "File where s3 credentials are stored. For the exact format see http://xxxx/doc")
+
 	err := fs.Parse(os.Args[1:])
 	if err != nil {
 		log.Fatalf("failed to parse flags: %v", err)
@@ -231,9 +233,8 @@ func main() {
 
 	go s.initDockerRunner()
 
-	// Prioritize using S3 storage if s3 credential is provided
-	if o.s3Credential != "" {
-		s.storage, err = storage.NewS3Storage(o.s3Credential)
+	if o.S3CredentialsFile != "" {
+		s.storage, err = storage.NewS3Storage(o.S3CredentialsFile)
 		if err != nil {
 			log.Fatalf("failed to create s3 storage: %v", err)
 		}
