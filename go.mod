@@ -19,6 +19,7 @@ require (
 )
 
 require (
+	github.com/xanzy/go-gitlab  v0.109.0 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect

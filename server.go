@@ -35,6 +35,7 @@ import (
 	"github.com/qiniu/reviewbot/internal/runner"
 	"github.com/qiniu/reviewbot/internal/storage"
 	"github.com/qiniu/x/log"
+	gitlabapi "github.com/xanzy/go-gitlab"
 	gitv2 "sigs.k8s.io/prow/pkg/git/v2"
 )
 
@@ -100,6 +101,13 @@ func (s *Server) initDockerRunner() {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	switch "" {
+	case "github":
+		x := GitlabServer{}
+		x.gitlabRequestHandle(w, r)
+	default:
+	}
+
 	eventGUID := github.DeliveryID(r)
 	if len(eventGUID) > 12 {
 		// limit the length of eventGUID to 12
@@ -115,9 +123,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	event, err := github.ParseWebHook(github.WebHookType(r), payload)
+
 	if err != nil {
 		log.Errorf("parse webhook failed: %v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		event, err = gitlabapi.ParseHook(gitlabapi.HookEventType(r), payload)
+
 		return
 	}
 
@@ -142,6 +153,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				log.Errorf("process check run request event: %v", err)
 			}
 		}()
+
 	default:
 		log.Debugf("skipping event type %s\n", github.WebHookType(r))
 	}
@@ -163,7 +175,6 @@ func (s *Server) processCheckRunRequestEvent(ctx context.Context, event *github.
 		log.Debugf("Skipping action %s for check run event", event.GetAction())
 		return nil
 	}
-
 	headSHA := event.GetCheckRun().GetHeadSHA()
 	repo := event.GetRepo()
 	org := repo.GetOwner().GetLogin()
@@ -196,7 +207,6 @@ func (s *Server) processCheckRunRequestEvent(ctx context.Context, event *github.
 			// continue to handle other pull requests
 		}
 	}
-
 	return nil
 }
 
@@ -264,7 +274,7 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 	if err != nil {
 		return fmt.Errorf("failed to prepare repo dir: %w", err)
 	}
-
+	
 	r, err := s.gitClientFactory.ClientForWithRepoOpts(org, repo, gitv2.RepoOpts{
 		CopyTo: repoPath,
 	})

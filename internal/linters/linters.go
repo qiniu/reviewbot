@@ -19,9 +19,11 @@ package linters
 import (
 	"context"
 	"fmt"
+	"github.com/xanzy/go-gitlab"
 	"io"
 	"os"
 	"regexp"
+	"sigs.k8s.io/prow/pkg/github/report"
 	"strconv"
 	"strings"
 	"time"
@@ -126,6 +128,11 @@ type Agent struct {
 	GenLogKey func() string
 	// GenLogViewUrl generates the log view url.
 	GenLogViewUrl func() string
+
+	GitLabClient             *gitlab.Client
+	MergeRequestEvent        *gitlab.MergeEvent
+	MergeRequestChangedFiles []*gitlab.MergeRequestDiff
+	Report                   report.Report
 }
 
 const CommentFooter = `
