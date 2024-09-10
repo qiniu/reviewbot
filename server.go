@@ -28,14 +28,13 @@ import (
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v57/github"
-	"github.com/google/uuid"
 	"github.com/gregjones/httpcache"
 	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
+	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/reviewbot/internal/runner"
 	"github.com/qiniu/reviewbot/internal/storage"
 	"github.com/qiniu/x/log"
-	"github.com/qiniu/x/xlog"
 	gitv2 "sigs.k8s.io/prow/pkg/git/v2"
 )
 
@@ -43,7 +42,12 @@ type Server struct {
 	gitClientFactory gitv2.ClientFactory
 	config           config.Config
 
+	// server addr which is used to generate the log view url
+	// e.g. https://domain
+	serverAddr string
+
 	dockerRunner runner.Runner
+	storage      storage.Storage
 
 	webhookSecret []byte
 
@@ -60,8 +64,8 @@ func (s *Server) initDockerRunner() {
 	var images []string
 	for _, customConfig := range s.config.CustomConfig {
 		for _, linter := range customConfig {
-			if linter.DockerAsRunner != "" {
-				images = append(images, linter.DockerAsRunner)
+			if linter.DockerAsRunner.Image != "" {
+				images = append(images, linter.DockerAsRunner.Image)
 			}
 		}
 	}
@@ -83,7 +87,11 @@ func (s *Server) initDockerRunner() {
 		ctx := context.Background()
 		for _, image := range images {
 			log.Infof("pulling image %s", image)
-			linterConfig := &config.Linter{DockerAsRunner: image}
+			linterConfig := &config.Linter{
+				DockerAsRunner: config.DockerAsRunner{
+					Image: image,
+				},
+			}
 			if err := s.dockerRunner.Prepare(ctx, linterConfig); err != nil {
 				log.Errorf("failed to pull image %s: %v", image, err)
 			}
@@ -97,12 +105,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// limit the length of eventGUID to 12
 		eventGUID = eventGUID[len(eventGUID)-12:]
 	}
-	ctx := context.WithValue(context.Background(), config.EventGUIDKey, eventGUID)
-	log := xlog.New(ctx.Value(config.EventGUIDKey).(string))
+	ctx := context.WithValue(context.Background(), lintersutil.EventGUIDKey, eventGUID)
+	log := lintersutil.FromContext(ctx)
 
 	payload, err := github.ValidatePayload(r, s.webhookSecret)
 	if err != nil {
-		log.Errorf("validate payload failed: %v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -141,6 +148,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) processPullRequestEvent(ctx context.Context, event *github.PullRequestEvent) error {
+	log := lintersutil.FromContext(ctx)
 	if event.GetAction() != "opened" && event.GetAction() != "reopened" && event.GetAction() != "synchronize" {
 		log.Debugf("skipping action %s\n", event.GetAction())
 		return nil
@@ -150,27 +158,83 @@ func (s *Server) processPullRequestEvent(ctx context.Context, event *github.Pull
 }
 
 func (s *Server) processCheckRunRequestEvent(ctx context.Context, event *github.CheckRunEvent) error {
+	log := lintersutil.FromContext(ctx)
 	if event.GetAction() != "rerequested" {
-		log.Debugf("skipping action %s\n", event.GetAction())
+		log.Debugf("Skipping action %s for check run event", event.GetAction())
 		return nil
 	}
-	pevent := github.PullRequestEvent{}
-	pevent.Repo = event.GetRepo()
-	pevent.PullRequest = event.GetCheckRun().PullRequests[0]
-	pevent.Installation = event.GetInstallation()
-	return s.handle(ctx, &pevent)
+
+	headSHA := event.GetCheckRun().GetHeadSHA()
+	repo := event.GetRepo()
+	org := repo.GetOwner().GetLogin()
+	repoName := repo.GetName()
+	installationID := event.GetInstallation().GetID()
+
+	client := s.GithubClient(installationID)
+	prs, err := linters.FilterPullRequestsWithCommit(ctx, client, org, repoName, headSHA)
+	if err != nil {
+		log.Errorf("failed to filter pull requests: %v", err)
+		return nil
+	}
+
+	if len(prs) == 0 {
+		log.Errorf("No pull requests found for commit SHA: %s", headSHA)
+		return nil
+	}
+
+	for _, pr := range prs {
+		log.Infof("try to reprocessing pull request %d, (%v/%v), installationID: %d\n", pr.GetNumber(), org, repo, installationID)
+		event := &github.PullRequestEvent{
+			Repo:         repo,
+			PullRequest:  pr,
+			Number:       pr.Number,
+			Installation: event.GetInstallation(),
+		}
+
+		if err := s.handle(ctx, event); err != nil {
+			log.Errorf("failed to handle pull request event: %v", err)
+			// continue to handle other pull requests
+		}
+	}
+
+	return nil
 }
 
 func (s *Server) processCheckSuiteEvent(ctx context.Context, event *github.CheckSuiteEvent) error {
+	log := lintersutil.FromContext(ctx)
 	if event.GetAction() != "rerequested" {
 		log.Debugf("skipping action %s\n", event.GetAction())
 		return nil
 	}
-	pevent := github.PullRequestEvent{}
-	pevent.Repo = event.GetRepo()
-	pevent.PullRequest = event.GetCheckSuite().PullRequests[0]
-	pevent.Installation = event.GetInstallation()
-	return s.handle(ctx, &pevent)
+
+	headSha := event.GetCheckSuite().GetHeadSHA()
+	org := event.GetRepo().GetOwner().GetLogin()
+	repo := event.GetRepo().GetName()
+	installationID := event.GetInstallation().GetID()
+	plist, err := linters.FilterPullRequestsWithCommit(ctx, s.GithubClient(installationID), org, repo, headSha)
+	if err != nil {
+		log.Errorf("failed to filter pull requests: %v", err)
+		return nil
+	}
+
+	if len(plist) == 0 {
+		log.Errorf("No pull requests found for commit SHA: %s", headSha)
+		return nil
+	}
+	for _, pr := range plist {
+		log.Infof("try to reprocessing pull request %d, (%v/%v), installationID: %d\n", pr.GetNumber(), org, repo, installationID)
+		event := github.PullRequestEvent{
+			Repo:         event.GetRepo(),
+			Number:       pr.Number,
+			PullRequest:  pr,
+			Installation: event.GetInstallation(),
+		}
+		if err := s.handle(ctx, &event); err != nil {
+			log.Errorf("failed to handle pull request event: %v", err)
+			// continue to handle other pull requests
+		}
+	}
+	return nil
 }
 
 func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) error {
@@ -180,7 +244,7 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 		repo    = event.GetRepo().GetName()
 		orgRepo = org + "/" + repo
 	)
-	log := xlog.New(ctx.Value(config.EventGUIDKey).(string))
+	log := lintersutil.FromContext(ctx)
 
 	installationID := event.GetInstallation().GetID()
 	log.Infof("processing pull request %d, (%v/%v), installationID: %d\n", num, org, repo, installationID)
@@ -262,9 +326,9 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 			GitClient:               s.gitClientFactory,
 			PullRequestEvent:        *event,
 			PullRequestChangedFiles: pullRequestAffectedFiles,
-			LinterName:              name,
 			RepoDir:                 r.Directory(),
 			Context:                 ctx,
+			ID:                      lintersutil.GetEventGUID(ctx),
 		}
 
 		if !linters.LinterRelated(name, agent) {
@@ -273,31 +337,21 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 		}
 
 		r := runner.NewLocalRunner()
-		if linterConfig.DockerAsRunner != "" {
+		if linterConfig.DockerAsRunner.Image != "" {
 			r = s.dockerRunner
 		}
 		agent.Runner = r
-
-		logStorageConfig := s.config.LogStorageConfig
-		if len(logStorageConfig.CustomRemoteConfigs) == 0 {
-			agent.LogStorage = storage.NewLocalStorage()
-		} else {
-			for remoteName, storageConfig := range logStorageConfig.CustomRemoteConfigs {
-				switch remoteName {
-				case "github":
-					agent.LogStorage = storage.NewGitubStorage(storageConfig.(config.GithubConfig))
-				default:
-					log.Warnf("%s was wrong storageType", remoteName)
-				}
-			}
+		agent.Storage = s.storage
+		agent.GenLogKey = func() string {
+			return fmt.Sprintf("%s/%s/%s", agent.LinterConfig.Name, agent.PullRequestEvent.Repo.GetFullName(), agent.ID)
 		}
-
-		agent.LinterUuid = uuid.New().String()
-		agent.LinterLogStoragePath = fmt.Sprintf("linter-logs/%s/%d/%s/log-build.txt", *agent.PullRequestEvent.Repo.Name, *agent.PullRequestEvent.Number, agent.LinterUuid)
-		agent.LinterLogViewUrl = "http://" + s.config.ServerAddr + "/view/" + agent.LinterLogStoragePath
-
-		// s.config.ServerAddr = "localhost:8888"
-		// log.Debugf("---------LinterLogViewUrl---------   : %s", agent.LinterLogViewUrl)
+		agent.GenLogViewUrl = func() string {
+			// if serverAddr is not provided, return empty string
+			if s.serverAddr == "" {
+				return ""
+			}
+			return s.serverAddr + "/view/" + agent.GenLogKey()
+		}
 
 		if err := fn(ctx, agent); err != nil {
 			log.Errorf("failed to run linter: %v", err)

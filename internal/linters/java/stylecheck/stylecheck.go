@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/x/errors"
@@ -30,7 +29,7 @@ func init() {
 }
 
 func stylecheckHandler(ctx context.Context, a linters.Agent) error {
-	slog := xlog.New(ctx.Value(config.EventGUIDKey).(string))
+	slog := lintersutil.FromContext(ctx)
 	var javaFiles []string
 	rulePath := a.LinterConfig.ConfigPath
 	for _, arg := range a.PullRequestChangedFiles {
@@ -48,7 +47,8 @@ func stylecheckHandler(ctx context.Context, a linters.Agent) error {
 	}
 
 	a = argsApply(slog, a)
-	a.LinterConfig.Args = append(append(a.LinterConfig.Args, javaFiles...), "-jar", localStyleJar, "-c", checkrulePath)
+	a.LinterConfig.Args = append(a.LinterConfig.Args, "-jar", localStyleJar, "-c", checkrulePath)
+	a.LinterConfig.Args = append(a.LinterConfig.Args, javaFiles...)
 
 	return linters.GeneralHandler(slog, a, linters.ExecRun, stylecheckParser(a.LinterConfig.WorkDir))
 }
@@ -60,7 +60,7 @@ func argsApply(log *xlog.Logger, a linters.Agent) linters.Agent {
 	}
 	log.Info("stylecheck comamnd:" + strings.Join(config.Command, " "))
 	if linters.IsEmpty(config.Args...) {
-		args := append([]string{}, "-f", "plain")
+		args := append([]string{}, "")
 		config.Args = args
 	}
 	a.LinterConfig = config

@@ -6,17 +6,20 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/archive"
 	"github.com/qiniu/reviewbot/config"
-	"github.com/qiniu/x/xlog"
+	"github.com/qiniu/reviewbot/internal/lintersutil"
 )
 
 type DockerRunner struct {
-	cli DockerClientInterface
+	cli    DockerClientInterface
+	script string
 }
 
 func NewDockerRunner(cli DockerClientInterface) (Runner, error) {
@@ -30,13 +33,17 @@ func NewDockerRunner(cli DockerClientInterface) (Runner, error) {
 	return &DockerRunner{cli: cli}, nil
 }
 
+func (r *DockerRunner) GetFinalScript() string {
+	return r.script
+}
+
 // Prepare will pull the docker image if it is not exist.
 func (r *DockerRunner) Prepare(ctx context.Context, cfg *config.Linter) error {
-	if cfg.DockerAsRunner == "" {
+	if cfg.DockerAsRunner.Image == "" {
 		return nil
 	}
 
-	_, _, err := r.cli.ImageInspectWithRaw(ctx, cfg.DockerAsRunner)
+	_, _, err := r.cli.ImageInspectWithRaw(ctx, cfg.DockerAsRunner.Image)
 	if err == nil {
 		return nil
 	}
@@ -44,7 +51,7 @@ func (r *DockerRunner) Prepare(ctx context.Context, cfg *config.Linter) error {
 		return fmt.Errorf("failed to inspect image: %w", err)
 	}
 
-	reader, err := r.cli.ImagePull(ctx, cfg.DockerAsRunner, image.PullOptions{})
+	reader, err := r.cli.ImagePull(ctx, cfg.DockerAsRunner.Image, image.PullOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to pull image: %w", err)
 	}
@@ -56,8 +63,8 @@ func (r *DockerRunner) Prepare(ctx context.Context, cfg *config.Linter) error {
 }
 
 func (r *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadCloser, error) {
-	log := xlog.New(ctx.Value(config.EventGUIDKey).(string))
-	if cfg.DockerAsRunner == "" {
+	log := lintersutil.FromContext(ctx)
+	if cfg.DockerAsRunner.Image == "" {
 		return nil, fmt.Errorf("docker image is not set")
 	}
 
@@ -88,10 +95,11 @@ func (r *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClos
 	// handle args
 	scriptContent += strings.Join(cfg.Args, " ")
 	log.Infof("Script content: \n%s", scriptContent)
+	r.script = scriptContent
 
 	var (
 		dockerConfig = &container.Config{
-			Image:      cfg.DockerAsRunner,
+			Image:      cfg.DockerAsRunner.Image,
 			Env:        cfg.Env,
 			Entrypoint: entrypoint,
 			Cmd:        []string{scriptContent},
@@ -110,11 +118,29 @@ func (r *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClos
 	if err != nil {
 		return nil, fmt.Errorf("failed to create container: %w", err)
 	}
-
 	log.Infof("container created: %v", resp.ID)
+
+	if cfg.DockerAsRunner.CopyLinterFromOrigin {
+		linterOrignPath, err := exec.LookPath(cfg.Name)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find %s :%w", cfg.Name, err)
+		}
+
+		reader, err := archive.Tar(linterOrignPath, archive.Uncompressed)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create tar reader: %w", err)
+		}
+
+		err = r.cli.CopyToContainer(ctx, resp.ID, "/usr/local/bin/", reader, container.CopyToContainerOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("copy to containner was failed : %w", err)
+		}
+	}
+
 	if err := r.cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
 		return nil, fmt.Errorf("failed to start container: %w", err)
 	}
+	log.Infof("container started: %v", resp.ID)
 
 	logOptions := container.LogsOptions{
 		ShowStdout: true,

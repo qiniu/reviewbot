@@ -52,6 +52,40 @@ func ListPullRequestsFiles(ctx context.Context, gc *github.Client, owner string,
 	}
 }
 
+// FilterPullRequests filter full request by commit.
+func FilterPullRequestsWithCommit(ctx context.Context, gc *github.Client, owner, repo, headSha string) ([]*github.PullRequest, error) {
+	var allPRs []*github.PullRequest
+	opt := &github.PullRequestListOptions{
+		State: "open",
+		ListOptions: github.ListOptions{
+			PerPage: 100,
+		},
+	}
+
+	for {
+		prs, resp, err := gc.PullRequests.List(ctx, owner, repo, opt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list pull requests: %w", err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("failed to list pull requests: %v", github.Stringify(resp.Body))
+		}
+
+		for _, pr := range prs {
+			if pr.GetHead().GetSHA() == headSha {
+				allPRs = append(allPRs, pr)
+			}
+		}
+
+		if resp.NextPage == 0 {
+			break
+		}
+		opt.Page = resp.NextPage
+	}
+
+	return allPRs, nil
+}
+
 // ListPullRequestsComments lists all comments on the specified pull request.
 // TODO(CarlJi): add pagination support.
 func ListPullRequestsComments(ctx context.Context, gc *github.Client, owner string, repo string, number int) ([]*github.PullRequestComment, error) {
@@ -133,7 +167,7 @@ func CreateGithubChecks(ctx context.Context, a Agent, lintErrs map[string][]Lint
 		owner      = a.PullRequestEvent.Repo.GetOwner().GetLogin()
 		repo       = a.PullRequestEvent.Repo.GetName()
 		startTime  = a.PullRequestEvent.GetPullRequest().GetUpdatedAt()
-		linterName = a.LinterName
+		linterName = a.LinterConfig.Name
 	)
 
 	annotations := toGithubCheckRunAnnotations(lintErrs)
@@ -142,7 +176,6 @@ func CreateGithubChecks(ctx context.Context, a Agent, lintErrs map[string][]Lint
 	if len(annotations) > 50 {
 		annotations = annotations[:50]
 	}
-
 	check := github.CreateCheckRunOptions{
 		Name:      linterName,
 		HeadSHA:   headSha,
@@ -153,9 +186,15 @@ func CreateGithubChecks(ctx context.Context, a Agent, lintErrs map[string][]Lint
 		},
 		Output: &github.CheckRunOutput{
 			Title:       github.String(fmt.Sprintf("%s found %d issues related to your changes", linterName, len(annotations))),
-			Summary:     github.String(fmt.Sprintf("[full log ](%s)\n", a.LinterLogViewUrl) + Reference),
 			Annotations: annotations,
 		},
+	}
+
+	logURL := a.GenLogViewUrl()
+	if logURL == "" {
+		check.Output.Summary = github.String(Reference)
+	} else {
+		check.Output.Summary = github.String(fmt.Sprintf("[full log ](%s)\n", logURL) + Reference)
 	}
 
 	if len(annotations) > 0 {

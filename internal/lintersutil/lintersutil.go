@@ -1,11 +1,13 @@
 package lintersutil
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/qiniu/x/log"
+	"github.com/qiniu/x/xlog"
 )
 
 // LimitJoin joins the strings in str with a newline separator until the length of the result is greater than length.
@@ -39,4 +41,27 @@ func FileExists(path string) (absPath string, exist bool) {
 	}
 
 	return fileAbs, true
+}
+
+type contextKey string
+
+// EventGUIDKey is the key for the event GUID in the context.
+const EventGUIDKey contextKey = "event_guid"
+
+// FromContext returns a logger from the context.
+func FromContext(ctx context.Context) *xlog.Logger {
+	eventGUID, ok := ctx.Value(EventGUIDKey).(string)
+	if !ok {
+		return xlog.New("default")
+	}
+	return xlog.New(eventGUID)
+}
+
+// GetEventGUID returns the event GUID from the context.
+func GetEventGUID(ctx context.Context) string {
+	eventGUID, ok := ctx.Value(EventGUIDKey).(string)
+	if !ok {
+		return "default"
+	}
+	return eventGUID
 }

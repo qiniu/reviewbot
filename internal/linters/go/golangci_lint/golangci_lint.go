@@ -25,7 +25,7 @@ func init() {
 }
 
 func golangciLintHandler(ctx context.Context, a linters.Agent) error {
-	log := xlog.New(ctx.Value(config.EventGUIDKey).(string))
+	log := lintersutil.FromContext(ctx)
 	var goModDirs []string
 	if len(a.LinterConfig.Command) == 0 || (len(a.LinterConfig.Command) == 1 && a.LinterConfig.Command[0] == lintName) {
 		// Default mode, automatically find the go.mod path in current repo

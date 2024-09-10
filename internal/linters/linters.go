@@ -24,6 +24,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/reviewbot/config"
@@ -100,10 +101,12 @@ type LinterOutput struct {
 
 // Agent knows necessary information in order to run linters.
 type Agent struct {
+	// ID each linter execution has a unique id.
+	ID string
 	// Context is the context of the agent.
 	Context context.Context
-	// LogStorages is the way to contral log storage
-	LogStorage storage.Storage
+	// Storage knows how to store and retrieve the linter logs.
+	Storage storage.Storage
 	// Runner is the way to run the linter.	like docker, local, etc.
 	Runner runner.Runner
 	// GitHubClient is the GitHub client.
@@ -116,16 +119,13 @@ type Agent struct {
 	PullRequestEvent github.PullRequestEvent
 	// PullRequestChangedFiles is the changed files of a pull request.
 	PullRequestChangedFiles []*github.CommitFile
-	// LinterName is the linter name.
-	LinterName string
 	// RepoDir is the repo directory.
 	RepoDir string
-	// LinterUuid is the uinque id of onece linter exec .
-	LinterUuid string
-	// LinterLogStoragePath is the path of log storage
-	LinterLogStoragePath string
-	// LinterLogStoragePath is the path of log storage
-	LinterLogViewUrl string
+
+	// GenLogKey generates the log key.
+	GenLogKey func() string
+	// GenLogViewUrl generates the log view url.
+	GenLogViewUrl func() string
 }
 
 const CommentFooter = `
@@ -145,7 +145,7 @@ If you have any questions about this comment, feel free to raise an issue here:
 type LinterParser func(*xlog.Logger, []byte) (map[string][]LinterOutput, []string)
 
 func GeneralHandler(log *xlog.Logger, a Agent, execRun func(a Agent) ([]byte, error), linterParser func(*xlog.Logger, []byte) (map[string][]LinterOutput, []string)) error {
-	linterName := a.LinterName
+	linterName := a.LinterConfig.Name
 	output, err := execRun(a)
 	if err != nil {
 		// NOTE(CarlJi): the error is *ExitError, it seems to have little information and needs to be handled in a better way.
@@ -170,6 +170,8 @@ func GeneralHandler(log *xlog.Logger, a Agent, execRun func(a Agent) ([]byte, er
 
 // ExecRun executes a command.
 func ExecRun(a Agent) ([]byte, error) {
+	eventGuid := lintersutil.FromContext(a.Context).ReqId
+	start := time.Now()
 	reader, err := a.Runner.Run(a.Context, &a.LinterConfig)
 	if err != nil {
 		log.Warnf("failed to run linter: %v, mark and continue", err)
@@ -181,12 +183,14 @@ func ExecRun(a Agent) ([]byte, error) {
 		return nil, fmt.Errorf("failed to read linter output: %w", err)
 	}
 
-	ctx := context.Background()
-	err = a.LogStorage.Writer(ctx, a.LinterLogStoragePath, output)
+	end := time.Now()
+	toLog := []byte(fmt.Sprintf("[%s][%s] run script:\n%s\n",
+		start.Format(time.RFC3339), eventGuid, a.Runner.GetFinalScript()))
+	toLog = append(toLog, []byte(fmt.Sprintf("[%s][%s] output:\n%s\n",
+		end.Format(time.RFC3339), eventGuid, string(output)))...)
+	err = a.Storage.Write(a.Context, a.GenLogKey(), toLog)
 	if err != nil {
 		log.Errorf("write to storage was failed %v", err)
-	} else {
-		log.Info("write to storage was successful")
 	}
 
 	return output, nil
@@ -206,7 +210,7 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 		org        = a.PullRequestEvent.Repo.GetOwner().GetLogin()
 		repo       = a.PullRequestEvent.Repo.GetName()
 		orgRepo    = a.PullRequestEvent.Repo.GetFullName()
-		linterName = a.LinterName
+		linterName = a.LinterConfig.Name
 	)
 
 	log.Infof("[%s] found total %d files with %d lint errors on repo %v", linterName, len(lintResults), countLinterErrors(lintResults), orgRepo)

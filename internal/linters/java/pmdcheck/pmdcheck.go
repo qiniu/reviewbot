@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/x/errors"
@@ -28,7 +27,7 @@ func init() {
 }
 
 func pmdCheckHandler(ctx context.Context, a linters.Agent) error {
-	plog := xlog.New(ctx.Value(config.EventGUIDKey).(string))
+	plog := lintersutil.FromContext(ctx)
 	var javaFiles []string
 	rulePath := a.LinterConfig.ConfigPath
 	for _, arg := range a.PullRequestChangedFiles {
@@ -48,6 +47,7 @@ func pmdCheckHandler(ctx context.Context, a linters.Agent) error {
 	a.LinterConfig.Args = append(append(a.LinterConfig.Args, javaFiles...), "-R", checkrulePath)
 	return linters.GeneralHandler(plog, a, linters.ExecRun, pmdcheckParser)
 }
+
 func argsApply(log *xlog.Logger, a linters.Agent) linters.Agent {
 	config := a.LinterConfig
 	if len(config.Command) == 1 && config.Command[0] == linterName {

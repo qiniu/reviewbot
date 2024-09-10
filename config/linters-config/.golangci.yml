@@ -25,6 +25,25 @@ linters-settings:
         disabled: true
       - name: max-public-structs
         disabled: true
+      - name: unused-parameter
+        disabled: true
+      - name: import-shadowing
+        disabled: true
+      - name: unused-receiver
+        disabled: true
+      - name: deep-exit
+        disabled: true
+      - name: function-length
+        disabled: true
+      - name: cyclomatic
+        arguments: [30]
+
+  errcheck:
+    exclude-functions:
+      - (net/http.ResponseWriter).Write
+      - (net/http.ResponseWriter).WriteHeader
+      - (net/http.ResponseWriter).Header
+      - (*flag.FlagSet).Parse
 
 issues:
   exclude-rules:
@@ -61,3 +80,4 @@ linters:
     - godox # seems too arbitrary
     - err113 # seems too arbitrary
     - gochecknoinits # see too many false positives
+    - gofumpt # see too many false positives

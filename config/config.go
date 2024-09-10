@@ -8,10 +8,9 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+// Config is the config for the using of reviewbot.
 type Config struct {
-	GlobalDefaultConfig GlobalConfig     `json:"globalDefaultConfig,omitempty"`
-	LogStorageConfig    LogStorageConfig `json:"logStorageConfig,omitempty"`
-	ServerAddr          string           `json:"serverAddr,omitempty"`
+	GlobalDefaultConfig GlobalConfig `json:"globalDefaultConfig,omitempty"`
 
 	// CustomConfig is the custom linter config.
 	// e.g.
@@ -39,19 +38,19 @@ type GlobalConfig struct {
 	JavaStyleCheckRuleConfig string `json:"javastylecheckruleConfig,omitempty"`
 }
 
-type LogStorageConfig struct {
-	CustomRemoteConfigs map[string]any `json:"customRemoteConfigs"`
+type DockerAsRunner struct {
+	Image                string `json:"image"`
+	CopyLinterFromOrigin bool   `json:"copylinterFromOrigin,omitempty"`
 }
-
-type GithubConfig struct{}
-
 type Linter struct {
+	// Name is the linter name.
+	Name string
 	// Enable is whether to enable this linter, if false, linter still run but not report.
 	Enable *bool `json:"enable,omitempty"`
 	// DockerAsRunner is the docker image to run the linter.
 	// Optional, if not empty, use the docker image to run the linter.
 	// e.g. "golang:1.23.4"
-	DockerAsRunner string `json:"dockerAsRunner,omitempty"`
+	DockerAsRunner DockerAsRunner `json:"dockerAsRunner,omitempty"`
 	// WorkDir is the working directory of the linter.
 	WorkDir string `json:"workDir,omitempty"`
 	// Command is the command to run the linter. e.g. "golangci-lint", "staticcheck"
@@ -134,6 +133,7 @@ func (c Config) Get(org, repo, ln string) Linter {
 		Enable:       boolPtr(true),
 		ReportFormat: c.GlobalDefaultConfig.GithubReportType,
 		Modifier:     NewBaseModifier(),
+		Name:         ln,
 	}
 
 	// set golangci-lint config path if exists
@@ -193,8 +193,15 @@ func applyCustomConfig(legacy, custom Linter) Linter {
 		legacy.ConfigPath = custom.ConfigPath
 	}
 
-	if custom.DockerAsRunner != "" {
-		legacy.DockerAsRunner = custom.DockerAsRunner
+	if custom.DockerAsRunner.Image != "" {
+		legacy.DockerAsRunner.Image = custom.DockerAsRunner.Image
+	}
+	if custom.DockerAsRunner.CopyLinterFromOrigin {
+		legacy.DockerAsRunner.CopyLinterFromOrigin = custom.DockerAsRunner.CopyLinterFromOrigin
+	}
+
+	if custom.Name != "" {
+		legacy.Name = custom.Name
 	}
 
 	return legacy
@@ -249,8 +256,3 @@ func (*baseModifier) Modify(cfg *Linter) (*Linter, error) {
 
 	return &newCfg, nil
 }
-
-type contextKey string
-
-// EventGUIDKey is the key for the event GUID in the context.
-const EventGUIDKey contextKey = "event_guid"

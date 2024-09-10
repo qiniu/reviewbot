@@ -15,28 +15,39 @@ import (
 	"github.com/docker/docker/api/types/network"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/qiniu/reviewbot/config"
-	"github.com/qiniu/x/xlog"
+	"github.com/qiniu/reviewbot/internal/lintersutil"
 )
 
+// Runner defines the interface for how to run the linter.
 type Runner interface {
+	// Prepare prepares the linter for running.
 	Prepare(ctx context.Context, cfg *config.Linter) error
+	// Run runs the linter and returns the output.
 	Run(ctx context.Context, cfg *config.Linter) (io.ReadCloser, error)
+	// GetFinalScript returns the final script to be executed.
+	// It should be called after Run function. and it's used for logging and debugging.
+	GetFinalScript() string
 }
 
 // LocalRunner is a runner that runs the linter locally.
 type LocalRunner struct {
+	script string
 }
 
 func NewLocalRunner() Runner {
 	return &LocalRunner{}
 }
 
-func (*LocalRunner) Prepare(ctx context.Context, cfg *config.Linter) error {
+func (l *LocalRunner) GetFinalScript() string {
+	return l.script
+}
+
+func (l *LocalRunner) Prepare(ctx context.Context, cfg *config.Linter) error {
 	return nil
 }
 
 func (l *LocalRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadCloser, error) {
-	log := xlog.New(ctx.Value(config.EventGUIDKey).(string))
+	log := lintersutil.FromContext(ctx)
 	newCfg, err := cfg.Modifier.Modify(cfg)
 	if err != nil {
 		return nil, err
@@ -61,7 +72,9 @@ func (l *LocalRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClose
 	scriptContent += strings.Join(newCfg.Args, " ")
 
 	log.Infof("Script content: \n%s", scriptContent)
+	l.script = scriptContent
 
+	//nolint:gosec
 	c := exec.CommandContext(ctx, shell[0], append(shell[1:], scriptContent)...)
 	c.Dir = newCfg.WorkDir
 
@@ -121,4 +134,5 @@ type DockerClientInterface interface {
 	ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *ocispec.Platform, containerName string) (container.CreateResponse, error)
 	ContainerStart(ctx context.Context, containerID string, options container.StartOptions) error
 	ContainerLogs(ctx context.Context, container string, options container.LogsOptions) (io.ReadCloser, error)
+	CopyToContainer(ctx context.Context, containerID, dstPath string, content io.Reader, options container.CopyToContainerOptions) error
 }

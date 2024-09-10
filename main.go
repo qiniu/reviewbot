@@ -17,14 +17,15 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"expvar"
 	"flag"
 	"fmt"
+	"html/template"
 	"net"
 	"net/http"
 	"net/http/pprof"
+	"net/url"
 	"os"
 
 	"github.com/google/go-github/v57/github"
@@ -63,6 +64,14 @@ type options struct {
 	appID          int64
 	installationID int64
 	appPrivateKey  string
+
+	// log storage dir for local storage
+	logDir string
+	// s3 credential config
+	s3Credential string
+	// server addr which is used to generate the log view url
+	// e.g. https://domain
+	serverAddr string
 }
 
 func (o options) Validate() error {
@@ -95,8 +104,79 @@ func gatherOptions() options {
 	fs.Int64Var(&o.appID, "app-id", 0, "github app id")
 	fs.Int64Var(&o.installationID, "app-installation-id", 0, "github app installation id")
 	fs.StringVar(&o.appPrivateKey, "app-private-key", "", "github app private key")
-	fs.Parse(os.Args[1:])
+	fs.StringVar(&o.logDir, "log-dir", "/tmp", "log storage dir for local storage")
+	fs.StringVar(&o.serverAddr, "server-addr", "", "server addr which is used to generate the log view url")
+	err := fs.Parse(os.Args[1:])
+	if err != nil {
+		log.Fatalf("failed to parse flags: %v", err)
+	}
 	return o
+}
+
+var viewTemplate = template.Must(template.New("view").Parse(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: monospace;
+            line-height: 1.4;
+            margin: 0;
+            padding: 0;
+        }
+        pre {
+            margin: 0;
+            padding: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .container {
+            max-width: 100%;
+            margin: 0;
+            padding: 0 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <pre>{{.Content}}</pre>
+    </div>
+</body>
+</html>
+`))
+
+func (s *Server) HandleView(w http.ResponseWriter, r *http.Request) {
+	path, err := url.PathUnescape(r.URL.Path[len("/view/"):])
+	if err != nil {
+		http.Error(w, "Invalid URL", http.StatusBadRequest)
+		return
+	}
+
+	contents, err := s.storage.Read(r.Context(), path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			http.Error(w, "Log not found", http.StatusNotFound)
+		} else {
+			log.Printf("Error reading file: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+	data := struct {
+		Content string
+	}{
+		Content: string(contents),
+	}
+
+	if err := viewTemplate.Execute(w, data); err != nil {
+		log.Printf("Error executing template: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
 }
 
 func main() {
@@ -146,13 +226,28 @@ func main() {
 		appID:            o.appID,
 		appPrivateKey:    o.appPrivateKey,
 		debug:            o.debug,
+		serverAddr:       o.serverAddr,
 	}
 
 	go s.initDockerRunner()
 
+	// Prioritize using S3 storage if s3 credential is provided
+	if o.s3Credential != "" {
+		s.storage, err = storage.NewS3Storage(o.s3Credential)
+		if err != nil {
+			log.Fatalf("failed to create s3 storage: %v", err)
+		}
+	} else {
+		// Fallback to local storage
+		s.storage, err = storage.NewLocalStorage(o.logDir)
+		if err != nil {
+			log.Fatalf("failed to create local storage: %v", err)
+		}
+	}
+
 	mux := http.NewServeMux()
 	mux.Handle("/", s)
-	mux.Handle("/view/", HandleView(storage.NewLocalStorage()))
+	mux.Handle("/view/", http.HandlerFunc(s.HandleView))
 	mux.Handle("/metrics", promhttp.Handler())
 	log.Infof("listening on port %d", o.port)
 
@@ -173,22 +268,6 @@ func main() {
 		log.Fatal(http.Serve(listener, debugMux))
 	}()
 	// TODO(CarlJi): graceful shutdown
+	//nolint:gocritic
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", o.port), mux))
-}
-
-func HandleView(ls storage.Storage) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		uri := r.URL.Path[len("/view/"):]
-		ctx := context.Background()
-		linterLog, err := ls.Reader(ctx, uri)
-
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Log not found: %v", err), http.StatusNotFound)
-			return
-		}
-
-		if _, err = w.Write(linterLog); err != nil {
-			log.Warnf("Error writing log, %v", err)
-		}
-	}
 }
