@@ -39,17 +39,17 @@ func NewDockerRunner(cli DockerClientInterface) (Runner, error) {
 	return &DockerRunner{cli: cli}, nil
 }
 
-func (r *DockerRunner) GetFinalScript() string {
-	return r.script
+func (d *DockerRunner) GetFinalScript() string {
+	return d.script
 }
 
 // Prepare will pull the docker image if it is not exist.
-func (r *DockerRunner) Prepare(ctx context.Context, cfg *config.Linter) error {
+func (d *DockerRunner) Prepare(ctx context.Context, cfg *config.Linter) error {
 	if cfg.DockerAsRunner.Image == "" {
 		return nil
 	}
 
-	_, _, err := r.cli.ImageInspectWithRaw(ctx, cfg.DockerAsRunner.Image)
+	_, _, err := d.cli.ImageInspectWithRaw(ctx, cfg.DockerAsRunner.Image)
 	if err == nil {
 		return nil
 	}
@@ -57,7 +57,7 @@ func (r *DockerRunner) Prepare(ctx context.Context, cfg *config.Linter) error {
 		return fmt.Errorf("failed to inspect image: %w", err)
 	}
 
-	reader, err := r.cli.ImagePull(ctx, cfg.DockerAsRunner.Image, image.PullOptions{})
+	reader, err := d.cli.ImagePull(ctx, cfg.DockerAsRunner.Image, image.PullOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to pull image: %w", err)
 	}
@@ -68,13 +68,13 @@ func (r *DockerRunner) Prepare(ctx context.Context, cfg *config.Linter) error {
 	return err
 }
 
-func (r *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadCloser, error) {
+func (d *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadCloser, error) {
 	log := lintersutil.FromContext(ctx)
 	if cfg.DockerAsRunner.Image == "" {
 		return nil, fmt.Errorf("docker image is not set")
 	}
 
-	if err := r.Prepare(ctx, cfg); err != nil {
+	if err := d.Prepare(ctx, cfg); err != nil {
 		return nil, err
 	}
 
@@ -104,7 +104,7 @@ func (r *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClos
 	// handle args
 	scriptContent += strings.Join(cfg.Args, " ")
 	log.Infof("Script content: \n%s", scriptContent)
-	r.script = scriptContent
+	d.script = scriptContent
 
 	var (
 		dockerConfig = &container.Config{
@@ -122,7 +122,7 @@ func (r *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClos
 	log.Infof("Docker config: entrypoint: %v, cmd: %v, env: %v, working dir: %v, volume: %v",
 		dockerConfig.Entrypoint, dockerConfig.Cmd, dockerConfig.Env, dockerConfig.WorkingDir, dockerHostConfig.Binds)
 
-	resp, err := r.cli.ContainerCreate(ctx, dockerConfig, dockerHostConfig, nil, nil, "")
+	resp, err := d.cli.ContainerCreate(ctx, dockerConfig, dockerHostConfig, nil, nil, "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create container: %w", err)
 	}
@@ -130,7 +130,7 @@ func (r *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClos
 
 	// NOTE(Carl): do not know why mount volume does not work in DinD mode,
 	// copy the code to container instead.
-	if err := r.copyToContainer(ctx, resp.ID, cfg.WorkDir, filepath.Dir(cfg.WorkDir)); err != nil {
+	if err := d.copyToContainer(ctx, resp.ID, cfg.WorkDir, filepath.Dir(cfg.WorkDir)); err != nil {
 		return nil, fmt.Errorf("failed to copy code to container: %w", err)
 	}
 
@@ -140,22 +140,26 @@ func (r *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClos
 			return nil, fmt.Errorf("failed to find %s :%w", cfg.Name, err)
 		}
 
-		err = r.copyToContainer(ctx, resp.ID, linterOriginPath, "/usr/local/bin/")
+		err = d.copyToContainer(ctx, resp.ID, linterOriginPath, "/usr/local/bin/")
 		if err != nil {
 			return nil, fmt.Errorf("failed to copy linter to container: %w", err)
 		}
 	}
 
-	if err := r.cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+	if err := d.cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
 		return nil, fmt.Errorf("failed to start container: %w", err)
 	}
 	log.Infof("container started: %v", resp.ID)
 
-	statusCh, errCh := r.cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
+	statusCh, errCh := d.cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
 	select {
 	case err := <-errCh:
 		return nil, fmt.Errorf("error waiting for container: %w", err)
-	case <-statusCh:
+	case status := <-statusCh:
+		if status.StatusCode != 0 {
+			log.Errorf("container exited with status code: %d, try to read log from container", status.StatusCode)
+			return d.readLogFromContainer(ctx, resp.ID)
+		}
 	}
 
 	// find the artifact path
@@ -168,10 +172,13 @@ func (r *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClos
 	}
 
 	if artifactPath != "" {
-		return r.readArtifactContent(ctx, resp.ID, artifactPath)
+		return d.readArtifactContent(ctx, resp.ID, artifactPath)
 	}
 
-	// read the log from container
+	return d.readLogFromContainer(ctx, resp.ID)
+}
+
+func (d *DockerRunner) readLogFromContainer(ctx context.Context, containerID string) (io.ReadCloser, error) {
 	logOptions := container.LogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
@@ -181,17 +188,18 @@ func (r *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClos
 		Tail:       "all",
 	}
 
-	logReader, err := r.cli.ContainerLogs(ctx, resp.ID, logOptions)
+	logReader, err := d.cli.ContainerLogs(ctx, containerID, logOptions)
 	if err != nil {
 		return nil, err
 	}
 
 	// remove docker log header
 	cleanReader := NewCleanLogReader(logReader)
+
 	return cleanReader, nil
 }
 
-func (r *DockerRunner) copyToContainer(ctx context.Context, containerID, srcPath, dstPath string) error {
+func (d *DockerRunner) copyToContainer(ctx context.Context, containerID, srcPath, dstPath string) error {
 	// prepare source code dir
 	srcInfo, err := archive.CopyInfoSourcePath(srcPath, false)
 	if err != nil {
@@ -204,7 +212,7 @@ func (r *DockerRunner) copyToContainer(ctx context.Context, containerID, srcPath
 	}
 	defer srcArchive.Close()
 
-	err = r.cli.CopyToContainer(ctx, containerID, dstPath, srcArchive, container.CopyToContainerOptions{})
+	err = d.cli.CopyToContainer(ctx, containerID, dstPath, srcArchive, container.CopyToContainerOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to copy to container: %w", err)
 	}
@@ -335,9 +343,9 @@ func (d *dockerArtifactModifier) Modify(cfg *config.Linter) (*config.Linter, err
 	return newCfg, nil
 }
 
-func (r *DockerRunner) readArtifactContent(ctx context.Context, containerID, artifactPath string) (io.ReadCloser, error) {
+func (d *DockerRunner) readArtifactContent(ctx context.Context, containerID, artifactPath string) (io.ReadCloser, error) {
 	log := lintersutil.FromContext(ctx)
-	reader, _, err := r.cli.CopyFromContainer(ctx, containerID, artifactPath)
+	reader, _, err := d.cli.CopyFromContainer(ctx, containerID, artifactPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to copy from container: %w", err)
 	}

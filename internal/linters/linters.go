@@ -176,6 +176,9 @@ func ExecRun(a Agent) ([]byte, error) {
 	if err != nil {
 		log.Warnf("failed to run linter: %v, mark and continue", err)
 	}
+	if reader == nil {
+		return nil, fmt.Errorf("runner returned nil reader with error: %w", err)
+	}
 	defer reader.Close()
 
 	output, err := io.ReadAll(reader)
