@@ -128,7 +128,7 @@ func (l *LocalRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClose
 }
 
 // for easy mock.
-// copy from github.com/docker/docker/client/client.go.
+// copy from https://github.com/moby/moby/blob/v27.2.1/client/interface.go#L48.
 type DockerClientInterface interface {
 	ImageInspectWithRaw(ctx context.Context, imageID string) (types.ImageInspect, []byte, error)
 	ImagePull(ctx context.Context, refStr string, options image.PullOptions) (io.ReadCloser, error)
@@ -138,4 +138,5 @@ type DockerClientInterface interface {
 	CopyToContainer(ctx context.Context, containerID, dstPath string, content io.Reader, options container.CopyToContainerOptions) error
 	ContainerWait(ctx context.Context, containerID string, condition container.WaitCondition) (<-chan container.WaitResponse, <-chan error)
 	CopyFromContainer(ctx context.Context, containerID, srcPath string) (io.ReadCloser, container.PathStat, error)
+	ContainerStatPath(ctx context.Context, containerID, path string) (container.PathStat, error)
 }

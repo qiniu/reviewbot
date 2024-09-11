@@ -4,4 +4,4 @@ Host github.com
   UserKnownHostsFile /github_known_hosts
   CheckHostIP no
   StrictHostKeyChecking no
-  IdentityFile /secrets/github_key
+  IdentityFile /root/.ssh/id_rsa

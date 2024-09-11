@@ -11,7 +11,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"sort"
 	"strings"
 
@@ -24,8 +23,9 @@ import (
 )
 
 type DockerRunner struct {
-	cli    DockerClientInterface
-	script string
+	Cli            DockerClientInterface
+	ArchiveWrapper ArchiveWrapper
+	script         string
 }
 
 func NewDockerRunner(cli DockerClientInterface) (Runner, error) {
@@ -36,7 +36,7 @@ func NewDockerRunner(cli DockerClientInterface) (Runner, error) {
 			return nil, err
 		}
 	}
-	return &DockerRunner{cli: cli}, nil
+	return &DockerRunner{Cli: cli, ArchiveWrapper: &DefaultArchiveWrapper{}}, nil
 }
 
 func (d *DockerRunner) GetFinalScript() string {
@@ -49,7 +49,7 @@ func (d *DockerRunner) Prepare(ctx context.Context, cfg *config.Linter) error {
 		return nil
 	}
 
-	_, _, err := d.cli.ImageInspectWithRaw(ctx, cfg.DockerAsRunner.Image)
+	_, _, err := d.Cli.ImageInspectWithRaw(ctx, cfg.DockerAsRunner.Image)
 	if err == nil {
 		return nil
 	}
@@ -57,7 +57,7 @@ func (d *DockerRunner) Prepare(ctx context.Context, cfg *config.Linter) error {
 		return fmt.Errorf("failed to inspect image: %w", err)
 	}
 
-	reader, err := d.cli.ImagePull(ctx, cfg.DockerAsRunner.Image, image.PullOptions{})
+	reader, err := d.Cli.ImagePull(ctx, cfg.DockerAsRunner.Image, image.PullOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to pull image: %w", err)
 	}
@@ -122,7 +122,7 @@ func (d *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClos
 	log.Infof("Docker config: entrypoint: %v, cmd: %v, env: %v, working dir: %v, volume: %v",
 		dockerConfig.Entrypoint, dockerConfig.Cmd, dockerConfig.Env, dockerConfig.WorkingDir, dockerHostConfig.Binds)
 
-	resp, err := d.cli.ContainerCreate(ctx, dockerConfig, dockerHostConfig, nil, nil, "")
+	resp, err := d.Cli.ContainerCreate(ctx, dockerConfig, dockerHostConfig, nil, nil, "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create container: %w", err)
 	}
@@ -130,7 +130,8 @@ func (d *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClos
 
 	// NOTE(Carl): do not know why mount volume does not work in DinD mode,
 	// copy the code to container instead.
-	if err := d.copyToContainer(ctx, resp.ID, cfg.WorkDir, filepath.Dir(cfg.WorkDir)); err != nil {
+	log.Infof("copy code to container: src: %s, dst: %s", cfg.WorkDir, cfg.WorkDir)
+	if err := d.copyToContainer(ctx, resp.ID, cfg.WorkDir, cfg.WorkDir); err != nil {
 		return nil, fmt.Errorf("failed to copy code to container: %w", err)
 	}
 
@@ -140,18 +141,37 @@ func (d *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClos
 			return nil, fmt.Errorf("failed to find %s :%w", cfg.Name, err)
 		}
 
+		log.Infof("copy linter to container: src: %s, dst: %s", linterOriginPath, "/usr/local/bin/")
 		err = d.copyToContainer(ctx, resp.ID, linterOriginPath, "/usr/local/bin/")
 		if err != nil {
 			return nil, fmt.Errorf("failed to copy linter to container: %w", err)
 		}
 	}
 
-	if err := d.cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+	if cfg.DockerAsRunner.CopySSHKeyToContainer != "" {
+		paths := strings.Split(cfg.DockerAsRunner.CopySSHKeyToContainer, ":")
+		var srcPath, dstPath string
+		if len(paths) == 2 {
+			srcPath, dstPath = paths[0], paths[1]
+		} else if len(paths) == 1 {
+			srcPath, dstPath = paths[0], paths[0]
+		} else {
+			return nil, fmt.Errorf("invalid copy ssh key format: %s", cfg.DockerAsRunner.CopySSHKeyToContainer)
+		}
+
+		log.Infof("copy ssh key to container: src: %s, dst: %s", srcPath, dstPath)
+		err = d.copyToContainer(ctx, resp.ID, srcPath, dstPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to copy ssh key to container: %w", err)
+		}
+	}
+
+	if err := d.Cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
 		return nil, fmt.Errorf("failed to start container: %w", err)
 	}
 	log.Infof("container started: %v", resp.ID)
 
-	statusCh, errCh := d.cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
+	statusCh, errCh := d.Cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
 	var statusCode int64
 	select {
 	case err := <-errCh:
@@ -159,7 +179,7 @@ func (d *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClos
 	case status := <-statusCh:
 		statusCode = status.StatusCode
 		if statusCode != 0 {
-			log.Errorf("container exited with status code: %d, mark and continue", statusCode)
+			log.Warnf("container exited with status code: %d, mark and continue", statusCode)
 		}
 	}
 
@@ -199,7 +219,7 @@ func (d *DockerRunner) readLogFromContainer(ctx context.Context, containerID str
 		Tail:       "all",
 	}
 
-	logReader, err := d.cli.ContainerLogs(ctx, containerID, logOptions)
+	logReader, err := d.Cli.ContainerLogs(ctx, containerID, logOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -210,20 +230,37 @@ func (d *DockerRunner) readLogFromContainer(ctx context.Context, containerID str
 	return cleanReader, nil
 }
 
+// mainly refer https://github.com/docker/cli/blob/b1d27091e50595fecd8a2a4429557b70681395b2/cli/command/container/cp.go#L186
 func (d *DockerRunner) copyToContainer(ctx context.Context, containerID, srcPath, dstPath string) error {
+	// Prepare destination copy info by stat-ing the container path.
+	dstInfo := archive.CopyInfo{Path: dstPath}
+
 	// prepare source code dir
-	srcInfo, err := archive.CopyInfoSourcePath(srcPath, false)
+	srcInfo, err := d.ArchiveWrapper.CopyInfoSourcePath(srcPath, false)
 	if err != nil {
 		return fmt.Errorf("failed to create archive info: %w", err)
 	}
 
-	srcArchive, err := archive.TarResource(srcInfo)
+	srcArchive, err := d.ArchiveWrapper.TarResource(srcInfo)
 	if err != nil {
 		return fmt.Errorf("failed to create tar archive: %w", err)
 	}
 	defer srcArchive.Close()
 
-	err = d.cli.CopyToContainer(ctx, containerID, dstPath, srcArchive, container.CopyToContainerOptions{})
+	var (
+		resolvedDstPath string
+		content         io.ReadCloser
+	)
+	dstDir, preparedArchive, err := d.ArchiveWrapper.PrepareArchiveCopy(srcArchive, srcInfo, dstInfo)
+	if err != nil {
+		return err
+	}
+	defer preparedArchive.Close()
+
+	resolvedDstPath = dstDir
+	content = preparedArchive
+
+	err = d.Cli.CopyToContainer(ctx, containerID, resolvedDstPath, content, container.CopyToContainerOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to copy to container: %w", err)
 	}
@@ -356,7 +393,7 @@ func (d *dockerArtifactModifier) Modify(cfg *config.Linter) (*config.Linter, err
 
 func (d *DockerRunner) readArtifactContent(ctx context.Context, containerID, artifactPath string) (io.ReadCloser, error) {
 	log := lintersutil.FromContext(ctx)
-	reader, _, err := d.cli.CopyFromContainer(ctx, containerID, artifactPath)
+	reader, _, err := d.Cli.CopyFromContainer(ctx, containerID, artifactPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to copy from container: %w", err)
 	}
@@ -411,4 +448,26 @@ func (d *DockerRunner) readArtifactContent(ctx context.Context, containerID, art
 	}
 
 	return io.NopCloser(bytes.NewReader(combinedContent.Bytes())), nil
+}
+
+// for easy mock.
+// copy from https://github.com/moby/moby/blob/v27.2.1/pkg/archive/copy.go.
+type ArchiveWrapper interface {
+	CopyInfoSourcePath(srcPath string, followLink bool) (archive.CopyInfo, error)
+	TarResource(srcInfo archive.CopyInfo) (io.ReadCloser, error)
+	PrepareArchiveCopy(srcArchive io.Reader, srcInfo, dstInfo archive.CopyInfo) (dstDir string, preparedArchive io.ReadCloser, err error)
+}
+
+type DefaultArchiveWrapper struct{}
+
+func (d *DefaultArchiveWrapper) CopyInfoSourcePath(path string, followLink bool) (archive.CopyInfo, error) {
+	return archive.CopyInfoSourcePath(path, followLink)
+}
+
+func (d *DefaultArchiveWrapper) TarResource(sourceInfo archive.CopyInfo) (content io.ReadCloser, err error) {
+	return archive.TarResource(sourceInfo)
+}
+
+func (d *DefaultArchiveWrapper) PrepareArchiveCopy(srcContent io.Reader, srcInfo, dstInfo archive.CopyInfo) (dstDir string, content io.ReadCloser, err error) {
+	return archive.PrepareArchiveCopy(srcContent, srcInfo, dstInfo)
 }
