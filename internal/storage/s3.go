@@ -16,7 +16,7 @@ import (
 	"github.com/aws/smithy-go"
 )
 
-var ErrObjectNotFound = fmt.Errorf("object not found")
+var ErrObjectNotFound = errors.New("object not found")
 
 type S3Storage struct {
 	s3     *s3.Client
@@ -77,8 +77,7 @@ func (s *S3Storage) Read(ctx context.Context, key string) ([]byte, error) {
 	if err != nil {
 		var apiErr smithy.APIError
 		if errors.As(err, &apiErr) {
-			switch apiErr.ErrorCode() {
-			case "NoSuchKey":
+			if apiErr.ErrorCode() == "NoSuchKey" {
 				return nil, ErrObjectNotFound
 			}
 		}
