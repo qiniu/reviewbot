@@ -158,8 +158,8 @@ func (s *Server) HandleView(w http.ResponseWriter, r *http.Request) {
 
 	contents, err := s.storage.Read(r.Context(), path)
 	if err != nil {
-		if os.IsNotExist(err) {
-			http.Error(w, "Log not found", http.StatusNotFound)
+		if errors.Is(err, storage.ErrObjectNotFound) {
+			http.Error(w, "empty log", http.StatusNotFound)
 		} else {
 			log.Errorf("Error reading file: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)

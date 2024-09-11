@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -12,7 +13,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/smithy-go"
 )
+
+var ErrObjectNotFound = fmt.Errorf("object not found")
 
 type S3Storage struct {
 	s3     *s3.Client
@@ -71,11 +75,20 @@ func (s *S3Storage) Read(ctx context.Context, key string) ([]byte, error) {
 		Key:    aws.String(objectKey),
 	})
 	if err != nil {
+		var apiErr smithy.APIError
+		if errors.As(err, &apiErr) {
+			switch apiErr.ErrorCode() {
+			case "NoSuchKey":
+				return nil, ErrObjectNotFound
+			}
+		}
 		return nil, fmt.Errorf("failed to download file from s3 bucket: %w", err)
 	}
+	defer result.Body.Close()
+
 	output, err := io.ReadAll(result.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read file from  s3 result body: %w", err)
+		return nil, fmt.Errorf("failed to read file from s3 result body: %w", err)
 	}
 	return output, nil
 }
