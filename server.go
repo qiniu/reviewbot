@@ -342,7 +342,6 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 			continue
 		}
 
-		// set workdir
 		if linterConfig.WorkDir != "" {
 			linterConfig.WorkDir = r.Directory() + "/" + linterConfig.WorkDir
 		} else {
