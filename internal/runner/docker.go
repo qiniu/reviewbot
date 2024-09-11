@@ -152,13 +152,14 @@ func (d *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClos
 	log.Infof("container started: %v", resp.ID)
 
 	statusCh, errCh := d.cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
+	var statusCode int64
 	select {
 	case err := <-errCh:
 		return nil, fmt.Errorf("error waiting for container: %w", err)
 	case status := <-statusCh:
-		if status.StatusCode != 0 {
-			log.Errorf("container exited with status code: %d, try to read log from container", status.StatusCode)
-			return d.readLogFromContainer(ctx, resp.ID)
+		statusCode = status.StatusCode
+		if statusCode != 0 {
+			log.Errorf("container exited with status code: %d, mark and continue", statusCode)
 		}
 	}
 
@@ -172,7 +173,17 @@ func (d *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClos
 	}
 
 	if artifactPath != "" {
-		return d.readArtifactContent(ctx, resp.ID, artifactPath)
+		artifactReader, err := d.readArtifactContent(ctx, resp.ID, artifactPath)
+		if err != nil {
+			log.Errorf("failed to read artifact content: %v", err)
+		}
+
+		if artifactReader != nil {
+			// artifact is not empty, return it
+			return artifactReader, err
+		}
+
+		// if artifactReader is nil, try to read log from container
 	}
 
 	return d.readLogFromContainer(ctx, resp.ID)

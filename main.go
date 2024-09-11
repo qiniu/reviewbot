@@ -161,7 +161,7 @@ func (s *Server) HandleView(w http.ResponseWriter, r *http.Request) {
 		if os.IsNotExist(err) {
 			http.Error(w, "Log not found", http.StatusNotFound)
 		} else {
-			log.Printf("Error reading file: %v", err)
+			log.Errorf("Error reading file: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 		}
 		return
