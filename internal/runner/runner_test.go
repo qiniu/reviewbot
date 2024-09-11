@@ -14,6 +14,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/pkg/archive"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/lintersutil"
@@ -22,52 +23,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
-
-type MockDockerClient struct {
-	mock.Mock
-}
-
-var _ runner.DockerClientInterface = (*MockDockerClient)(nil)
-
-func (m *MockDockerClient) CopyFromContainer(ctx context.Context, containerID, srcPath string) (io.ReadCloser, container.PathStat, error) {
-	args := m.Called(ctx, containerID, srcPath)
-	return args.Get(0).(io.ReadCloser), args.Get(1).(container.PathStat), args.Error(2)
-}
-
-func (m *MockDockerClient) ContainerWait(ctx context.Context, containerID string, condition container.WaitCondition) (<-chan container.WaitResponse, <-chan error) {
-	args := m.Called(ctx, containerID, condition)
-	return args.Get(0).(chan container.WaitResponse), args.Get(1).(chan error)
-}
-
-func (m *MockDockerClient) ImageInspectWithRaw(ctx context.Context, imageID string) (types.ImageInspect, []byte, error) {
-	args := m.Called(ctx, imageID)
-	return args.Get(0).(types.ImageInspect), args.Get(1).([]byte), args.Error(2)
-}
-
-func (m *MockDockerClient) ImagePull(ctx context.Context, refStr string, options image.PullOptions) (io.ReadCloser, error) {
-	args := m.Called(ctx, refStr, options)
-	return args.Get(0).(io.ReadCloser), args.Error(1)
-}
-
-func (m *MockDockerClient) ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *ocispec.Platform, containerName string) (container.CreateResponse, error) {
-	args := m.Called(ctx, config, hostConfig, networkingConfig, platform, containerName)
-	return args.Get(0).(container.CreateResponse), args.Error(1)
-}
-
-func (m *MockDockerClient) ContainerStart(ctx context.Context, containerID string, options container.StartOptions) error {
-	args := m.Called(ctx, containerID, options)
-	return args.Error(0)
-}
-
-func (m *MockDockerClient) ContainerLogs(ctx context.Context, container string, options container.LogsOptions) (io.ReadCloser, error) {
-	args := m.Called(ctx, container, options)
-	return args.Get(0).(io.ReadCloser), args.Error(1)
-}
-
-func (m *MockDockerClient) CopyToContainer(ctx context.Context, containerID, dstPath string, content io.Reader, options container.CopyToContainerOptions) error {
-	m.Called(ctx, containerID, dstPath, content, options)
-	return nil
-}
 
 func TestLocalRunner(t *testing.T) {
 	tests := []struct {
@@ -284,8 +239,17 @@ func TestDockerRunner(t *testing.T) {
 				mockCli.On("ContainerLogs", mock.Anything, "test-container-id", mock.Anything).Return(mockLogs, nil)
 			}
 
-			dr, err := runner.NewDockerRunner(mockCli)
-			require.NoError(t, err)
+			// mock archive wrapper
+			mockArchiveWrapper := new(MockArchiveWrapper)
+			mockArchiveWrapper.On("CopyInfoSourcePath", mock.Anything, mock.Anything).Return(archive.CopyInfo{}, nil)
+			mockArchiveWrapper.On("TarResource", mock.Anything).Return(io.NopCloser(bytes.NewReader([]byte{})), nil)
+			mockArchiveWrapper.On("PrepareArchiveCopy", mock.Anything, mock.Anything, mock.Anything).Return("dstDir", io.NopCloser(bytes.NewReader([]byte{})), nil)
+
+			dr := runner.DockerRunner{
+				Cli:            mockCli,
+				ArchiveWrapper: mockArchiveWrapper,
+			}
+
 			ctx := context.WithValue(context.Background(), lintersutil.EventGUIDKey, "test")
 			output, err := dr.Run(ctx, tc.cfg)
 			if tc.wantErr {
@@ -312,4 +276,74 @@ type mockReadCloser struct {
 
 func (m *mockReadCloser) Close() error {
 	return nil
+}
+
+type MockDockerClient struct {
+	mock.Mock
+}
+
+var _ runner.DockerClientInterface = (*MockDockerClient)(nil)
+
+func (m *MockDockerClient) ContainerStatPath(ctx context.Context, containerID, path string) (container.PathStat, error) {
+	args := m.Called(ctx, containerID, path)
+	return args.Get(0).(container.PathStat), args.Error(1)
+}
+
+func (m *MockDockerClient) CopyFromContainer(ctx context.Context, containerID, srcPath string) (io.ReadCloser, container.PathStat, error) {
+	args := m.Called(ctx, containerID, srcPath)
+	return args.Get(0).(io.ReadCloser), args.Get(1).(container.PathStat), args.Error(2)
+}
+
+func (m *MockDockerClient) ContainerWait(ctx context.Context, containerID string, condition container.WaitCondition) (<-chan container.WaitResponse, <-chan error) {
+	args := m.Called(ctx, containerID, condition)
+	return args.Get(0).(chan container.WaitResponse), args.Get(1).(chan error)
+}
+
+func (m *MockDockerClient) ImageInspectWithRaw(ctx context.Context, imageID string) (types.ImageInspect, []byte, error) {
+	args := m.Called(ctx, imageID)
+	return args.Get(0).(types.ImageInspect), args.Get(1).([]byte), args.Error(2)
+}
+
+func (m *MockDockerClient) ImagePull(ctx context.Context, refStr string, options image.PullOptions) (io.ReadCloser, error) {
+	args := m.Called(ctx, refStr, options)
+	return args.Get(0).(io.ReadCloser), args.Error(1)
+}
+
+func (m *MockDockerClient) ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *ocispec.Platform, containerName string) (container.CreateResponse, error) {
+	args := m.Called(ctx, config, hostConfig, networkingConfig, platform, containerName)
+	return args.Get(0).(container.CreateResponse), args.Error(1)
+}
+
+func (m *MockDockerClient) ContainerStart(ctx context.Context, containerID string, options container.StartOptions) error {
+	args := m.Called(ctx, containerID, options)
+	return args.Error(0)
+}
+
+func (m *MockDockerClient) ContainerLogs(ctx context.Context, container string, options container.LogsOptions) (io.ReadCloser, error) {
+	args := m.Called(ctx, container, options)
+	return args.Get(0).(io.ReadCloser), args.Error(1)
+}
+
+func (m *MockDockerClient) CopyToContainer(ctx context.Context, containerID, dstPath string, content io.Reader, options container.CopyToContainerOptions) error {
+	m.Called(ctx, containerID, dstPath, content, options)
+	return nil
+}
+
+type MockArchiveWrapper struct {
+	mock.Mock
+}
+
+func (m *MockArchiveWrapper) CopyInfoSourcePath(path string, followLink bool) (archive.CopyInfo, error) {
+	args := m.Called(path, followLink)
+	return args.Get(0).(archive.CopyInfo), args.Error(1)
+}
+
+func (m *MockArchiveWrapper) TarResource(srcInfo archive.CopyInfo) (io.ReadCloser, error) {
+	args := m.Called(srcInfo)
+	return args.Get(0).(io.ReadCloser), args.Error(1)
+}
+
+func (m *MockArchiveWrapper) PrepareArchiveCopy(srcArchive io.Reader, srcInfo, dstInfo archive.CopyInfo) (dstDir string, preparedArchive io.ReadCloser, err error) {
+	args := m.Called(srcArchive, srcInfo, dstInfo)
+	return args.Get(0).(string), args.Get(1).(io.ReadCloser), args.Error(2)
 }

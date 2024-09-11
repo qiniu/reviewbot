@@ -61,7 +61,7 @@ spec:
             - mountPath: /etc/config
               name: config
               readOnly: true
-            - mountPath: /secrets/github_key
+            - mountPath: /root/.ssh/id_rsa
               subPath: github_key
               name: ssh-secret
               readOnly: true

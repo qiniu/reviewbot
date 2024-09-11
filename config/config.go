@@ -36,11 +36,30 @@ type GlobalConfig struct {
 	// if not empty, use the config to run javastylecheck-lint.
 	// it can be overridden by linter.ConfigPath.
 	JavaStyleCheckRuleConfig string `json:"javastylecheckruleConfig,omitempty"`
+
+	// CopySSHKeyToContainer is the path of the ssh key file to copy to the container.
+	// optional, if not empty, copy the ssh key to the container.
+	// it only works when using the docker runner.
+	// format can be:
+	// 1. /path/to/ssh/key => will copy the key to the same path(/path/to/ssh/key) in the container
+	// 2. /path/to/ssh/key:/another/path/to/ssh/key => will copy the key to the target path(/another/path/to/ssh/key) in the container
+	// it can be overridden by linter.DockerAsRunner.CopySSHKeyToContainer.
+	CopySSHKeyToContainer string `json:"copySSHKeyToContainer,omitempty"`
 }
 
 type DockerAsRunner struct {
 	Image                string `json:"image"`
-	CopyLinterFromOrigin bool   `json:"copylinterFromOrigin,omitempty"`
+	CopyLinterFromOrigin bool   `json:"copyLinterFromOrigin,omitempty"`
+	// CopySSHKeyToContainer is the path of the ssh key file to copy to the container.
+	// optional, if not empty, copy the ssh key to the container.
+	// format can be:
+	// 1. /path/to/ssh/key => will copy the key to the same path(/path/to/ssh/key) in the container
+	// 2. /path/to/ssh/key:/another/path/to/ssh/key => will copy the key to the target path(/another/path/to/ssh/key) in the container
+	//
+	// Note: it can not create the directory if the directory does not exist in the container.
+	// see: https://github.com/moby/moby/issues/20920
+	// so we need to ensure the directory exists in the container before copying the ssh key.
+	CopySSHKeyToContainer string `json:"copySSHKeyToContainer,omitempty"`
 }
 type Linter struct {
 	// Name is the linter name.
@@ -125,6 +144,8 @@ func NewConfig(conf string) (Config, error) {
 		}
 	}
 
+	// TODO(CarlJi): do we need to check the format of the copy ssh key here?
+
 	return c, nil
 }
 
@@ -147,6 +168,11 @@ func (c Config) Get(org, repo, ln string) Linter {
 	// check java style check config path
 	if c.GlobalDefaultConfig.JavaStyleCheckRuleConfig != "" && ln == "stylecheck" {
 		linter.ConfigPath = c.GlobalDefaultConfig.JavaStyleCheckRuleConfig
+	}
+
+	// set copy ssh key to container
+	if c.GlobalDefaultConfig.CopySSHKeyToContainer != "" {
+		linter.DockerAsRunner.CopySSHKeyToContainer = c.GlobalDefaultConfig.CopySSHKeyToContainer
 	}
 
 	if orgConfig, ok := c.CustomConfig[org]; ok {
@@ -198,6 +224,9 @@ func applyCustomConfig(legacy, custom Linter) Linter {
 	}
 	if custom.DockerAsRunner.CopyLinterFromOrigin {
 		legacy.DockerAsRunner.CopyLinterFromOrigin = custom.DockerAsRunner.CopyLinterFromOrigin
+	}
+	if custom.DockerAsRunner.CopySSHKeyToContainer != "" {
+		legacy.DockerAsRunner.CopySSHKeyToContainer = custom.DockerAsRunner.CopySSHKeyToContainer
 	}
 
 	if custom.Name != "" {
