@@ -19,6 +19,17 @@ customConfig: # custom config for specific orgs or repos
     golangci-lint:
       enable: false
 
+  # temporary disable, will be enabled after fixing the go mod issue in kodo
+  qbox/kodoe-manager:
+    gomodcheck:
+      enable: false
+  qbox/zrs:
+    gomodcheck:
+      enable: false
+  qbox/logverse:
+    gomodcheck:
+      enable: false
+
   qbox/kodo:
     golangci-lint:
       enable: true
