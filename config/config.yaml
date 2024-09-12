@@ -7,6 +7,7 @@
 globalDefaultConfig: # global default settings, will be overridden by qbox org and repo specific settings if they exist
   githubReportType: "github_check_run" # github_pr_review, github_check_run
   golangcilintConfig: "config/linters-config/.golangci.yml" # golangci-lint config file to use
+  copySSHKeyToContainer: "/root/.ssh/id_rsa"
 
 customConfig: # custom config for specific orgs or repos
   goplus:
@@ -24,7 +25,6 @@ customConfig: # custom config for specific orgs or repos
       dockerAsRunner:
         # kodo only use go1.22.+, see kodo/logservice/logupload/version/check_test.go
         image: "aslan-spock-register.qiniu.io/reviewbot/base:golangci-lint.1.59.1"
-        copySSHKeyToContainer: "/root/.ssh/id_rsa"
       command:
         - "/bin/sh"
         - "-c"
