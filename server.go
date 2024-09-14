@@ -66,7 +66,7 @@ type Server struct {
 func (s *Server) initDockerRunner() {
 	var images []string
 	for _, customConfig := range s.config.CustomConfig {
-		for _, linter := range customConfig {
+		for _, linter := range customConfig.Linters {
 			if linter.DockerAsRunner.Image != "" {
 				images = append(images, linter.DockerAsRunner.Image)
 			}
@@ -291,13 +291,13 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 	}
 	log.Infof("found %d files affected by pull request %d\n", len(pullRequestAffectedFiles), num)
 
-	repoPath, err := prepareRepoDir(org, repo, num)
+	defaultWorkdir, err := prepareRepoDir(org, repo, num)
 	if err != nil {
 		return fmt.Errorf("failed to prepare repo dir: %w", err)
 	}
 
 	r, err := s.gitClientFactory.ClientForWithRepoOpts(org, repo, gitv2.RepoOpts{
-		CopyTo: repoPath,
+		CopyTo: defaultWorkdir + "/" + repo,
 	})
 	if err != nil {
 		log.Errorf("failed to create git client: %v", err)
@@ -324,18 +324,27 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 		log.Infof("no .gitmodules file in repo %s", repo)
 	}
 
+	repoClients, err := PrepareExtraRef(org, repo, defaultWorkdir, s)
+	if err != nil {
+		log.Errorf("failed to prepare and clone ExtraRef : %v", err)
+	}
+
+	repoClients = append(repoClients, r)
 	defer func() {
 		if s.debug {
 			return // do not remove the repository in debug mode
 		}
-		err := r.Clean()
-		if err != nil {
-			log.Errorf("failed to remove the repository , err : %v", err)
+		for _, r := range repoClients {
+			err := r.Clean()
+			if err != nil {
+				log.Errorf("failed to remove the repository , err : %v", err)
+			}
 		}
+
 	}()
 
 	for name, fn := range linters.TotalPullRequestHandlers() {
-		linterConfig := s.config.Get(org, repo, name)
+		linterConfig := s.config.GetLinterConfig(org, repo, name)
 
 		// skip linter if it is disabled
 		if linterConfig.Enable != nil && !*linterConfig.Enable {
@@ -422,19 +431,58 @@ func prepareRepoDir(org, repo string, num int) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("failed to get user home dir: %w", err)
 		}
-		parentDir = filepath.Join(homeDir, "reviewbot-code")
+		parentDir = filepath.Join(homeDir, "reviewbot-code", fmt.Sprintf("%s-%s-%d", org, repo, num))
 	} else {
-		parentDir = filepath.Join("/tmp", "reviewbot-code")
+		parentDir = filepath.Join("/tmp", "reviewbot-code", fmt.Sprintf("%s-%s-%d", org, repo, num))
 	}
 
 	if err := os.MkdirAll(parentDir, 0o755); err != nil {
 		return "", fmt.Errorf("failed to create parent dir: %w", err)
 	}
 
-	repoPath, err := os.MkdirTemp(parentDir, fmt.Sprintf("%s-%s-%d-", org, repo, num))
+	err := os.Mkdir(parentDir+"/"+repo, 0o755)
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp dir: %w", err)
 	}
 
-	return repoPath, nil
+	return parentDir, nil
+}
+
+func PrepareExtraRef(org, repo, defaultWorkdir string, s *Server) (repoClients []gitv2.RepoClient, err error) {
+	var flag string
+	config := s.config
+	if _, ok := config.CustomConfig[org]; ok {
+		flag = org
+	}
+	if _, ok := config.CustomConfig[org+"/"+repo]; ok {
+		flag = org + "/" + repo
+	}
+
+	if flag != "" {
+		for _, v := range config.CustomConfig[flag].ExtraRefs {
+			var err error
+			if v.PathAlias != "" {
+				err = os.Mkdir(defaultWorkdir+"/"+v.PathAlias, 0o755)
+			} else {
+				err = os.Mkdir(defaultWorkdir+"/"+v.Repo, 0o755)
+			}
+
+			if err != nil {
+				return []gitv2.RepoClient{}, fmt.Errorf("failed to create extra reference dir: %w", err)
+			}
+			repoPath := defaultWorkdir + "/" + v.Repo
+			if v.PathAlias != "" {
+				repoPath = defaultWorkdir + v.PathAlias
+			}
+			r, err := s.gitClientFactory.ClientForWithRepoOpts(v.Org, v.Repo, gitv2.RepoOpts{
+				CopyTo: repoPath,
+			})
+			if err != nil {
+				return []gitv2.RepoClient{}, fmt.Errorf("failed to clone for %s/%s: %w", v.Org, v.Repo, err)
+			}
+
+			repoClients = append(repoClients, r)
+		}
+	}
+	return repoClients, nil
 }

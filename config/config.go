@@ -12,11 +12,29 @@ import (
 type Config struct {
 	GlobalDefaultConfig GlobalConfig `json:"globalDefaultConfig,omitempty"`
 
-	// CustomConfig is the custom linter config.
+	// CustomConfig is the custom org or repo config.
 	// e.g.
-	// * "org/repo": {"golangci-lint": {"enable": true, "workDir": "", "command": "golangci-lint", "args": ["run", "--config", ".golangci.yml"], "reportFormat": "github_checks"}}
-	// * "org": {"golangci-lint": {"enable": true, "workDir": "", "command": "golangci-lint", "args": ["run", "--config", ".golangci.yml"], "reportFormat": "github_checks"}}
-	CustomConfig map[string]map[string]Linter `json:"customConfig,omitempty"`
+	// * "org/repo": {"extra_refs":{org:xxx, repo:xxx, path_alias:github.com/repo }, "golangci-lint": {"enable": true, "workDir": "", "command": "golangci-lint", "args": ["run", "--config", ".golangci.yml"], "reportFormat": "github_checks"}}
+	// * "org": {"extra_refs":{org:xxx, repo:xxx, path_alias:github.com/repo }, "golangci-lint": {"enable": true, "workDir": "", "command": "golangci-lint", "args": ["run", "--config", ".golangci.yml"], "reportFormat": "github_checks"}}
+	CustomConfig map[string]RepoConfig `json:"customConfig,omitempty"`
+}
+
+type RepoConfig struct {
+	// ExtraRefs are auxiliary repositories that
+	// need to be cloned, determined from config
+	ExtraRefs []Refs            `json:"extra_refs,omitempty"`
+	Linters   map[string]Linter `json:"linters,omitempty"`
+}
+
+type Refs struct {
+	Org  string `json:"org,omitempty"`
+	Repo string `json:"repo,omitempty"`
+
+	// PathAlias is the location under /tmp/reviewbot-code/$org-$repo-$num/
+	// where this repository is cloned. If this is not
+	// set, /tmp/reviewbot-code/$org-$repo-$num/repo will be
+	// used as the default.
+	PathAlias string `json:"path_alias,omitempty"`
 }
 
 type GlobalConfig struct {
@@ -149,7 +167,7 @@ func NewConfig(conf string) (Config, error) {
 	return c, nil
 }
 
-func (c Config) Get(org, repo, ln string) Linter {
+func (c Config) GetLinterConfig(org, repo, ln string) Linter {
 	linter := Linter{
 		Enable:       boolPtr(true),
 		ReportFormat: c.GlobalDefaultConfig.GithubReportType,
@@ -176,13 +194,13 @@ func (c Config) Get(org, repo, ln string) Linter {
 	}
 
 	if orgConfig, ok := c.CustomConfig[org]; ok {
-		if l, ok := orgConfig[ln]; ok {
+		if l, ok := orgConfig.Linters[ln]; ok {
 			linter = applyCustomConfig(linter, l)
 		}
 	}
 
 	if repoConfig, ok := c.CustomConfig[org+"/"+repo]; ok {
-		if l, ok := repoConfig[ln]; ok {
+		if l, ok := repoConfig.Linters[ln]; ok {
 			linter = applyCustomConfig(linter, l)
 		}
 	}
