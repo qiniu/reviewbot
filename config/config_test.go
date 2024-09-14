@@ -34,30 +34,70 @@ globalDefaultConfig: # global default settings, will be overridden by qbox org a
 
 customConfig: # custom config for specific orgs or repos
   qbox: # github organization name
-    golangci-lint:
-      enable: true
-      args: ["run", "-D", "staticcheck"] # disable staticcheck globally since we have a separate linter for it
+    extraRefs:
+    - org: qbox
+      repo: net-cache
+    linters:
+     golangci-lint:
+       enable: true
+       args: ["run", "-D", "staticcheck"] # disable staticcheck globally since we have a separate linter for it
 
   qbox/net-cache:
-    luacheck:
-      enable: true
-      workDir: "nginx" # only run in the nginx directory since there are .luacheckrc files in this directory
+    linters:
+      luacheck:
+        enable: true
+        workDir: "nginx" # only run in the nginx directory since there are .luacheckrc files in this directory
+  qiniu/test:
+    extraRefs:
+    - org: qbox
+      repo: net-cache
+      cloneUrl : "git@github.com:qbox/net-schedule.git"
+    linters:
+      luacheck:
+        enable: true
+        workDir: "nginx" # only run in the nginx directory since there are .luacheckrc files in this directory
 `,
 			expected: Config{
 				GlobalDefaultConfig: GlobalConfig{
 					GithubReportType: GithubCheckRuns,
 				},
-				CustomConfig: map[string]map[string]Linter{
+				CustomConfig: map[string]RepoConfig{
 					"qbox": {
-						"golangci-lint": {
-							Enable: boolPtr(true),
-							Args:   []string{"run", "-D", "staticcheck"},
+						Linters: map[string]Linter{
+							"golangci-lint": {
+								Enable: boolPtr(true),
+								Args:   []string{"run", "-D", "staticcheck"},
+							},
+						},
+						ExtraRefs: []Refs{
+							{
+								Repo: "net-cache",
+								Org:  "qbox",
+							},
 						},
 					},
 					"qbox/net-cache": {
-						"luacheck": {
-							Enable:  boolPtr(true),
-							WorkDir: "nginx",
+						Linters: map[string]Linter{
+							"luacheck": {
+								Enable:  boolPtr(true),
+								WorkDir: "nginx",
+							},
+						},
+					},
+					"qiniu/test": {
+						Linters: map[string]Linter{
+							"luacheck": {
+								Enable:  boolPtr(true),
+								WorkDir: "nginx",
+							},
+						},
+						ExtraRefs: []Refs{
+							{
+								Repo:     "net-schedule",
+								Org:      "qbox",
+								Host:     "github.com",
+								CloneURL: "git@github.com:qbox/net-schedule.git",
+							},
 						},
 					},
 				},
@@ -70,34 +110,54 @@ customConfig: # custom config for specific orgs or repos
 globalDefaultConfig: # global default settings, will be overridden by qbox org and repo specific settings if they exist
   githubReportType: "github_check_run" # github_pr_review, github_check_run
   golangciLintConfig: "linters-config/.golangci.yml"
-
 customConfig: # custom config for specific orgs or repos
   qbox: # github organization name
-    golangci-lint:
-      enable: true
-      args: ["run", "-D", "staticcheck"] # disable staticcheck globally since we have a separate linter for it
+    extraRefs:
+    - org: qbox
+      repo: net-cache
+    - org: qiniu
+      repo: testrepo
+    linters:
+      golangci-lint:
+        enable: true
+        args: ["run", "-D", "staticcheck"] # disable staticcheck globally since we have a separate linter for it
 
   qbox/net-cache:
-    luacheck:
-      enable: true
-      workDir: "nginx" # only run in the nginx directory since there are .luacheckrc files in this directory
-`,
+    linters:
+      luacheck:
+        enable: true
+        workDir: "nginx" # only run in the nginx directory since there are .luacheckrc files in this directory
+        `,
 			expected: Config{
 				GlobalDefaultConfig: GlobalConfig{
 					GithubReportType:   GithubCheckRuns,
 					GolangCiLintConfig: "linters-config/.golangci.yml",
 				},
-				CustomConfig: map[string]map[string]Linter{
+				CustomConfig: map[string]RepoConfig{
 					"qbox": {
-						"golangci-lint": {
-							Enable: boolPtr(true),
-							Args:   []string{"run", "-D", "staticcheck"},
+						Linters: map[string]Linter{
+							"golangci-lint": {
+								Enable: boolPtr(true),
+								Args:   []string{"run", "-D", "staticcheck"},
+							},
+						},
+						ExtraRefs: []Refs{
+							{
+								Repo: "net-cache",
+								Org:  "qbox",
+							},
+							{
+								Repo: "testrepo",
+								Org:  "qiniu",
+							},
 						},
 					},
 					"qbox/net-cache": {
-						"luacheck": {
-							Enable:  boolPtr(true),
-							WorkDir: "nginx",
+						Linters: map[string]Linter{
+							"luacheck": {
+								Enable:  boolPtr(true),
+								WorkDir: "nginx",
+							},
 						},
 					},
 				},
@@ -150,46 +210,53 @@ globalDefaultConfig:
 
 customConfig: # custom config for specific orgs or repos
   goplus:
-    golangci-lint:
-      enable: true
-      configPath: "config/linters-config/.golangci.goplus.yml"
+    linters:
+      golangci-lint:
+        enable: true
+        configPath: "config/linters-config/.golangci.goplus.yml"
 
   qbox: # github organization name
-    golangci-lint:
-      enable: true
-      args: ["run", "-D", "staticcheck"] # disable staticcheck globally since we have a separate linter for it
+    linters:
+      golangci-lint:
+        enable: true
+        args: ["run", "-D", "staticcheck"] # disable staticcheck globally since we have a separate linter for it
 
   qbox/net-cache:
-    luacheck:
-      enable: true
-      workDir: "nginx" # only run in the nginx directory since there are .luacheckrc files in this directory
+    linters:
+      luacheck:
+        enable: true
+        workDir: "nginx" # only run in the nginx directory since there are .luacheckrc files in this directory
 
   qbox/kodo:
-    staticcheck:
-      enable: true
-      workDir: "src/qiniu.com/kodo"
+    linters:
+      staticcheck:
+        enable: true
+        workDir: "src/qiniu.com/kodo"
   
-  qbox/net-common:	  
-    golangci-lint:
-      enable: true
-      args: []
-      configPath: "repo.golangci.yml"
+  qbox/net-common:	 
+    linters: 
+      golangci-lint:
+        enable: true
+        args: []
+        configPath: "repo.golangci.yml"
 
-  qbox/net-tools:	  
-    golangci-lint:
-      enable: false
+  qbox/net-tools:
+    linters:	  
+      golangci-lint:
+        enable: false
   
   qbox/kodo-ops:
-    golangci-lint:
-      enable: true
-      command:
-        - "/bin/sh"
-        - "-c"
-        - "--"
-      args:
-        - |
-          cd website && yarn build && cd ..
-          golangci-lint run --enable-all --timeout=5m0s --allow-parallel-runners=true --print-issued-lines=false --out-format=line-number >> $ARTIFACT/lint.log 2>&1
+    linters:
+      golangci-lint:
+        enable: true
+        command:
+          - "/bin/sh"
+          - "-c"
+          - "--"
+        args:
+          - |
+            cd website && yarn build && cd ..
+            golangci-lint run --enable-all --timeout=5m0s --allow-parallel-runners=true --print-issued-lines=false --out-format=line-number >> $ARTIFACT/lint.log 2>&1
 
 `
 
@@ -348,7 +415,7 @@ customConfig: # custom config for specific orgs or repos
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			got := c.Get(tc.org, tc.repo, tc.linter)
+			got := c.GetLinterConfig(tc.org, tc.repo, tc.linter)
 			if *got.Enable != *tc.want.Enable {
 				t.Errorf("expected %v, got %v", *tc.want.Enable, *got.Enable)
 			}

@@ -61,6 +61,8 @@ type Server struct {
 	appPrivateKey string
 
 	debug bool
+
+	repoCacheDir string
 }
 
 func (s *Server) initDockerRunner() {
@@ -324,12 +326,14 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 		log.Infof("no .gitmodules file in repo %s", repo)
 	}
 
-	repoClients, err := PrepareExtraRef(org, repo, defaultWorkdir, s)
+	repoClients, err := s.PrepareExtraRef(org, repo, defaultWorkdir)
 	if err != nil {
 		log.Errorf("failed to prepare and clone ExtraRef : %v", err)
+		return err
 	}
 
 	repoClients = append(repoClients, r)
+
 	defer func() {
 		if s.debug {
 			return // do not remove the repository in debug mode
@@ -340,7 +344,6 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 				log.Errorf("failed to remove the repository , err : %v", err)
 			}
 		}
-
 	}()
 
 	for name, fn := range linters.TotalPullRequestHandlers() {
@@ -440,49 +443,48 @@ func prepareRepoDir(org, repo string, num int) (string, error) {
 		return "", fmt.Errorf("failed to create parent dir: %w", err)
 	}
 
-	err := os.Mkdir(parentDir+"/"+repo, 0o755)
-	if err != nil {
-		return "", fmt.Errorf("failed to create temp dir: %w", err)
-	}
-
 	return parentDir, nil
 }
 
-func PrepareExtraRef(org, repo, defaultWorkdir string, s *Server) (repoClients []gitv2.RepoClient, err error) {
-	var flag string
+func (s *Server) PrepareExtraRef(org, repo, defaultWorkdir string) (repoClients []gitv2.RepoClient, err error) {
+	var repoCfg config.RepoConfig
 	config := s.config
-	if _, ok := config.CustomConfig[org]; ok {
-		flag = org
+	if v, ok := config.CustomConfig[org]; ok {
+		repoCfg = v
 	}
-	if _, ok := config.CustomConfig[org+"/"+repo]; ok {
-		flag = org + "/" + repo
+	if v, ok := config.CustomConfig[org+"/"+repo]; ok {
+		repoCfg = v
 	}
 
-	if flag != "" {
-		for _, v := range config.CustomConfig[flag].ExtraRefs {
-			var err error
-			if v.PathAlias != "" {
-				err = os.Mkdir(defaultWorkdir+"/"+v.PathAlias, 0o755)
-			} else {
-				err = os.Mkdir(defaultWorkdir+"/"+v.Repo, 0o755)
-			}
+	if len(repoCfg.ExtraRefs) == 0 {
+		return []gitv2.RepoClient{}, nil
+	}
 
-			if err != nil {
-				return []gitv2.RepoClient{}, fmt.Errorf("failed to create extra reference dir: %w", err)
-			}
-			repoPath := defaultWorkdir + "/" + v.Repo
-			if v.PathAlias != "" {
-				repoPath = defaultWorkdir + v.PathAlias
-			}
-			r, err := s.gitClientFactory.ClientForWithRepoOpts(v.Org, v.Repo, gitv2.RepoOpts{
-				CopyTo: repoPath,
-			})
-			if err != nil {
-				return []gitv2.RepoClient{}, fmt.Errorf("failed to clone for %s/%s: %w", v.Org, v.Repo, err)
-			}
-
-			repoClients = append(repoClients, r)
+	for _, refConfig := range repoCfg.ExtraRefs {
+		opt := gitv2.ClientFactoryOpts{
+			CacheDirBase: github.String(s.repoCacheDir),
+			Persist:      github.Bool(true),
+			UseSSH:       github.Bool(true),
+			Host:         refConfig.Host,
 		}
+		gitClient, err := gitv2.NewClientFactory(opt.Apply)
+		if err != nil {
+			log.Fatalf("failed to create git client factory: %v", err)
+		}
+
+		repoPath := defaultWorkdir + "/" + refConfig.Repo
+		if refConfig.PathAlias != "" {
+			repoPath = defaultWorkdir + refConfig.PathAlias
+		}
+		r, err := gitClient.ClientForWithRepoOpts(refConfig.Org, refConfig.Repo, gitv2.RepoOpts{
+			CopyTo: repoPath,
+		})
+		if err != nil {
+			return []gitv2.RepoClient{}, fmt.Errorf("failed to clone for %s/%s: %w", refConfig.Org, refConfig.Repo, err)
+		}
+
+		repoClients = append(repoClients, r)
 	}
+
 	return repoClients, nil
 }

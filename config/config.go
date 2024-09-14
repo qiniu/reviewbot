@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"sigs.k8s.io/yaml"
 )
@@ -14,27 +15,29 @@ type Config struct {
 
 	// CustomConfig is the custom org or repo config.
 	// e.g.
-	// * "org/repo": {"extra_refs":{org:xxx, repo:xxx, path_alias:github.com/repo }, "golangci-lint": {"enable": true, "workDir": "", "command": "golangci-lint", "args": ["run", "--config", ".golangci.yml"], "reportFormat": "github_checks"}}
-	// * "org": {"extra_refs":{org:xxx, repo:xxx, path_alias:github.com/repo }, "golangci-lint": {"enable": true, "workDir": "", "command": "golangci-lint", "args": ["run", "--config", ".golangci.yml"], "reportFormat": "github_checks"}}
+	// * "org/repo": {"extraRefs":{org:xxx, repo:xxx, path_alias:github.com/repo }, "golangci-lint": {"enable": true, "workDir": "", "command": "golangci-lint", "args": ["run", "--config", ".golangci.yml"], "reportFormat": "github_checks"}}
+	// * "org": {"extraRefs":{org:xxx, repo:xxx, path_alias:github.com/repo }, "golangci-lint": {"enable": true, "workDir": "", "command": "golangci-lint", "args": ["run", "--config", ".golangci.yml"], "reportFormat": "github_checks"}}
 	CustomConfig map[string]RepoConfig `json:"customConfig,omitempty"`
 }
 
 type RepoConfig struct {
 	// ExtraRefs are auxiliary repositories that
 	// need to be cloned, determined from config
-	ExtraRefs []Refs            `json:"extra_refs,omitempty"`
+	ExtraRefs []Refs            `json:"extraRefs,omitempty"`
 	Linters   map[string]Linter `json:"linters,omitempty"`
 }
 
 type Refs struct {
-	Org  string `json:"org,omitempty"`
-	Repo string `json:"repo,omitempty"`
+	Org      string `json:"org,omitempty"`
+	Repo     string `json:"repo,omitempty"`
+	CloneURL string `json:"cloneUrl,omitempty"`
 
-	// PathAlias is the location under /tmp/reviewbot-code/$org-$repo-$num/
+	// PathAlias is the location under $parentDir/reviewbot-code/$org-$repo-$num/
 	// where this repository is cloned. If this is not
-	// set, /tmp/reviewbot-code/$org-$repo-$num/repo will be
+	// set, $parentDir/reviewbot-code/$org-$repo-$num/repo will be
 	// used as the default.
-	PathAlias string `json:"path_alias,omitempty"`
+	PathAlias string `json:"pathAlias,omitempty"`
+	Host      string
 }
 
 type GlobalConfig struct {
@@ -130,6 +133,23 @@ func NewConfig(conf string) (Config, error) {
 
 	if err = yaml.Unmarshal(f, &c); err != nil {
 		return c, err
+	}
+
+	// parse cloneURL to org repo and host
+	re := regexp.MustCompile(`^(?:git@|https://)?([^:/]+)[:/]{1}(.*?)/(.*?)\.git$`)
+	for orgRepo, refConfig := range c.CustomConfig {
+		for k, ref := range refConfig.ExtraRefs {
+			if ref.CloneURL == "" {
+				continue
+			}
+			matches := re.FindStringSubmatch(ref.CloneURL)
+			if len(matches) != 4 {
+				return c, fmt.Errorf("faile to parse CloneURL, please check the format of %s", ref.CloneURL)
+			}
+			c.CustomConfig[orgRepo].ExtraRefs[k].Host = matches[1]
+			c.CustomConfig[orgRepo].ExtraRefs[k].Org = matches[2]
+			c.CustomConfig[orgRepo].ExtraRefs[k].Repo = matches[3]
+		}
 	}
 
 	// set default value
