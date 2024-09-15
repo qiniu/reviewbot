@@ -1,6 +1,7 @@
 {
   "label": "Linters",
   "position": 3,
+  "collapsed": false,
   "link": {
     "type": "generated-index",
     "description": "我们来了解 Reviewbot 目前已有的功能！"
