@@ -27,6 +27,7 @@
 - go linters
   - [golangci-lint](/internal/linters/go/golangci_lint/)
   - [gofmt](/internal/linters/go/gofmt/)
+  - [gomodcheck](/internal/linters/go/gomodcheck/)
 - c/c++ linters
   - [cppcheck](/internal/linters/c/cppcheck/)
 - lua linters
