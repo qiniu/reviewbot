@@ -229,6 +229,7 @@ func main() {
 		appPrivateKey:    o.appPrivateKey,
 		debug:            o.debug,
 		serverAddr:       o.serverAddr,
+		repoCacheDir:     o.codeCacheDir,
 	}
 
 	go s.initDockerRunner()

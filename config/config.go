@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"sigs.k8s.io/yaml"
 )
@@ -12,11 +13,31 @@ import (
 type Config struct {
 	GlobalDefaultConfig GlobalConfig `json:"globalDefaultConfig,omitempty"`
 
-	// CustomConfig is the custom linter config.
+	// CustomConfig is the custom org or repo config.
 	// e.g.
-	// * "org/repo": {"golangci-lint": {"enable": true, "workDir": "", "command": "golangci-lint", "args": ["run", "--config", ".golangci.yml"], "reportFormat": "github_checks"}}
-	// * "org": {"golangci-lint": {"enable": true, "workDir": "", "command": "golangci-lint", "args": ["run", "--config", ".golangci.yml"], "reportFormat": "github_checks"}}
-	CustomConfig map[string]map[string]Linter `json:"customConfig,omitempty"`
+	// * "org/repo": {"extraRefs":{org:xxx, repo:xxx, path_alias:github.com/repo }, "golangci-lint": {"enable": true, "workDir": "", "command": "golangci-lint", "args": ["run", "--config", ".golangci.yml"], "reportFormat": "github_checks"}}
+	// * "org": {"extraRefs":{org:xxx, repo:xxx, path_alias:github.com/repo }, "golangci-lint": {"enable": true, "workDir": "", "command": "golangci-lint", "args": ["run", "--config", ".golangci.yml"], "reportFormat": "github_checks"}}
+	CustomConfig map[string]RepoConfig `json:"customConfig,omitempty"`
+}
+
+type RepoConfig struct {
+	// ExtraRefs are auxiliary repositories that
+	// need to be cloned, determined from config
+	ExtraRefs []Refs            `json:"extraRefs,omitempty"`
+	Linters   map[string]Linter `json:"linters,omitempty"`
+}
+
+type Refs struct {
+	Org      string `json:"org,omitempty"`
+	Repo     string `json:"repo,omitempty"`
+	CloneURL string `json:"cloneUrl,omitempty"`
+
+	// PathAlias is the location under $parentDir/reviewbot-code/$org-$repo-$num/
+	// where this repository is cloned. If this is not
+	// set, $parentDir/reviewbot-code/$org-$repo-$num/repo will be
+	// used as the default.
+	PathAlias string `json:"pathAlias,omitempty"`
+	Host      string
 }
 
 type GlobalConfig struct {
@@ -114,6 +135,23 @@ func NewConfig(conf string) (Config, error) {
 		return c, err
 	}
 
+	// parse cloneURL to org repo and host
+	re := regexp.MustCompile(`^(?:git@|https://)?([^:/]+)[:/]{1}(.*?)/(.*?)\.git$`)
+	for orgRepo, refConfig := range c.CustomConfig {
+		for k, ref := range refConfig.ExtraRefs {
+			if ref.CloneURL == "" {
+				continue
+			}
+			matches := re.FindStringSubmatch(ref.CloneURL)
+			if len(matches) != 4 {
+				return c, fmt.Errorf("faile to parse CloneURL, please check the format of %s", ref.CloneURL)
+			}
+			c.CustomConfig[orgRepo].ExtraRefs[k].Host = matches[1]
+			c.CustomConfig[orgRepo].ExtraRefs[k].Org = matches[2]
+			c.CustomConfig[orgRepo].ExtraRefs[k].Repo = matches[3]
+		}
+	}
+
 	// set default value
 	if c.GlobalDefaultConfig.GithubReportType == "" {
 		c.GlobalDefaultConfig.GithubReportType = GithubPRReview
@@ -149,7 +187,7 @@ func NewConfig(conf string) (Config, error) {
 	return c, nil
 }
 
-func (c Config) Get(org, repo, ln string) Linter {
+func (c Config) GetLinterConfig(org, repo, ln string) Linter {
 	linter := Linter{
 		Enable:       boolPtr(true),
 		ReportFormat: c.GlobalDefaultConfig.GithubReportType,
@@ -176,13 +214,13 @@ func (c Config) Get(org, repo, ln string) Linter {
 	}
 
 	if orgConfig, ok := c.CustomConfig[org]; ok {
-		if l, ok := orgConfig[ln]; ok {
+		if l, ok := orgConfig.Linters[ln]; ok {
 			linter = applyCustomConfig(linter, l)
 		}
 	}
 
 	if repoConfig, ok := c.CustomConfig[org+"/"+repo]; ok {
-		if l, ok := repoConfig[ln]; ok {
+		if l, ok := repoConfig.Linters[ln]; ok {
 			linter = applyCustomConfig(linter, l)
 		}
 	}

@@ -61,12 +61,14 @@ type Server struct {
 	appPrivateKey string
 
 	debug bool
+
+	repoCacheDir string
 }
 
 func (s *Server) initDockerRunner() {
 	var images []string
 	for _, customConfig := range s.config.CustomConfig {
-		for _, linter := range customConfig {
+		for _, linter := range customConfig.Linters {
 			if linter.DockerAsRunner.Image != "" {
 				images = append(images, linter.DockerAsRunner.Image)
 			}
@@ -291,13 +293,13 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 	}
 	log.Infof("found %d files affected by pull request %d\n", len(pullRequestAffectedFiles), num)
 
-	repoPath, err := prepareRepoDir(org, repo, num)
+	defaultWorkdir, err := prepareRepoDir(org, repo, num)
 	if err != nil {
 		return fmt.Errorf("failed to prepare repo dir: %w", err)
 	}
 
 	r, err := s.gitClientFactory.ClientForWithRepoOpts(org, repo, gitv2.RepoOpts{
-		CopyTo: repoPath,
+		CopyTo: defaultWorkdir + "/" + repo,
 	})
 	if err != nil {
 		log.Errorf("failed to create git client: %v", err)
@@ -324,18 +326,28 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 		log.Infof("no .gitmodules file in repo %s", repo)
 	}
 
+	repoClients, err := s.PrepareExtraRef(org, repo, defaultWorkdir)
+	if err != nil {
+		log.Errorf("failed to prepare and clone ExtraRef : %v", err)
+		return err
+	}
+
+	repoClients = append(repoClients, r)
+
 	defer func() {
 		if s.debug {
 			return // do not remove the repository in debug mode
 		}
-		err := r.Clean()
-		if err != nil {
-			log.Errorf("failed to remove the repository , err : %v", err)
+		for _, r := range repoClients {
+			err := r.Clean()
+			if err != nil {
+				log.Errorf("failed to remove the repository , err : %v", err)
+			}
 		}
 	}()
 
 	for name, fn := range linters.TotalPullRequestHandlers() {
-		linterConfig := s.config.Get(org, repo, name)
+		linterConfig := s.config.GetLinterConfig(org, repo, name)
 
 		// skip linter if it is disabled
 		if linterConfig.Enable != nil && !*linterConfig.Enable {
@@ -422,19 +434,57 @@ func prepareRepoDir(org, repo string, num int) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("failed to get user home dir: %w", err)
 		}
-		parentDir = filepath.Join(homeDir, "reviewbot-code")
+		parentDir = filepath.Join(homeDir, "reviewbot-code", fmt.Sprintf("%s-%s-%d", org, repo, num))
 	} else {
-		parentDir = filepath.Join("/tmp", "reviewbot-code")
+		parentDir = filepath.Join("/tmp", "reviewbot-code", fmt.Sprintf("%s-%s-%d", org, repo, num))
 	}
 
 	if err := os.MkdirAll(parentDir, 0o755); err != nil {
 		return "", fmt.Errorf("failed to create parent dir: %w", err)
 	}
 
-	repoPath, err := os.MkdirTemp(parentDir, fmt.Sprintf("%s-%s-%d-", org, repo, num))
-	if err != nil {
-		return "", fmt.Errorf("failed to create temp dir: %w", err)
+	return parentDir, nil
+}
+
+func (s *Server) PrepareExtraRef(org, repo, defaultWorkdir string) (repoClients []gitv2.RepoClient, err error) {
+	var repoCfg config.RepoConfig
+	config := s.config
+	if v, ok := config.CustomConfig[org]; ok {
+		repoCfg = v
+	}
+	if v, ok := config.CustomConfig[org+"/"+repo]; ok {
+		repoCfg = v
 	}
 
-	return repoPath, nil
+	if len(repoCfg.ExtraRefs) == 0 {
+		return []gitv2.RepoClient{}, nil
+	}
+
+	for _, refConfig := range repoCfg.ExtraRefs {
+		opt := gitv2.ClientFactoryOpts{
+			CacheDirBase: github.String(s.repoCacheDir),
+			Persist:      github.Bool(true),
+			UseSSH:       github.Bool(true),
+			Host:         refConfig.Host,
+		}
+		gitClient, err := gitv2.NewClientFactory(opt.Apply)
+		if err != nil {
+			log.Fatalf("failed to create git client factory: %v", err)
+		}
+
+		repoPath := defaultWorkdir + "/" + refConfig.Repo
+		if refConfig.PathAlias != "" {
+			repoPath = defaultWorkdir + refConfig.PathAlias
+		}
+		r, err := gitClient.ClientForWithRepoOpts(refConfig.Org, refConfig.Repo, gitv2.RepoOpts{
+			CopyTo: repoPath,
+		})
+		if err != nil {
+			return []gitv2.RepoClient{}, fmt.Errorf("failed to clone for %s/%s: %w", refConfig.Org, refConfig.Repo, err)
+		}
+
+		repoClients = append(repoClients, r)
+	}
+
+	return repoClients, nil
 }
