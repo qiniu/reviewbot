@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"regexp"
 
+	"github.com/qiniu/x/log"
 	"sigs.k8s.io/yaml"
 )
 
@@ -28,8 +29,13 @@ type RepoConfig struct {
 }
 
 type Refs struct {
-	Org      string `json:"org,omitempty"`
-	Repo     string `json:"repo,omitempty"`
+	// Org is the organization name, e.g. "qiniu"
+	Org string `json:"org,omitempty"`
+	// Repo is the repository name, e.g. "kodo"
+	Repo string `json:"repo,omitempty"`
+	// Host is the git provider, e.g. "github.com", "gitlab.com"
+	Host string `json:"host,omitempty"`
+	// CloneURL is the git clone url, e.g. "https://github.com/qiniu/kodo.git"
 	CloneURL string `json:"cloneUrl,omitempty"`
 
 	// PathAlias is the location under $parentDir/reviewbot-code/$org-$repo-$num/
@@ -37,7 +43,6 @@ type Refs struct {
 	// set, $parentDir/reviewbot-code/$org-$repo-$num/repo will be
 	// used as the default.
 	PathAlias string `json:"pathAlias,omitempty"`
-	Host      string
 }
 
 type GlobalConfig struct {
@@ -131,7 +136,7 @@ func NewConfig(conf string) (Config, error) {
 		return c, err
 	}
 
-	if err = yaml.Unmarshal(f, &c); err != nil {
+	if err = yaml.UnmarshalStrict(f, &c); err != nil {
 		return c, err
 	}
 
@@ -144,7 +149,7 @@ func NewConfig(conf string) (Config, error) {
 			}
 			matches := re.FindStringSubmatch(ref.CloneURL)
 			if len(matches) != 4 {
-				return c, fmt.Errorf("faile to parse CloneURL, please check the format of %s", ref.CloneURL)
+				return c, fmt.Errorf("failed to parse CloneURL, please check the format of %s", ref.CloneURL)
 			}
 			c.CustomConfig[orgRepo].ExtraRefs[k].Host = matches[1]
 			c.CustomConfig[orgRepo].ExtraRefs[k].Org = matches[2]
@@ -183,6 +188,7 @@ func NewConfig(conf string) (Config, error) {
 	}
 
 	// TODO(CarlJi): do we need to check the format of the copy ssh key here?
+	log.Debugf("config %+v", c)
 
 	return c, nil
 }
