@@ -23,14 +23,17 @@ customConfig: # custom config for specific orgs or repos
 
   # temporary disable, will be enabled after fixing the go mod issue in kodo
   qbox/kodoe-manager:
-    gomodcheck:
-      enable: false
+    linters:
+      gomodcheck:
+        enable: false
   qbox/zrs:
-    gomodcheck:
-      enable: false
+    linters:
+      gomodcheck:
+        enable: false
   qbox/logverse:
-    gomodcheck:
-      enable: false
+    linters:
+      gomodcheck:
+        enable: false
 
   qbox/kodo:
     linters:
