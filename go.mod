@@ -6,6 +6,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.30.5
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.32
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.61.2
+	github.com/aws/smithy-go v1.20.4
 	github.com/bradleyfalzon/ghinstallation/v2 v2.8.0
 	github.com/docker/docker v27.2.0+incompatible
 	github.com/google/go-github/v57 v57.0.0
@@ -31,7 +32,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.3.19 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.11.19 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.17.17 // indirect
-	github.com/aws/smithy-go v1.20.4 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
@@ -76,4 +76,4 @@ require (
 	k8s.io/utils v0.0.0-20230406110748-d93618cff8a2 // indirect
 )
 
-replace sigs.k8s.io/prow => github.com/Carlji/prow v1.0.0-beta
+replace sigs.k8s.io/prow => github.com/Carlji/prow v1.0.0
