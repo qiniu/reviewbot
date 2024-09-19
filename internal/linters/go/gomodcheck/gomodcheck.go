@@ -54,10 +54,12 @@ func goModCheckOutput(log *xlog.Logger, a linters.Agent) (map[string][]linters.L
 
 		for _, replace := range mod.Replace {
 			var parsePath string
-			matches := re.FindString(replace.New.Path)
-			if matches != "" {
-				parsePath = filepath.Join(filepath.Dir(goModPath), matches)
+			if !strings.HasPrefix(replace.New.Path, "../") {
+				continue
 			}
+			matches := re.FindString(replace.New.Path)
+			parsePath = filepath.Join(filepath.Dir(goModPath), matches)
+
 			isSub, err := isSubdirectory(a.RepoDir, parsePath)
 			if err != nil {
 				log.Errorf("failed to compare whether A is a subdirectory of B : %v", err)
