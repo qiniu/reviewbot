@@ -54,6 +54,19 @@ func TestGoModCheck(t *testing.T) {
 			},
 			want: map[string][]linters.LinterOutput{},
 		},
+		{
+			id:      "case3 : valid non-local replacement ",
+			content: []byte("replace github.com/xxxxx/xxx v0.0.0 => github.com/xxx/xxxx v1.1.1"),
+			input: linters.Agent{
+				RepoDir: "a/b",
+				PullRequestChangedFiles: []*github.CommitFile{
+					{
+						Filename: &modDir,
+					},
+				},
+			},
+			want: map[string][]linters.LinterOutput{},
+		},
 	}
 
 	for _, tc := range tcs {
