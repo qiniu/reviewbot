@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/qiniu/reviewbot/internal/linters"
@@ -50,16 +49,12 @@ func goModCheckOutput(log *xlog.Logger, a linters.Agent) (map[string][]linters.L
 			log.Errorf("Error parsing %s: %s", goModPath, err)
 			return output, err
 		}
-		re := regexp.MustCompile(`^(?:\.\./)+`)
-
 		for _, replace := range mod.Replace {
-			var parsePath string
 			if !strings.HasPrefix(replace.New.Path, "../") {
 				continue
 			}
-			matches := re.FindString(replace.New.Path)
-			parsePath = filepath.Join(filepath.Dir(goModPath), matches)
 
+			parsePath := filepath.Join(filepath.Dir(goModPath), replace.New.Path)
 			isSub, err := isSubdirectory(a.RepoDir, parsePath)
 			if err != nil {
 				log.Errorf("failed to compare whether A is a subdirectory of B : %v", err)
