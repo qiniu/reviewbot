@@ -21,19 +21,22 @@ customConfig: # custom config for specific orgs or repos
       golangci-lint:
         enable: false
 
-  # temporary disable, will be enabled after fixing the go mod issue in kodo
-  qbox/kodoe-manager:
-    linters:
-      gomodcheck:
-        enable: false
   qbox/zrs:
-    linters:
-      gomodcheck:
-        enable: false
+    extraRefs:
+      - org: qbox
+        repo: kodo
+  qbox/kodoe-manager:
+    extraRefs:
+      - org: qbox
+        repo: kodo
+  qbox/configcenter:
+    extraRefs:
+      - org: qbox
+        repo: kodo
   qbox/logverse:
-    linters:
-      gomodcheck:
-        enable: false
+    extraRefs:
+      - org: qbox
+        repo: kodo
 
   qbox/kodo:
     linters:
@@ -56,6 +59,9 @@ customConfig: # custom config for specific orgs or repos
             golangci-lint run --timeout=10m0s --allow-parallel-runners=true --print-issued-lines=false --out-format=line-number >> $ARTIFACT/lint.log 2>&1
 
   qbox/kodo-ops:
+    extraRefs:
+      - org: qbox
+        repo: kodo
     linters:
       golangci-lint:
         enable: true

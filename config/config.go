@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -29,13 +30,15 @@ type RepoConfig struct {
 }
 
 type Refs struct {
-	// Org is the organization name, e.g. "qiniu"
-	Org string `json:"org,omitempty"`
-	// Repo is the repository name, e.g. "kodo"
-	Repo string `json:"repo,omitempty"`
-	// Host is the git provider, e.g. "github.com", "gitlab.com"
-	Host string `json:"host,omitempty"`
-	// CloneURL is the git clone url, e.g. "https://github.com/qiniu/kodo.git"
+	// Org, Repo, and Host form a set that will ultimately be combined into a CloneURL
+	// For example: Org="qiniu", Repo="kodo", Host="github.com"
+	// will generate CloneURL="https://github.com/qiniu/kodo.git"
+	//
+	// Alternatively, you can directly provide the CloneURL, which will be parsed into the corresponding Org, Repo, and Host
+	// Org, Repo, Host, and CloneURL are equivalent; only one set needs to be filled
+	Org      string `json:"org,omitempty"`
+	Repo     string `json:"repo,omitempty"`
+	Host     string `json:"host,omitempty"`
 	CloneURL string `json:"cloneUrl,omitempty"`
 
 	// PathAlias is the location under $parentDir/reviewbot-code/$org-$repo-$num/
@@ -140,21 +143,10 @@ func NewConfig(conf string) (Config, error) {
 		return c, err
 	}
 
-	// parse cloneURL to org repo and host
-	re := regexp.MustCompile(`^(?:git@|https://)?([^:/]+)[:/]{1}(.*?)/(.*?)\.git$`)
-	for orgRepo, refConfig := range c.CustomConfig {
-		for k, ref := range refConfig.ExtraRefs {
-			if ref.CloneURL == "" {
-				continue
-			}
-			matches := re.FindStringSubmatch(ref.CloneURL)
-			if len(matches) != 4 {
-				return c, fmt.Errorf("failed to parse CloneURL, please check the format of %s", ref.CloneURL)
-			}
-			c.CustomConfig[orgRepo].ExtraRefs[k].Host = matches[1]
-			c.CustomConfig[orgRepo].ExtraRefs[k].Org = matches[2]
-			c.CustomConfig[orgRepo].ExtraRefs[k].Repo = matches[3]
-		}
+	// ============ validate and update the config ============
+
+	if err := c.parseCloneURLs(); err != nil {
+		return c, err
 	}
 
 	// set default value
@@ -328,4 +320,37 @@ func (*baseModifier) Modify(cfg *Linter) (*Linter, error) {
 	newCfg.Command = []string{"/bin/sh", "-c", "--"}
 
 	return &newCfg, nil
+}
+
+func (c *Config) parseCloneURLs() error {
+	re := regexp.MustCompile(`^(?:git@|https://)?([^:/]+)[:/]{1}(.*?)/(.*?)\.git$`)
+
+	for orgRepo, refConfig := range c.CustomConfig {
+		for k, ref := range refConfig.ExtraRefs {
+			if ref.CloneURL == "" {
+				continue
+			}
+
+			if err := c.parseAndUpdateCloneURL(re, orgRepo, k); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (c *Config) parseAndUpdateCloneURL(re *regexp.Regexp, orgRepo string, k int) error {
+	ref := &c.CustomConfig[orgRepo].ExtraRefs[k]
+	matches := re.FindStringSubmatch(ref.CloneURL)
+	if len(matches) != 4 {
+		log.Errorf("failed to parse CloneURL, please check the format of %s", ref.CloneURL)
+		return errors.New("invalid CloneURL")
+	}
+
+	ref.Host = matches[1]
+	ref.Org = matches[2]
+	ref.Repo = matches[3]
+
+	return nil
 }
