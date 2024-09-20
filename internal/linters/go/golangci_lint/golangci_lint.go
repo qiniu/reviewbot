@@ -13,6 +13,7 @@ import (
 	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/reviewbot/internal/lintersutil"
+	"github.com/qiniu/x/log"
 	"github.com/qiniu/x/xlog"
 )
 
@@ -21,7 +22,7 @@ var lintName = "golangci-lint"
 
 func init() {
 	linters.RegisterPullRequestHandler(lintName, golangciLintHandler)
-	linters.RegisterLinterLanguages(lintName, []string{".go"})
+	linters.RegisterLinterLanguages(lintName, []string{".go", ".mod", ".sum"})
 }
 
 func golangciLintHandler(ctx context.Context, a linters.Agent) error {
@@ -30,6 +31,7 @@ func golangciLintHandler(ctx context.Context, a linters.Agent) error {
 	if len(a.LinterConfig.Command) == 0 || (len(a.LinterConfig.Command) == 1 && a.LinterConfig.Command[0] == lintName) {
 		// Default mode, automatically find the go.mod path in current repo
 		goModDirs = findGoModDirs(a)
+		log.Infof("find go.mod in dirs: %v", goModDirs)
 		// Default mode, automatically apply parameters.
 		a = argsApply(log, a)
 	} else if a.LinterConfig.ConfigPath != "" {
@@ -258,6 +260,7 @@ func configApply(log *xlog.Logger, a linters.Agent) string {
 func findGoModDirs(a linters.Agent) []string {
 	// it means WorkDir is specified via the config file probably, so we don't need to find go.mod
 	if a.LinterConfig.WorkDir != a.RepoDir {
+		log.Infof("WorkDir does not match the repo dir, so we don't need to find go.mod. WorkDir: %v, RepoDir: %v", a.LinterConfig.WorkDir, a.RepoDir)
 		return []string{}
 	}
 
@@ -276,7 +279,7 @@ func extractDirs(commitFiles []*github.CommitFile) []string {
 	directorySet := make(map[string]bool)
 
 	for _, file := range commitFiles {
-		if filepath.Ext(file.GetFilename()) != ".go" {
+		if filepath.Ext(file.GetFilename()) != ".go" && filepath.Ext(file.GetFilename()) != ".mod" && filepath.Ext(file.GetFilename()) != ".sum" {
 			continue
 		}
 		dir := filepath.Dir(file.GetFilename())
