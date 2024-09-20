@@ -12,7 +12,6 @@ import (
 )
 
 func TestGoModCheck(t *testing.T) {
-	modDir := "c/go.mod"
 	tcs := []struct {
 		id      string
 		content []byte
@@ -21,19 +20,18 @@ func TestGoModCheck(t *testing.T) {
 	}{
 		{
 			id:      "case1 : cross-repository local replacement ",
-			content: []byte("replace github.com/xxxxx/xxx v0.0.0 => ../../github.com/xxx/xxxx"),
+			content: []byte("replace github.com/a/c v0.0.0 => ../../github.com/c/d"),
 			input: linters.Agent{
-				RepoDir: "a/b",
 				PullRequestChangedFiles: []*github.CommitFile{
 					{
-						Filename: &modDir,
+						Filename: github.String("c/go.mod"),
 					},
 				},
 			},
 			want: map[string][]linters.LinterOutput{
 				"c/go.mod": {
 					{
-						File:    modDir,
+						File:    "c/go.mod",
 						Line:    1,
 						Column:  1,
 						Message: "cross-repository local replacement are not allowed[reviewbot]\nfor more information see https://github.com/qiniu/reviewbot/issues/275",
@@ -43,12 +41,11 @@ func TestGoModCheck(t *testing.T) {
 		},
 		{
 			id:      "case2 : valid local replacement ",
-			content: []byte("replace github.com/xxxxx/xxx v0.0.0 => ../github.com/xxx/xxxx"),
+			content: []byte("replace github.com/a/b v0.0.0 => ../github.com/c/d"),
 			input: linters.Agent{
-				RepoDir: "a/b",
 				PullRequestChangedFiles: []*github.CommitFile{
 					{
-						Filename: &modDir,
+						Filename: github.String("c/go.mod"),
 					},
 				},
 			},
@@ -56,38 +53,68 @@ func TestGoModCheck(t *testing.T) {
 		},
 		{
 			id:      "case3 : valid non-local replacement ",
-			content: []byte("replace github.com/xxxxx/xxx v0.0.0 => github.com/xxx/xxxx v1.1.1"),
+			content: []byte("replace github.com/a/b v0.0.0 => github.com/c/d v1.1.1"),
 			input: linters.Agent{
-				RepoDir: "a/b",
 				PullRequestChangedFiles: []*github.CommitFile{
 					{
-						Filename: &modDir,
+						Filename: github.String("c/go.mod"),
 					},
 				},
 			},
 			want: map[string][]linters.LinterOutput{},
 		},
+		{
+			id:      "case4 : multiple go.mod files",
+			content: []byte("replace github.com/a/b v0.0.0 => ../../github.com/c/d"),
+			input: linters.Agent{
+				PullRequestChangedFiles: []*github.CommitFile{
+					{
+						Filename: github.String("c/go.mod"),
+					},
+					{
+						Filename: github.String("d/go.mod"),
+					},
+				},
+			},
+			want: map[string][]linters.LinterOutput{
+				"c/go.mod": {
+					{
+						File:    "c/go.mod",
+						Line:    1,
+						Column:  1,
+						Message: "cross-repository local replacement are not allowed[reviewbot]\nfor more information see https://github.com/qiniu/reviewbot/issues/275",
+					},
+				},
+				"d/go.mod": {
+					{
+						File:    "d/go.mod",
+						Line:    1,
+						Column:  1,
+						Message: "cross-repository local replacement are not allowed[reviewbot]\nfor more information see https://github.com/qiniu/reviewbot/issues/275",
+					},
+				},
+			},
+		},
 	}
 
 	for _, tc := range tcs {
 		t.Run(tc.id, func(t *testing.T) {
-			filename := filepath.Join(tc.input.RepoDir, modDir)
-			err := os.MkdirAll(filepath.Dir(filename), 0o755)
-			if err != nil {
-				t.Errorf("Error creating directories:%v", err)
-				return
-			}
-			defer func() {
-				err = os.RemoveAll(filename)
+			// prepare go.mod files
+			for _, file := range tc.input.PullRequestChangedFiles {
+				filename := file.GetFilename()
+				dir := filepath.Dir(filename)
+				err := os.MkdirAll(dir, 0o755)
+				if err != nil {
+					t.Errorf("Error creating directories: %v", err)
+					return
+				}
+				defer os.RemoveAll(dir)
+
+				err = os.WriteFile(filename, tc.content, 0o600)
 				if err != nil {
 					t.Errorf("Error writing to file: %v", err)
 					return
 				}
-			}()
-			err = os.WriteFile(filename, tc.content, 0o644)
-			if err != nil {
-				t.Errorf("Error writing to file: %v", err)
-				return
 			}
 
 			output, err := goModCheckOutput(&xlog.Logger{}, tc.input)
