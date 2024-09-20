@@ -293,13 +293,21 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 	}
 	log.Infof("found %d files affected by pull request %d\n", len(pullRequestAffectedFiles), num)
 
-	defaultWorkdir, err := prepareRepoDir(org, repo, num)
+	defaultWorkDir, err := prepareRepoDir(org, repo, num)
 	if err != nil {
 		return fmt.Errorf("failed to prepare repo dir: %w", err)
 	}
+	defer func() {
+		if s.debug {
+			return // do not remove the repository in debug mode
+		}
+		if err := os.RemoveAll(defaultWorkDir); err != nil {
+			log.Errorf("failed to remove the repository , err : %v", err)
+		}
+	}()
 
 	r, err := s.gitClientFactory.ClientForWithRepoOpts(org, repo, gitv2.RepoOpts{
-		CopyTo: defaultWorkdir + "/" + repo,
+		CopyTo: defaultWorkDir + "/" + repo,
 	})
 	if err != nil {
 		log.Errorf("failed to create git client: %v", err)
@@ -326,25 +334,11 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 		log.Infof("no .gitmodules file in repo %s", repo)
 	}
 
-	repoClients, err := s.PrepareExtraRef(org, repo, defaultWorkdir)
+	_, err = s.PrepareExtraRef(org, repo, defaultWorkDir)
 	if err != nil {
 		log.Errorf("failed to prepare and clone ExtraRef : %v", err)
 		return err
 	}
-
-	repoClients = append(repoClients, r)
-
-	defer func() {
-		if s.debug {
-			return // do not remove the repository in debug mode
-		}
-		for _, r := range repoClients {
-			err := r.Clean()
-			if err != nil {
-				log.Errorf("failed to remove the repository , err : %v", err)
-			}
-		}
-	}()
 
 	for name, fn := range linters.TotalPullRequestHandlers() {
 		linterConfig := s.config.GetLinterConfig(org, repo, name)
@@ -434,19 +428,24 @@ func prepareRepoDir(org, repo string, num int) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("failed to get user home dir: %w", err)
 		}
-		parentDir = filepath.Join(homeDir, "reviewbot-code", fmt.Sprintf("%s-%s-%d", org, repo, num))
+		parentDir = filepath.Join(homeDir, "reviewbot-code-workspace")
 	} else {
-		parentDir = filepath.Join("/tmp", "reviewbot-code", fmt.Sprintf("%s-%s-%d", org, repo, num))
+		parentDir = filepath.Join("/tmp", "reviewbot-code-workspace")
 	}
 
 	if err := os.MkdirAll(parentDir, 0o755); err != nil {
 		return "", fmt.Errorf("failed to create parent dir: %w", err)
 	}
 
-	return parentDir, nil
+	dir, err := os.MkdirTemp(parentDir, fmt.Sprintf("%s-%s-%d", org, repo, num))
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp dir: %w", err)
+	}
+
+	return dir, nil
 }
 
-func (s *Server) PrepareExtraRef(org, repo, defaultWorkdir string) (repoClients []gitv2.RepoClient, err error) {
+func (s *Server) PrepareExtraRef(org, repo, defaultWorkDir string) (repoClients []gitv2.RepoClient, err error) {
 	var repoCfg config.RepoConfig
 	config := s.config
 	if v, ok := config.CustomConfig[org]; ok {
@@ -472,9 +471,9 @@ func (s *Server) PrepareExtraRef(org, repo, defaultWorkdir string) (repoClients 
 			log.Fatalf("failed to create git client factory: %v", err)
 		}
 
-		repoPath := defaultWorkdir + "/" + refConfig.Repo
+		repoPath := defaultWorkDir + "/" + refConfig.Repo
 		if refConfig.PathAlias != "" {
-			repoPath = defaultWorkdir + refConfig.PathAlias
+			repoPath = defaultWorkDir + refConfig.PathAlias
 		}
 		r, err := gitClient.ClientForWithRepoOpts(refConfig.Org, refConfig.Repo, gitv2.RepoOpts{
 			CopyTo: repoPath,
