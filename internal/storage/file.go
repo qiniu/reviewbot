@@ -55,10 +55,14 @@ func (l *LocalStorage) Read(ctx context.Context, path string) ([]byte, error) {
 		return nil, fmt.Errorf("file does not exist: %s", filePath)
 	}
 
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("error reading file: %w", err)
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("operation canceled: %w", ctx.Err())
+	default:
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			return nil, fmt.Errorf("error reading file: %w", err)
+		}
+		return data, nil
 	}
-
-	return data, nil
 }

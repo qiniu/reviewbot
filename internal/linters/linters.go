@@ -144,7 +144,7 @@ If you have any questions about this comment, feel free to raise an issue here:
 // The unexpected lines are the lines that cannot be parsed.
 type LinterParser func(*xlog.Logger, []byte) (map[string][]LinterOutput, []string)
 
-func GeneralHandler(log *xlog.Logger, a Agent, execRun func(a Agent) ([]byte, error), linterParser func(*xlog.Logger, []byte) (map[string][]LinterOutput, []string)) error {
+func GeneralHandler(ctx context.Context, log *xlog.Logger, a Agent, execRun func(a Agent) ([]byte, error), linterParser func(*xlog.Logger, []byte) (map[string][]LinterOutput, []string)) error {
 	linterName := a.LinterConfig.Name
 	output, err := execRun(a)
 	if err != nil {
@@ -165,7 +165,7 @@ func GeneralHandler(log *xlog.Logger, a Agent, execRun func(a Agent) ([]byte, er
 		}
 	}
 
-	return Report(log, a, lintResults)
+	return Report(ctx, log, a, lintResults)
 }
 
 // ExecRun executes a command.
@@ -207,7 +207,7 @@ func GeneralParse(log *xlog.Logger, output []byte) (map[string][]LinterOutput, [
 // Report reports the lint results.
 // This function should be always called even in custom linter handler since it will filter out the lint errors that are not related to the PR.
 // and handle some special cases like auto-generated files.
-func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) error {
+func Report(ctx context.Context, log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) error {
 	var (
 		num        = a.PullRequestEvent.GetNumber()
 		org        = a.PullRequestEvent.Repo.GetOwner().GetLogin()
@@ -231,7 +231,7 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 
 	switch a.LinterConfig.ReportFormat {
 	case config.GithubCheckRuns:
-		ch, err := CreateGithubChecks(context.Background(), a, lintResults)
+		ch, err := CreateGithubChecks(ctx, a, lintResults)
 		if err != nil {
 			log.Errorf("failed to create github checks: %v", err)
 			return err
@@ -241,7 +241,7 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 		metric.NotifyWebhookByText(ConstructGotchaMsg(linterName, a.PullRequestEvent.GetPullRequest().GetHTMLURL(), ch.GetHTMLURL(), lintResults))
 	case config.GithubPRReview:
 		// List existing comments
-		existedComments, err := ListPullRequestsComments(context.Background(), a.GithubClient, org, repo, num)
+		existedComments, err := ListPullRequestsComments(ctx, a.GithubClient, org, repo, num)
 		if err != nil {
 			log.Errorf("failed to list comments: %v", err)
 			return err
@@ -258,7 +258,7 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 		log.Infof("%s found %d existed comments for this PR %d (%s) \n", linterFlag, len(existedCommentsToKeep), num, orgRepo)
 
 		toAdds, toDeletes := filterLinterOutputs(lintResults, existedCommentsToKeep)
-		if err := DeletePullReviewComments(context.Background(), a.GithubClient, org, repo, toDeletes); err != nil {
+		if err := DeletePullReviewComments(ctx, a.GithubClient, org, repo, toDeletes); err != nil {
 			log.Errorf("failed to delete comments: %v", err)
 			return err
 		}
@@ -270,7 +270,7 @@ func Report(log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) er
 		}
 
 		// Add the comments
-		addedCmts, err := CreatePullReviewComments(context.Background(), a.GithubClient, org, repo, num, comments)
+		addedCmts, err := CreatePullReviewComments(ctx, a.GithubClient, org, repo, num, comments)
 		if err != nil {
 			log.Errorf("failed to post comments: %v", err)
 			return err

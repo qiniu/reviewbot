@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/google/go-github/v57/github"
+	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/x/log"
 )
 
@@ -138,6 +139,7 @@ func CreatePullReviewComments(ctx context.Context, gc *github.Client, owner stri
 
 // DeletePullReviewComments deletes the specified comments on the pull request.
 func DeletePullReviewComments(ctx context.Context, gc *github.Client, owner, repo string, comments []*github.PullRequestComment) error {
+	log := lintersutil.FromContext(ctx)
 	for _, comment := range comments {
 		cmt := comment
 		err := RetryWithBackoff(ctx, func() error {
@@ -169,7 +171,7 @@ func CreateGithubChecks(ctx context.Context, a Agent, lintErrs map[string][]Lint
 		startTime  = a.PullRequestEvent.GetPullRequest().GetUpdatedAt()
 		linterName = a.LinterConfig.Name
 	)
-
+	log := lintersutil.FromContext(ctx)
 	annotations := toGithubCheckRunAnnotations(lintErrs)
 	// limit the number of annotations to 50
 	// see: https://github.com/qiniu/reviewbot/issues/258
@@ -226,6 +228,7 @@ func CreateGithubChecks(ctx context.Context, a Agent, lintErrs map[string][]Lint
 
 // RetryWithBackoff retries the function with backoff.
 func RetryWithBackoff(ctx context.Context, f func() error) error {
+	log := lintersutil.FromContext(ctx)
 	backoff := time.Second
 	for i := 0; i < 5; i++ {
 		err := f()

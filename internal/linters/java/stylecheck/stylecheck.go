@@ -50,7 +50,7 @@ func stylecheckHandler(ctx context.Context, a linters.Agent) error {
 	a.LinterConfig.Args = append(a.LinterConfig.Args, "-jar", localStyleJar, "-c", checkrulePath)
 	a.LinterConfig.Args = append(a.LinterConfig.Args, javaFiles...)
 
-	return linters.GeneralHandler(slog, a, linters.ExecRun, stylecheckParser(a.LinterConfig.WorkDir))
+	return linters.GeneralHandler(ctx, slog, a, linters.ExecRun, stylecheckParser(a.LinterConfig.WorkDir))
 }
 
 func argsApply(log *xlog.Logger, a linters.Agent) linters.Agent {
