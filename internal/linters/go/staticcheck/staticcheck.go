@@ -39,5 +39,5 @@ func staticcheckHandler(ctx context.Context, a linters.Agent) error {
 		a.LinterConfig.Args = append([]string{}, "-debug.no-compile-errors=true", "./...")
 	}
 
-	return linters.GeneralHandler(log, a, linters.ExecRun, linters.GeneralParse)
+	return linters.GeneralHandler(ctx, log, a, linters.ExecRun, linters.GeneralParse)
 }

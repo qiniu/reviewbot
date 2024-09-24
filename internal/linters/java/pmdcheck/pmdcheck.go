@@ -45,7 +45,7 @@ func pmdCheckHandler(ctx context.Context, a linters.Agent) error {
 	}
 	a = argsApply(plog, a)
 	a.LinterConfig.Args = append(append(a.LinterConfig.Args, javaFiles...), "-R", checkrulePath)
-	return linters.GeneralHandler(plog, a, linters.ExecRun, pmdcheckParser)
+	return linters.GeneralHandler(ctx, plog, a, linters.ExecRun, pmdcheckParser)
 }
 
 func argsApply(log *xlog.Logger, a linters.Agent) linters.Agent {

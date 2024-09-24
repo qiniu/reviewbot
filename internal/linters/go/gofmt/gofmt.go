@@ -50,7 +50,7 @@ func gofmtHandler(ctx context.Context, a linters.Agent) error {
 		return err
 	}
 
-	return linters.Report(log, a, parsedOutput)
+	return linters.Report(ctx, log, a, parsedOutput)
 }
 
 type Gofmt struct {

@@ -27,6 +27,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
@@ -64,6 +65,11 @@ type Server struct {
 
 	repoCacheDir string
 }
+
+var (
+	mu    sync.Mutex
+	prMap = make(map[string]context.CancelFunc)
+)
 
 func (s *Server) initDockerRunner() {
 	var images []string
@@ -278,6 +284,28 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 		orgRepo = org + "/" + repo
 	)
 	log := lintersutil.FromContext(ctx)
+
+	prID := fmt.Sprintf("%s-%s-%d", org, repo, num)
+	if cancel, exists := prMap[prID]; exists {
+		log.Infof("Cancelling processing for Pull Request : %s\n", prID)
+		cancel()
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	mu.Lock()
+	prMap[prID] = cancel
+	mu.Unlock()
+
+	defer func() {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			mu.Lock()
+			delete(prMap, prID)
+			mu.Unlock()
+		}
+	}()
 
 	installationID := event.GetInstallation().GetID()
 	log.Infof("processing pull request %d, (%v/%v), installationID: %d\n", num, org, repo, installationID)

@@ -43,7 +43,7 @@ func luacheckHandler(ctx context.Context, a linters.Agent) error {
 	// checking on luacheck 0.26.1 Lua5.1, there is no problem even with multiple --no-color parameter,
 	// so we can add the parameter directly
 	a.LinterConfig.Args = append(a.LinterConfig.Args, "--no-color")
-	return linters.GeneralHandler(log, a, linters.ExecRun, parser)
+	return linters.GeneralHandler(ctx, log, a, linters.ExecRun, parser)
 }
 
 func parser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, []string) {

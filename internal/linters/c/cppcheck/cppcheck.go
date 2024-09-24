@@ -23,7 +23,7 @@ func cppcheckHandler(ctx context.Context, a linters.Agent) error {
 		a.LinterConfig.Args = append([]string{}, "--quiet", "--template='{file}:{line}:{column}: {message}'", ".")
 	}
 
-	return linters.GeneralHandler(log, a, linters.ExecRun, parser)
+	return linters.GeneralHandler(ctx, log, a, linters.ExecRun, parser)
 }
 
 func parser(log *xlog.Logger, input []byte) (map[string][]linters.LinterOutput, []string) {

@@ -45,11 +45,11 @@ func golangciLintHandler(ctx context.Context, a linters.Agent) error {
 	// When the go.mod file is not found, set GO111MODULE=off, so that golangci does not run through gomod.
 	if len(goModDirs) == 0 {
 		a.LinterConfig.Env = append(a.LinterConfig.Env, "GO111MODULE=off")
-		return linters.GeneralHandler(log, a, linters.ExecRun, parser)
+		return linters.GeneralHandler(ctx, log, a, linters.ExecRun, parser)
 	}
 
 	a.LinterConfig.Modifier = newGoModTidyBuilder(a.LinterConfig.Modifier, goModDirs)
-	return linters.GeneralHandler(log, a, linters.ExecRun, parser)
+	return linters.GeneralHandler(ctx, log, a, linters.ExecRun, parser)
 }
 
 type goModTidyModifier struct {
