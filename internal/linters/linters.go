@@ -165,7 +165,7 @@ func GeneralHandler(ctx context.Context, log *xlog.Logger, a Agent, execRun func
 		}
 	}
 
-	return Report(ctx, log, a, lintResults)
+	return Report(ctx, a, lintResults)
 }
 
 // ExecRun executes a command.
@@ -207,7 +207,8 @@ func GeneralParse(log *xlog.Logger, output []byte) (map[string][]LinterOutput, [
 // Report reports the lint results.
 // This function should be always called even in custom linter handler since it will filter out the lint errors that are not related to the PR.
 // and handle some special cases like auto-generated files.
-func Report(ctx context.Context, log *xlog.Logger, a Agent, lintResults map[string][]LinterOutput) error {
+func Report(ctx context.Context, a Agent, lintResults map[string][]LinterOutput) error {
+	log := lintersutil.FromContext(ctx)
 	var (
 		num        = a.PullRequestEvent.GetNumber()
 		org        = a.PullRequestEvent.Repo.GetOwner().GetLogin()
@@ -215,7 +216,6 @@ func Report(ctx context.Context, log *xlog.Logger, a Agent, lintResults map[stri
 		orgRepo    = a.PullRequestEvent.Repo.GetFullName()
 		linterName = a.LinterConfig.Name
 	)
-
 	log.Infof("[%s] found total %d files with %d lint errors on repo %v", linterName, len(lintResults), countLinterErrors(lintResults), orgRepo)
 	lintResults, err := Filters(log, a, lintResults)
 	if err != nil {

@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/qiniu/reviewbot/internal/linters"
-	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/x/log"
 )
 
@@ -27,7 +26,6 @@ func init() {
 // Check the notes in the code to see if they comply with the standard rules from
 // https://pkg.go.dev/go/doc#Note
 func noteCheckHandler(ctx context.Context, a linters.Agent) error {
-	log := lintersutil.FromContext(ctx)
 	outputs := make(map[string][]linters.LinterOutput)
 
 	for _, file := range a.PullRequestChangedFiles {
@@ -53,7 +51,7 @@ func noteCheckHandler(ctx context.Context, a linters.Agent) error {
 		}
 	}
 
-	return linters.Report(ctx, log, a, outputs)
+	return linters.Report(ctx, a, outputs)
 }
 
 const NoteSuggestion = "A Note is recommended to use \"MARKER(uid): note body\" format."

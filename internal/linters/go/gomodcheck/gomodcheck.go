@@ -26,7 +26,7 @@ func goModCheckHandler(ctx context.Context, a linters.Agent) error {
 		log.Errorf("gomodchecks parse output failed: %v", err)
 		return err
 	}
-	return linters.Report(ctx, log, a, parsedOutput)
+	return linters.Report(ctx, a, parsedOutput)
 }
 
 func goModCheckOutput(log *xlog.Logger, a linters.Agent) (map[string][]linters.LinterOutput, error) {
