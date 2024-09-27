@@ -19,6 +19,7 @@ package linters
 import (
 	"context"
 	"fmt"
+	"github.com/xanzy/go-gitlab"
 	"io"
 	"os"
 	"regexp"
@@ -98,6 +99,10 @@ type LinterOutput struct {
 	// StartLine required when using multi-line comments
 	StartLine int
 }
+type ChangeFile struct {
+	Status    string
+	FilenName string
+}
 
 // Agent knows necessary information in order to run linters.
 type Agent struct {
@@ -126,6 +131,11 @@ type Agent struct {
 	GenLogKey func() string
 	// GenLogViewUrl generates the log view url.
 	GenLogViewUrl func() string
+
+	ChangeFiles              []ChangeFile
+	GitLabClient             *gitlab.Client
+	MergeRequestEvent        gitlab.MergeEvent
+	MergeRequestChangedFiles []*gitlab.MergeRequestDiff
 }
 
 const CommentFooter = `
@@ -209,15 +219,26 @@ func GeneralParse(log *xlog.Logger, output []byte) (map[string][]LinterOutput, [
 // and handle some special cases like auto-generated files.
 func Report(ctx context.Context, a Agent, lintResults map[string][]LinterOutput) error {
 	log := lintersutil.FromContext(ctx)
-	var (
-		num        = a.PullRequestEvent.GetNumber()
-		org        = a.PullRequestEvent.Repo.GetOwner().GetLogin()
-		repo       = a.PullRequestEvent.Repo.GetName()
-		orgRepo    = a.PullRequestEvent.Repo.GetFullName()
+	var num, pid int
+	var org, repo, orgRepo, linterName string
+
+	if a.MergeRequestChangedFiles != nil {
+		num = a.MergeRequestEvent.ObjectAttributes.IID
+		org = a.MergeRequestEvent.Project.Namespace
+		repo = a.MergeRequestEvent.Repository.Name
+		orgRepo = a.MergeRequestEvent.Project.PathWithNamespace
+		pid = a.MergeRequestEvent.ObjectAttributes.TargetProjectID
 		linterName = a.LinterConfig.Name
-	)
+	} else {
+		num = a.PullRequestEvent.GetNumber()
+		org = a.PullRequestEvent.Repo.GetOwner().GetLogin()
+		repo = a.PullRequestEvent.Repo.GetName()
+		orgRepo = a.PullRequestEvent.Repo.GetFullName()
+		linterName = a.LinterConfig.Name
+	}
+
 	log.Infof("[%s] found total %d files with %d lint errors on repo %v", linterName, len(lintResults), countLinterErrors(lintResults), orgRepo)
-	lintResults, err := Filters(log, a, lintResults)
+	lintResults, err := FiltersMerge(log, a, lintResults)
 	if err != nil {
 		log.Errorf("failed to filter lint errors: %v", err)
 		return err
@@ -226,9 +247,14 @@ func Report(ctx context.Context, a Agent, lintResults map[string][]LinterOutput)
 	log.Infof("[%s] found %d files with valid %d linter errors related to this PR %d (%s) \n", linterName, len(lintResults), countLinterErrors(lintResults), num, orgRepo)
 
 	if len(lintResults) > 0 {
-		metric.IncIssueCounter(orgRepo, linterName, a.PullRequestEvent.PullRequest.GetHTMLURL(), a.PullRequestEvent.GetPullRequest().GetHead().GetSHA(), float64(countLinterErrors(lintResults)))
-	}
+		if &a.MergeRequestEvent != nil {
+			metric.IncIssueCounter(orgRepo, linterName, a.MergeRequestEvent.Project.WebURL, a.MergeRequestEvent.ObjectAttributes.LastCommit.ID, float64(countLinterErrors(lintResults)))
+		} else {
+			metric.IncIssueCounter(orgRepo, linterName, a.PullRequestEvent.PullRequest.GetHTMLURL(), a.PullRequestEvent.GetPullRequest().GetHead().GetSHA(), float64(countLinterErrors(lintResults)))
+		}
 
+	}
+	a.LinterConfig.ReportFormat = config.GitLabComment
 	switch a.LinterConfig.ReportFormat {
 	case config.GithubCheckRuns:
 		ch, err := CreateGithubChecks(ctx, a, lintResults)
@@ -277,6 +303,63 @@ func Report(ctx context.Context, a Agent, lintResults map[string][]LinterOutput)
 		}
 		log.Infof("[%s] add %d comments for this PR %d (%s) \n", linterName, len(addedCmts), num, orgRepo)
 		metric.NotifyWebhookByText(ConstructGotchaMsg(linterName, a.PullRequestEvent.GetPullRequest().GetHTMLURL(), addedCmts[0].GetHTMLURL(), lintResults))
+	case config.GitLabComment:
+		existedComments, err := ListMergeRequestsComments(context.Background(), a.GitLabClient, org, repo, num, pid)
+		if err != nil {
+			log.Errorf("failed to list comments: %v", err)
+			return err
+		}
+
+		// filter out the comments that are not related to the linter
+		var existedCommentsToKeep []*gitlab.Note
+		linterFlag := linterNamePrefix(linterName)
+		for _, comment := range existedComments {
+			if strings.HasPrefix(comment.Body, linterFlag) {
+				existedCommentsToKeep = append(existedCommentsToKeep, comment)
+			}
+		}
+		log.Infof("%s found %d existed comments for this PR %d (%s) \n", linterFlag, len(existedCommentsToKeep), num, orgRepo)
+
+		toAdds, toDeletes := filterLinterOutputsForGitLab(lintResults, existedCommentsToKeep)
+		if err := DeleteMergeReviewCommentsForGitLab(context.Background(), a.GitLabClient, org, repo, toDeletes, pid, num); err != nil {
+			log.Errorf("failed to delete comments: %v", err)
+			return err
+		}
+		log.Infof("%s delete %d comments for this PR %d (%s) \n", linterFlag, len(toDeletes), num, orgRepo)
+		h, b, s, e := MergeRequestSHA(context.Background(), a.GitLabClient, pid, num)
+		if e != nil {
+			log.Errorf("failed to delete comments: %v", e)
+			return e
+		}
+
+		comments := constructMergeRequestComments(toAdds, linterFlag, a.MergeRequestEvent.ObjectAttributes.LastCommit.ID, h, b, s)
+		if len(comments) == 0 {
+			return nil
+		}
+		log.Infof("comments%v", comments)
+
+		// Add the comments
+		addedCmts, err := CreateMergeReviewComments(context.Background(), a.GitLabClient, org, repo, num, comments, pid)
+		if err != nil {
+			log.Errorf("failed to post comments: %v", err)
+			return err
+		}
+
+		discussion := constructMergeRequestDiscussion(toAdds, linterFlag, a.MergeRequestEvent.ObjectAttributes.LastCommit.ID, h, b, s)
+		if len(discussion) == 0 {
+			return nil
+		}
+		log.Infof("discussion%v", discussion)
+
+		// Add the comments
+		addedDis, err := CreateMergeReviewDiscussion(context.Background(), a.GitLabClient, org, repo, num, discussion, pid)
+		if err != nil {
+			log.Errorf("failed to post comments: %v", err)
+			return err
+		}
+		log.Infof("[%s] add %d comments for this PR %d (%s) \n", linterName, len(addedDis), num, orgRepo)
+		metric.NotifyWebhookByText(ConstructGotchaMsg(linterName, a.MergeRequestEvent.Project.WebURL, addedCmts[0].Body, lintResults))
+
 	case config.Quiet:
 		return nil
 	default:

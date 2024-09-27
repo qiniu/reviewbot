@@ -94,7 +94,6 @@ func ListPullRequestsComments(ctx context.Context, gc *github.Client, owner stri
 	opts := &github.PullRequestListCommentsOptions{
 		ListOptions: github.ListOptions{PerPage: 100},
 	}
-
 	err := RetryWithBackoff(ctx, func() error {
 		comments, resp, err := gc.PullRequests.ListComments(ctx, owner, repo, number, opts)
 		if err != nil {

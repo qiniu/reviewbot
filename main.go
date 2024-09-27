@@ -40,7 +40,7 @@ import (
 	// linters import
 	_ "github.com/qiniu/reviewbot/internal/linters/c/cppcheck"
 	_ "github.com/qiniu/reviewbot/internal/linters/doc/note-check"
-	_ "github.com/qiniu/reviewbot/internal/linters/git-flow/commit-check"
+	//_ "github.com/qiniu/reviewbot/internal/linters/git-flow/commit-check"
 	_ "github.com/qiniu/reviewbot/internal/linters/go/gofmt"
 	_ "github.com/qiniu/reviewbot/internal/linters/go/golangci_lint"
 	_ "github.com/qiniu/reviewbot/internal/linters/go/gomodcheck"
@@ -51,14 +51,15 @@ import (
 )
 
 type options struct {
-	port          int
-	dryRun        bool
-	debug         bool
-	logLevel      int
-	accessToken   string
-	webhookSecret string
-	codeCacheDir  string
-	config        string
+	port              int
+	dryRun            bool
+	debug             bool
+	logLevel          int
+	accessToken       string
+	gitlabAccessToken string
+	webhookSecret     string
+	codeCacheDir      string
+	config            string
 
 	// support github app
 	appID          int64
@@ -98,6 +99,7 @@ func gatherOptions() options {
 	fs.BoolVar(&o.debug, "debug", false, "debug mode")
 	fs.IntVar(&o.logLevel, "log-level", 0, "log level")
 	fs.StringVar(&o.accessToken, "access-token", "", "personal access token")
+	fs.StringVar(&o.gitlabAccessToken, "gitlab-access-token", "", "personal gitlab access token")
 	fs.StringVar(&o.webhookSecret, "webhook-secret", "", "webhook secret file")
 	fs.StringVar(&o.codeCacheDir, "code-cache-dir", "/tmp", "code cache dir")
 	fs.StringVar(&o.config, "config", "", "config file")
@@ -204,6 +206,8 @@ func main() {
 		CacheDirBase: github.String(o.codeCacheDir),
 		Persist:      github.Bool(true),
 		UseSSH:       github.Bool(true),
+		Host:         "gitlab.qiniu.io",
+		//Host: "gitlab.com",
 	}
 	v2, err := gitv2.NewClientFactory(opt.Apply)
 	if err != nil {
@@ -221,15 +225,16 @@ func main() {
 	}
 
 	s := &Server{
-		webhookSecret:    []byte(o.webhookSecret),
-		gitClientFactory: v2,
-		config:           cfg,
-		accessToken:      o.accessToken,
-		appID:            o.appID,
-		appPrivateKey:    o.appPrivateKey,
-		debug:            o.debug,
-		serverAddr:       o.serverAddr,
-		repoCacheDir:     o.codeCacheDir,
+		webhookSecret:     []byte(o.webhookSecret),
+		gitClientFactory:  v2,
+		config:            cfg,
+		accessToken:       o.accessToken,
+		gitlabAccessToken: o.gitlabAccessToken,
+		appID:             o.appID,
+		appPrivateKey:     o.appPrivateKey,
+		debug:             o.debug,
+		serverAddr:        o.serverAddr,
+		repoCacheDir:      o.codeCacheDir,
 	}
 
 	go s.initDockerRunner()
