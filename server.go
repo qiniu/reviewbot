@@ -18,6 +18,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"math/rand"
@@ -418,6 +419,11 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 		}
 
 		if err := fn(ctx, agent); err != nil {
+			if errors.Is(err, context.Canceled) {
+				log.Infof("linter %s is canceled", name)
+				// no need to continue
+				return nil
+			}
 			log.Errorf("failed to run linter: %v", err)
 			// continue to run other linters
 			continue

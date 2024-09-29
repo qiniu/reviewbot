@@ -18,6 +18,7 @@ package linters
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -193,7 +194,9 @@ func ExecRun(a Agent) ([]byte, error) {
 		end.Format(time.RFC3339), eventGuid, string(output)))...)
 	err = a.Storage.Write(a.Context, a.GenLogKey(), toLog)
 	if err != nil {
-		log.Errorf("write to storage was failed %v", err)
+		if !errors.Is(err, context.Canceled) {
+			log.Errorf("write to storage was failed %v", err)
+		}
 	}
 
 	return output, nil
@@ -233,7 +236,9 @@ func Report(ctx context.Context, a Agent, lintResults map[string][]LinterOutput)
 	case config.GithubCheckRuns:
 		ch, err := CreateGithubChecks(ctx, a, lintResults)
 		if err != nil {
-			log.Errorf("failed to create github checks: %v", err)
+			if !errors.Is(err, context.Canceled) {
+				log.Errorf("failed to create github checks: %v", err)
+			}
 			return err
 		}
 		log.Infof("[%s] create check run success, HTML_URL: %v", linterName, ch.GetHTMLURL())
@@ -243,7 +248,9 @@ func Report(ctx context.Context, a Agent, lintResults map[string][]LinterOutput)
 		// List existing comments
 		existedComments, err := ListPullRequestsComments(ctx, a.GithubClient, org, repo, num)
 		if err != nil {
-			log.Errorf("failed to list comments: %v", err)
+			if !errors.Is(err, context.Canceled) {
+				log.Errorf("failed to list comments: %v", err)
+			}
 			return err
 		}
 

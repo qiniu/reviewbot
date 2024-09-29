@@ -18,6 +18,7 @@ package linters
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -210,7 +211,9 @@ func CreateGithubChecks(ctx context.Context, a Agent, lintErrs map[string][]Lint
 	err := RetryWithBackoff(ctx, func() error {
 		checkRun, resp, err := a.GithubClient.Checks.CreateCheckRun(ctx, owner, repo, check)
 		if err != nil {
-			log.Errorf("create check run failed: %v", err)
+			if !errors.Is(err, context.Canceled) {
+				log.Errorf("create check run failed: %v", err)
+			}
 			return err
 		}
 
@@ -234,6 +237,10 @@ func RetryWithBackoff(ctx context.Context, f func() error) error {
 		err := f()
 		if err == nil {
 			return nil
+		}
+
+		if errors.Is(err, context.Canceled) {
+			return err
 		}
 
 		log.Errorf("retrying after error: %v", err)
