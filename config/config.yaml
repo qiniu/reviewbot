@@ -25,6 +25,9 @@ customConfig: # custom config for specific orgs or repos
     extraRefs:
       - org: qbox
         repo: kodo
+    linters:
+      gomodcheck:
+        enable: false
   qbox/kodoe-manager:
     extraRefs:
       - org: qbox

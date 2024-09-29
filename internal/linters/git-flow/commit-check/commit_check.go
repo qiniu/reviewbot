@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/http"
 	"regexp"
 	"strings"
 	"text/template"
@@ -46,7 +47,7 @@ func commitMessageCheckHandler(ctx context.Context, a linters.Agent) error {
 		author = a.PullRequestEvent.GetPullRequest().GetUser().GetLogin()
 	)
 
-	commits, err := listCommits(context.Background(), a, org, repo, number)
+	commits, err := listCommits(ctx, a, org, repo, number)
 	if err != nil {
 		return err
 	}
@@ -73,19 +74,30 @@ func commitMessageCheckHandler(ctx context.Context, a linters.Agent) error {
 }
 
 func listCommits(ctx context.Context, agent linters.Agent, org, repo string, number int) ([]*github.RepositoryCommit, error) {
-	var preFilterCommits []*github.RepositoryCommit
-	opts := &github.ListOptions{}
-	commits, response, err := agent.GithubClient.PullRequests.ListCommits(context.Background(), org, repo, number, opts)
-	if err != nil {
-		return preFilterCommits, err
+	opts := &github.ListOptions{
+		PerPage: 100,
+	}
+	var allCommits []*github.RepositoryCommit
+
+	for {
+		commits, resp, err := agent.GithubClient.PullRequests.ListCommits(ctx, org, repo, number, opts)
+		if err != nil {
+			return nil, fmt.Errorf("listing commits: %w", err)
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("list commits failed with status %d: %v", resp.StatusCode, resp.Body)
+		}
+
+		allCommits = append(allCommits, commits...)
+
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
 	}
 
-	if response.StatusCode != 200 {
-		log.Errorf("list commits failed: %v", response)
-		return preFilterCommits, fmt.Errorf("list commits failed: %v", response.Body)
-	}
-
-	return commits, nil
+	return allCommits, nil
 }
 
 func listExistedComments(ctx context.Context, agent linters.Agent, org, repo string, number int) ([]*github.IssueComment, error) {
