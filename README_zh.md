@@ -1,51 +1,87 @@
-# reviewbot - Comprehensive linters runner for code review scenarios
+# reviewbot - build your self-hosted automated code analysis and review server easily
 
 [![Build Status](https://github.com/qiniu/reviewbot/actions/workflows/go.yml/badge.svg)](https://github.com/qiniu/reviewbot/actions/workflows/go.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/qiniu/reviewbot)](https://goreportcard.com/report/github.com/qiniu/reviewbot)
 [![GitHub release](https://img.shields.io/github/v/tag/qiniu/reviewbot.svg?label=release)](https://github.com/qiniu/reviewbot/releases)
 
-旨在帮助组织，建立软件工程的最佳实践并有效的推广它们。
+Reviewbot 帮助你快速搭建一个自托管的代码分析和代码审查服务，支持多种语言和多种代码规范，尤其适合有大量私有仓库的组织。
 
-## Why Reviewbot?
+所有的问题都会在 Pull Request 阶段，以尽可能 `Review Comments` 或`Github Annotations`形式来反馈，且精确到代码行。
 
-保障有限数量、有限语言的仓库代码质量是不难的，我们只需要利用各种检查工具给相关的仓库一一配置即可。但如果面临的是整个组织，各种语言，各种新旧仓库(300+)，且有很多历史遗留问题，又该如何做呢？
+- Github Check Run (Annotations)
 
-我们想，最好有一个中心化的静态检查服务，能在极少配置的情况下，就能应用到所有仓库，且能让每一项新增工程实践，都能在组织内高效落地。
+  <div style="display: flex; justify-content: flex-start; gap: 10px;">
+    <img src="./docs/static/github-check-run.png" alt="Github Check Run" width="467"/>
+    <img src="./docs/static/github-check-run-annotations.png" alt="Github Check Run Annotations" width="467"/>
+  </div>
 
-**Reviewbot** 就是在这样的场景下诞生。
+- Github Pull Request Review Comments
+  <div style="display: flex; justify-content: flex-start;">
+    <img src="./docs/static/github-pr-review-comments.png" alt="Github Pull Request Review Comments" width="467"/>
+  </div>
 
-她受到了行业内很多工具的启发，但又有所不同:
+这种方式能帮助 PR 的作者避免在冗长的 console log 中查找问题，非常有利于问题改进。
 
-- 类似 `golangci-lint`, **Reviewbot** 会是个 Linters 聚合器，但她包含更多的语言和流程规范(go/java/shell/git-flow/doc-style ...)，甚至自定义规范
-- 参考 [reviewdog](https://github.com/reviewdog/reviewdog), **Reviewbot** 主要也是以 Review Comments 形式来反馈问题，精确到代码行，可以作为质量门禁，持续的帮助组织提升代码质量，比较优雅
-- 推荐以 GitHub APP 或者 Webhook Server 形式部署私有运行，对私有代码友好
+## 目录
 
-如果你也面临着类似的问题，欢迎尝试**Reviewbot**!
+- [为什么选择 Reviewbot](#why-reviewbot)
+- [安装](#installation)
+- [支持的代码检查工具](#supported-linters)
+  - [Go 语言](#go-语言)
+  - [C/C++](#cc)
+  - [Lua](#lua)
+  - [Java](#java)
+  - [Git 流程规范](#git-流程规范)
+  - [文档规范](#文档规范)
+- [配置](#配置)
+- [如何添加新的代码检查工具](#如何添加新的代码检查工具)
+- [贡献](#贡献)
+- [许可证](#许可证)
 
-## Linters Support
+## Why Reviewbot
 
-- go linters
-  - [golangci-lint](/internal/linters/go/golangci_lint/)
-  - [gofmt](/internal/linters/go/gofmt/)
-  - [gomodcheck](/internal/linters/go/gomodcheck/)
-- c/c++ linters
-  - [cppcheck](/internal/linters/c/cppcheck/)
-- lua linters
-  - [luacheck](/internal/linters/lua/luacheck/)
-- git flow 规范
-  - [commit msg check](/internal/linters/git-flow/commit-check/)
-- doc 规范
-  - [note check](/internal/linters/doc/note-check/)
-
-## Quickstart
+## 安装
 
 Please take a look at our [getting started guide](https://reviewbot-x.netlify.app).
 
-## Contributing
+## Supported Linters
+
+### 支持的代码检查工具
+
+#### Go 语言
+
+- [golangci-lint](/internal/linters/go/golangci_lint/)
+- [gofmt](/internal/linters/go/gofmt/)
+- [gomodcheck](/internal/linters/go/gomodcheck/)
+
+#### C/C++
+
+- [cppcheck](/internal/linters/c/cppcheck/)
+
+#### Lua
+
+- [luacheck](/internal/linters/lua/luacheck/)
+
+#### Java
+
+- [pmdcheck](/internal/linters/java/pmdcheck/)
+- [checkstyle](/internal/linters/java/checkstyle/)
+
+#### Git 流程规范
+
+- [commit msg check](/internal/linters/git-flow/commit-check/)
+
+#### 文档规范
+
+- [note check](/internal/linters/doc/note-check/)
+
+## 配置
+
+## 如何添加新的代码检查工具
+
+## 贡献
 
 Your contributions to Reviewbot are essential for its long-term maintenance and improvement. Thanks for supporting Reviewbot!
-
-### Reporting Issues
 
 If you find a bug while working with the Reviewbot, please open an issue on GitHub and let us know what went wrong. We will try to fix it as quickly as we can.
 
