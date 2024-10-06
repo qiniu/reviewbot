@@ -51,7 +51,7 @@ type Refs struct {
 type GlobalConfig struct {
 	// GithubReportType is the format of the report, will be used if linterConfig.ReportFormat is empty.
 	// e.g. "github_checks", "github_pr_review"
-	GithubReportType ReportType `json:"githubReportType,omitempty"`
+	ReportType ReportType `json:"ReportType,omitempty"`
 
 	// GolangciLintConfig is the path of golangci-lint config file to run golangci-lint globally.
 	// if not empty, use the config to run golangci-lint.
@@ -150,8 +150,8 @@ func NewConfig(conf string) (Config, error) {
 	}
 
 	// set default value
-	if c.GlobalDefaultConfig.GithubReportType == "" {
-		c.GlobalDefaultConfig.GithubReportType = GithubPRReview
+	if c.GlobalDefaultConfig.ReportType == "" {
+		c.GlobalDefaultConfig.ReportType = GithubPRReview
 	}
 
 	// check golangci-lint config path
@@ -188,7 +188,7 @@ func NewConfig(conf string) (Config, error) {
 func (c Config) GetLinterConfig(org, repo, ln string) Linter {
 	linter := Linter{
 		Enable:       boolPtr(true),
-		ReportFormat: c.GlobalDefaultConfig.GithubReportType,
+		ReportFormat: c.GlobalDefaultConfig.ReportType,
 		Modifier:     NewBaseModifier(),
 		Name:         ln,
 	}
@@ -275,7 +275,7 @@ func applyCustomConfig(legacy, custom Linter) Linter {
 // GithubReportType is the type of the report.
 type ReportType string
 
-//type GitLabReportType string
+// type GitLabReportType string
 
 const (
 	GithubCheckRuns  ReportType = "github_check_run"

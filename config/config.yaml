@@ -5,7 +5,7 @@
 # 3. Conducting specific gray testing for a particular feature.
 
 globalDefaultConfig: # global default settings, will be overridden by qbox org and repo specific settings if they exist
-  githubReportType: "gitlab_mr_comment" # github_pr_review, github_check_run
+  ReportType: "github_check_run" # github_pr_review, github_check_run,gitlab_mr_comment,gitlab_mr_discussion
   golangcilintConfig: "config/linters-config/.golangci.yml" # golangci-lint config file to use
   copySSHKeyToContainer: "/root/.ssh/id_rsa"
 

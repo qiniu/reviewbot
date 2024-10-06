@@ -1,7 +1,6 @@
 package linters
 
 import (
-	"github.com/xanzy/go-gitlab"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -9,6 +8,7 @@ import (
 	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/x/log"
 	"github.com/qiniu/x/xlog"
+	"github.com/xanzy/go-gitlab"
 )
 
 // Filters filters the lint errors.
