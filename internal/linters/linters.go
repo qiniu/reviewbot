@@ -254,7 +254,6 @@ func Report(ctx context.Context, a Agent, lintResults map[string][]LinterOutput)
 		}
 
 	}
-	a.LinterConfig.ReportFormat = config.GitLabComment
 	switch a.LinterConfig.ReportFormat {
 	case config.GithubCheckRuns:
 		ch, err := CreateGithubChecks(ctx, a, lintResults)

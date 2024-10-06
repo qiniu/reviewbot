@@ -18,12 +18,12 @@ package linters
 
 import (
 	"fmt"
-	"github.com/xanzy/go-gitlab"
 	"regexp"
 	"strconv"
 
 	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/x/log"
+	"github.com/xanzy/go-gitlab"
 )
 
 type HunkChecker interface {
@@ -124,6 +124,5 @@ func DiffHunksMerge(commitFile *gitlab.MergeRequestDiff) ([]Hunk, error) {
 	if commitFile == nil || commitFile.NewPath == "" {
 		return nil, fmt.Errorf("invalid commitFile: %v", commitFile)
 	}
-
 	return ParsePatch(commitFile.Diff)
 }

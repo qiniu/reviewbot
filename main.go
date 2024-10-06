@@ -207,7 +207,6 @@ func main() {
 		Persist:      github.Bool(true),
 		UseSSH:       github.Bool(true),
 		Host:         "gitlab.qiniu.io",
-		//Host: "gitlab.com",
 	}
 	v2, err := gitv2.NewClientFactory(opt.Apply)
 	if err != nil {
