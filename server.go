@@ -566,7 +566,7 @@ func (s *Server) gitlabRequestHandle(w http.ResponseWriter, r *http.Request) {
 		go func() {
 			log.Info("start process")
 			if err := s.processMergeRequestEvent(ctx, event); err != nil {
-				log.Errorf("process merge request request event: %v", err)
+				log.Errorf("process merge request event: %v", err)
 			}
 		}()
 
@@ -703,6 +703,7 @@ func (s *Server) gitlabHandle(ctx context.Context, event *gitlab.MergeEvent) err
 		}
 
 		log.Infof("[%s] config on repo %v: %+v", name, orgRepo, linterConfig)
+		linterConfig.ReportFormat = config.GitLabComment
 
 		agent := linters.Agent{
 			LinterConfig:             linterConfig,
