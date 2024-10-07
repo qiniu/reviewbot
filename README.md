@@ -40,6 +40,7 @@ This approach helps PR authors avoid searching for issues in lengthy console log
   - [Disabling a Linter](#disabling-a-linter)
   - [Executing Linters via Docker](#executing-linters-via-docker)
 - [Reviewbot Operational Flow](#reviewbot-operational-flow)
+- [How to add a new Linter](#how-to-add-a-new-linter)
 - [Monitoring Detection Results](#monitoring-detection-results)
 - [Contributing](#contributing)
 - [License](#license)
@@ -49,9 +50,10 @@ This approach helps PR authors avoid searching for issues in lengthy console log
 Reviewbot is a self-hosted code analysis and review service supporting multiple languages and coding standards. It is particularly beneficial for organizations with numerous private repositories:
 
 - **Security** - Recommended self-hosting for data security and control
+- **Improvement-Oriented** - Detected issues are primarily reported in the form of Review Comments or Github Annotations, facilitating efficient problem resolution and code improvement
 - **Flexibility** - Supports multiple languages and coding standards, with easy integration of new code inspection tools
 - **Observability** - Supports alert notifications for timely awareness of detected issues
-- **Usability** - Designed for zero-configuration, enabling inspection of all repositories with minimal setup
+- **Configurable** - Supports configuration of linter execution commands, parameters, and environments, providing flexibility for complex scenarios
 
 Reviewbot is developed using Golang, featuring simple logic and clear code, making it easy to understand and maintain.
 
@@ -100,9 +102,34 @@ The following are some common configuration scenarios:
 
 Linters are generally executed using default commands, but we can adjust these commands. For example:
 
+```yaml
+qbox/kodo:
+  linters:
+    staticcheck:
+      workDir: "src/qiniu.com/kodo"
+```
+
 This configuration means that for the `staticcheck` inspection of the `qbox/kodo` repository code, execution should occur in the `src/qiniu.com/kodo` directory.
 
 We can even configure more complex commands, such as:
+
+```yaml
+qbox/kodo:
+  linters:
+    golangci-lint:
+      command:
+        - "/bin/sh"
+        - "-c"
+        - "--"
+      args:
+        - |
+          source env.sh
+          cp .golangci.yml src/qiniu.com/kodo/.golangci.yml
+          cd src/qiniu.com/kodo
+          export GO111MODULE=auto
+          go mod tidy
+          golangci-lint run --timeout=10m0s --allow-parallel-runners=true --print-issued-lines=false --out-format=line-number >> $ARTIFACT/lint.log 2>&1
+```
 
 This configuration indicates that for the `golangci-lint` inspection of the `qbox/kodo` repository code, execution occurs through custom commands and arguments.
 
@@ -114,7 +141,14 @@ The **$ARTIFACT** environment variable is noteworthy. This is a built-in variabl
 
 We can also disable a specific linter check for a particular repository through configuration. For example:
 
-This configuration means that the `golangci-lint` check is disabled for the `qbox/kodo` repository.
+```yaml
+qbox/net-gslb:
+  linters:
+    golangci-lint:
+      enable: false
+```
+
+This configuration means that the `golangci-lint` check is disabled for the `qbox/net-gslb` repository.
 
 ### Executing Linters via Docker
 
@@ -125,6 +159,14 @@ By default, Reviewbot uses locally installed linters for checks. However, in som
 - When the target repository depends on many third-party libraries, which would be cumbersome to install locally
 
 In these scenarios, we can configure Docker images to execute the linters. For example:
+
+```yaml
+qbox/net-gslb:
+  linters:
+    golangci-lint:
+      dockerAsRunner:
+        image: "golangci/golangci-lint:v1.54.2"
+```
 
 This configuration means that for the `golangci-lint` check of the `qbox/net-gslb` repository code, the `golangci/golangci-lint:v1.54.2` Docker image is used for execution.
 
@@ -161,9 +203,36 @@ Github Event -> Reviewbot -> Execute Linter -> Provide Feedback
     - Some linters provide Code Comments, precise to the code line
     - Some linters provide issue comments
 
+## How to Add a New Linter?
+
+- Please select an Issue you want to address from the [issues](https://github.com/qiniu/reviewbot/issues) list.
+  - Of course, if there isn't one, you can first create an Issue describing the Linter you want to add
+- Coding
+  - Based on the language or domain the linter focuses on, [choose the appropriate code location](https://github.com/qiniu/reviewbot/tree/master/internal/linters)
+  - The implementation logic for most linters is divided into three main parts:
+    - Execute the linter, generally by calling the relevant executable program
+    - Process the linter's output, focusing only on the output related to the current PR
+    - Provide feedback on the output related to the current PR, precise to the code line
+- Deployment: If your linter is an external executable program, you'll need to add instructions on how to install this linter in the [Dockerfile](https://github.com/qiniu/reviewbot/blob/master/Dockerfile)
+- Documentation: To facilitate subsequent use and maintenance, we should [add appropriate documentation here](https://github.com/qiniu/reviewbot/tree/master/docs/website/docs/components)
+
 ## Monitoring Detection Results
 
-Reviewbot provides a monitoring dashboard for detection results, allowing you to view the detection results of all repositories and linters.
+Reviewbot supports notification of detection results through WeWork (企业微信) alerts. For specific implementation details, refer to [here](https://github.com/qiniu/reviewbot/blob/8bfb122a2e4292f1cc74aedab8f51d1a0c149d55/internal/metric/metrics.go#L17).
+
+To enable this feature, simply set the environment variable `WEWORK_WEBHOOK` when starting Reviewbot. This environment variable should point to the WeWork chat group's bot URL. When valid issues are detected, notifications will be sent automatically. For example:
+
+<div style="display: flex; justify-content: flex-start;">
+  <img src="./docs/static/found-valid-issue.png" alt="Found valid issue" width="467"/>
+</div>
+
+If unexpected output is encountered, notifications will also be sent, like this:
+
+<div style="display: flex; justify-content: flex-start;">
+  <img src="./docs/static/found-unexpected-issue.png" alt="Found unexpected issue" width="467"/>
+</div>
+
+For unexpected outputs, **it usually means that the default execution configuration of the relevant linter does not support the current repository**. In such cases, you need to explicitly specify the configuration through a configuration file based on the actual situation.
 
 ## Contributing
 

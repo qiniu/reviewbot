@@ -47,9 +47,10 @@ Reviewbot 帮助你快速搭建一个自托管的代码分析和代码审查服�
 Reviewbot 是一个自托管的代码分析和代码审查服务，支持多种语言和多种代码规范，尤其适合有大量私有仓库的组织:
 
 - **安全性** - 推荐自托管，数据安全可控
+- **面向改进** - 检测出的问题，都会优先以类 Review Comments 或 Github Annotations 形式优先反馈，方便问题改进
 - **灵活性** - 支持多种语言和多种代码规范，也非常容易添加新的代码检查工具
 - **可观测** - 支持 alert 通知，方便及时感知检测出的问题
-- **易用性** - 面向零配置设计，不需要太多的配置，就能对所有仓库进行检测
+- **可配置** - 支持通过配置来调整 linter 的执行命令、执行参数、执行环境等，非常灵活
 
 Reviewbot 基于 golang 开发，逻辑简单，代码清晰，容易理解和维护。
 
@@ -209,6 +210,24 @@ Github 事件 -> Reviewbot -> 执行 linter -> 反馈结果
     - 反馈 跟本次 PR 相关的输出，精确到代码行
 - 部署，如果你的 linter 是外部可执行程序，那么就需要在 [Dockerfile](https://github.com/qiniu/reviewbot/blob/master/Dockerfile) 中添加如何安装这个 linter
 - 文档，为方便后续的使用和运维，我们应当 [在这里](https://github.com/qiniu/reviewbot/tree/master/docs/website/docs/components) 添加合适的文档
+
+## 观察检测结果
+
+Reviewbot 支持通过企业微信 alert 来通知检测结果，具体实现参考[这里](https://github.com/qiniu/reviewbot/blob/8bfb122a2e4292f1cc74aedab8f51d1a0c149d55/internal/metric/metrics.go#L17)
+
+只需要在 Reviewbot 启动时，设置环境变量 `WEWORK_WEBHOOK` 就行，这个环境变量指向企业微信聊天组的机器人 URL，当检测出有效问题时，会自动发送通知。类似:
+
+<div style="display: flex; justify-content: flex-start;">
+  <img src="./docs/static/found-valid-issue.png" alt="Found valid issue" width="467"/>
+</div>
+
+如果遇到非预期的输出，也会发送通知，类似:
+
+<div style="display: flex; justify-content: flex-start;">
+  <img src="./docs/static/found-unexpected-issue.png" alt="Found unexpected issue" width="467"/>
+</div>
+
+对于非预期输出，**通常意味着相关 linter 默认的执行配置不支持当前仓库**，你需要通过配置文件基于实际情况显式指定。
 
 ## 贡献
 
