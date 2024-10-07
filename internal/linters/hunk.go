@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/x/log"
+	"github.com/xanzy/go-gitlab"
 )
 
 type HunkChecker interface {
@@ -55,10 +56,8 @@ func NewGithubCommitFileHunkChecker(commitFiles []*github.CommitFile) (*GithubCo
 			log.Warnf("duplicate commitFiles: %v, %v", commitFile, v)
 			continue
 		}
-
 		hunks[commitFile.GetFilename()] = fileHunks
 	}
-
 	return &GithubCommitFileHunkChecker{
 		Hunks: hunks,
 	}, nil
@@ -120,4 +119,10 @@ func DiffHunks(commitFile *github.CommitFile) ([]Hunk, error) {
 	}
 
 	return ParsePatch(commitFile.GetPatch())
+}
+func DiffHunksMerge(commitFile *gitlab.MergeRequestDiff) ([]Hunk, error) {
+	if commitFile == nil || commitFile.NewPath == "" {
+		return nil, fmt.Errorf("invalid commitFile: %v", commitFile)
+	}
+	return ParsePatch(commitFile.Diff)
 }
