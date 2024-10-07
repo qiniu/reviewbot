@@ -14,7 +14,7 @@
  limitations under the License.
 */
 
-package commit_check
+package commit
 
 import (
 	"bytes"
