@@ -84,7 +84,7 @@ Please refer to the [getting started guide](https://reviewbot-x.netlify.app/gett
 
 ### Git Workflow Standards
 
-- [commit msg check](/internal/linters/git-flow/commit-check/)
+- [commit msg check](/internal/linters/git-flow/commit/)
 
 ### Documentation Standards
 

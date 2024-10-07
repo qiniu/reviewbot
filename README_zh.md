@@ -81,7 +81,7 @@ Reviewbot 基于 golang 开发，逻辑简单，代码清晰，容易理解和�
 
 #### Git 流程规范
 
-- [commit msg check](/internal/linters/git-flow/commit-check/)
+- [commit msg check](/internal/linters/git-flow/commit/)
 
 #### 文档规范
 
