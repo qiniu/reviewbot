@@ -1,4 +1,4 @@
-# reviewbot - build your self-hosted automated code analysis and review server easily
+# Reviewbot - Empower Your Code Quality with Self-Hosted Automated Analysis and Review
 
 [![Build Status](https://github.com/qiniu/reviewbot/actions/workflows/go.yml/badge.svg)](https://github.com/qiniu/reviewbot/actions/workflows/go.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/qiniu/reviewbot)](https://goreportcard.com/report/github.com/qiniu/reviewbot)
