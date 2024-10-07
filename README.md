@@ -4,6 +4,8 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/qiniu/reviewbot)](https://goreportcard.com/report/github.com/qiniu/reviewbot)
 [![GitHub release](https://img.shields.io/github/v/tag/qiniu/reviewbot.svg?label=release)](https://github.com/qiniu/reviewbot/releases)
 
+[中文](./README_zh.md)
+
 Reviewbot assists you in rapidly establishing a self-hosted code analysis and review service, supporting multiple languages and coding standards. It is particularly suitable for organizations with numerous private repositories.
 
 All issues are reported during the Pull Request stage, either as `Review Comments` or `Github Annotations`, precisely pinpointing the relevant code lines.
@@ -46,10 +48,10 @@ This approach helps PR authors avoid searching for issues in lengthy console log
 
 Reviewbot is a self-hosted code analysis and review service supporting multiple languages and coding standards. It is particularly beneficial for organizations with numerous private repositories:
 
-- Security - Recommended self-hosting for data security and control
-- Flexibility - Supports multiple languages and coding standards, with easy integration of new code inspection tools
-- Observability - Supports alert notifications for timely awareness of detected issues
-- Usability - Designed for zero-configuration, enabling inspection of all repositories with minimal setup
+- **Security** - Recommended self-hosting for data security and control
+- **Flexibility** - Supports multiple languages and coding standards, with easy integration of new code inspection tools
+- **Observability** - Supports alert notifications for timely awareness of detected issues
+- **Usability** - Designed for zero-configuration, enabling inspection of all repositories with minimal setup
 
 Reviewbot is developed using Golang, featuring simple logic and clear code, making it easy to understand and maintain.
 
