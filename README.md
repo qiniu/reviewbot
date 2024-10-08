@@ -33,6 +33,7 @@ This approach helps PR authors avoid searching for issues in lengthy console log
   - [C/C++](#cc)
   - [Lua](#lua)
   - [Java](#java)
+  - [Shell](#shell)
   - [Git Workflow Standards](#git-workflow-standards)
   - [Documentation Standards](#documentation-standards)
 - [Configuration](#configuration)
@@ -81,6 +82,10 @@ Please refer to the [getting started guide](https://reviewbot-x.netlify.app/gett
 
 - [pmdcheck](/internal/linters/java/pmdcheck/)
 - [stylecheck](/internal/linters/java/stylecheck/)
+
+### Shell
+
+- [shellcheck](/internal/linters/shell/shellcheck/)
 
 ### Git Workflow Standards
 
