@@ -31,6 +31,7 @@ Reviewbot 帮助你快速搭建一个自托管的代码分析和代码审查服�
   - [C/C++](#cc)
   - [Lua](#lua)
   - [Java](#java)
+  - [Shell](#shell)
   - [Git 流程规范](#git-流程规范)
   - [文档规范](#文档规范)
 - [配置](#配置)
@@ -78,6 +79,10 @@ Reviewbot 基于 golang 开发，逻辑简单，代码清晰，容易理解和�
 
 - [pmdcheck](/internal/linters/java/pmdcheck/)
 - [stylecheck](/internal/linters/java/stylecheck/)
+
+#### Shell
+
+- [shellcheck](/internal/linters/shell/shellcheck/)
 
 #### Git 流程规范
 
