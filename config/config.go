@@ -74,6 +74,8 @@ type GlobalConfig struct {
 	// 2. /path/to/ssh/key:/another/path/to/ssh/key => will copy the key to the target path(/another/path/to/ssh/key) in the container
 	// it can be overridden by linter.DockerAsRunner.CopySSHKeyToContainer.
 	CopySSHKeyToContainer string `json:"copySSHKeyToContainer,omitempty"`
+
+	KubeConfigPath string `json:"kubeConfigPath"`
 }
 
 type DockerAsRunner struct {
@@ -90,6 +92,14 @@ type DockerAsRunner struct {
 	// so we need to ensure the directory exists in the container before copying the ssh key.
 	CopySSHKeyToContainer string `json:"copySSHKeyToContainer,omitempty"`
 }
+
+type KubernetesAsRunner struct {
+	Namespace      string `json:"namespace"`
+	Image          string `json:"image"`
+	KubeConfigPath string `json:"kubeConfigPath"`
+	SSHKeyMount    string `json:"sshkeyMount,omitempty"`
+	PVCMount       string `json:"pvcMount,omitempty"`
+}
 type Linter struct {
 	// Name is the linter name.
 	Name string
@@ -99,6 +109,9 @@ type Linter struct {
 	// Optional, if not empty, use the docker image to run the linter.
 	// e.g. "golang:1.23.4"
 	DockerAsRunner DockerAsRunner `json:"dockerAsRunner,omitempty"`
+	// KubernetesAsRunner is the kubenertes pod to run the linter.
+	// Optional, if not empty, use the kubenertes pod  to run the linter.
+	KubernetesAsRunner KubernetesAsRunner `json:"kubernetesAsRunner,omitempty"`
 	// WorkDir is the working directory of the linter.
 	WorkDir string `json:"workDir,omitempty"`
 	// Command is the command to run the linter. e.g. "golangci-lint", "staticcheck"
@@ -209,6 +222,11 @@ func (c Config) GetLinterConfig(org, repo, ln string) Linter {
 	// set copy ssh key to container
 	if c.GlobalDefaultConfig.CopySSHKeyToContainer != "" {
 		linter.DockerAsRunner.CopySSHKeyToContainer = c.GlobalDefaultConfig.CopySSHKeyToContainer
+		linter.KubernetesAsRunner.SSHKeyMount = c.GlobalDefaultConfig.CopySSHKeyToContainer
+	}
+
+	if c.GlobalDefaultConfig.KubeConfigPath != "" {
+		linter.KubernetesAsRunner.KubeConfigPath = c.GlobalDefaultConfig.KubeConfigPath
 	}
 
 	if orgConfig, ok := c.CustomConfig[org]; ok {
@@ -263,6 +281,19 @@ func applyCustomConfig(legacy, custom Linter) Linter {
 	}
 	if custom.DockerAsRunner.CopySSHKeyToContainer != "" {
 		legacy.DockerAsRunner.CopySSHKeyToContainer = custom.DockerAsRunner.CopySSHKeyToContainer
+	}
+
+	if custom.KubernetesAsRunner.Image != "" {
+		legacy.KubernetesAsRunner.Image = custom.KubernetesAsRunner.Image
+	}
+	if custom.KubernetesAsRunner.Namespace != "" {
+		legacy.KubernetesAsRunner.Namespace = custom.KubernetesAsRunner.Namespace
+	}
+	if custom.KubernetesAsRunner.SSHKeyMount != "" {
+		legacy.KubernetesAsRunner.SSHKeyMount = custom.KubernetesAsRunner.SSHKeyMount
+	}
+	if custom.KubernetesAsRunner.PVCMount != "" {
+		legacy.KubernetesAsRunner.PVCMount = custom.KubernetesAsRunner.PVCMount
 	}
 
 	if custom.Name != "" {

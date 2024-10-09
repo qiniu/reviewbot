@@ -51,8 +51,9 @@ type Server struct {
 	// e.g. https://domain
 	serverAddr string
 
-	dockerRunner runner.Runner
-	storage      storage.Storage
+	dockerRunner     runner.Runner
+	KubenertesRunner runner.Runner
+	storage          storage.Storage
 
 	webhookSecret []byte
 
@@ -71,6 +72,47 @@ var (
 	mu    sync.Mutex
 	prMap = make(map[string]context.CancelFunc)
 )
+
+func (s *Server) checkKubenertes() {
+	type checkConnfig struct {
+		namespace string
+		k8sRunner runner.Runner
+	}
+
+	var checkConfigs []checkConnfig
+	for _, customConfig := range s.config.CustomConfig {
+		for _, linter := range customConfig.Linters {
+			if linter.KubernetesAsRunner.KubeConfigPath == "" {
+				linter.KubernetesAsRunner.KubeConfigPath = s.config.GlobalDefaultConfig.KubeConfigPath
+			}
+			k8sRunner, err := runner.NewKubenertesRunner(linter.KubernetesAsRunner.KubeConfigPath)
+			if err != nil {
+				log.Errorf("failed to init kube runner: %v", err)
+			}
+			if linter.KubernetesAsRunner.Namespace != "" {
+				checkConfigs = append(checkConfigs, checkConnfig{namespace: linter.KubernetesAsRunner.Namespace, k8sRunner: k8sRunner})
+			}
+
+		}
+	}
+
+	go func() {
+		ctx := context.Background()
+		for _, checkConfig := range checkConfigs {
+			linterConfig := &config.Linter{
+				KubernetesAsRunner: config.KubernetesAsRunner{
+					Namespace: checkConfig.namespace,
+				},
+			}
+			err := checkConfig.k8sRunner.Prepare(ctx, linterConfig)
+			if err != nil {
+				log.Fatalf("check namespace(%s) failed : %v", checkConfig.namespace, err)
+			}
+			log.Infof("check namespace(%s) success", checkConfig.namespace)
+		}
+	}()
+
+}
 
 func (s *Server) initDockerRunner() {
 	var images []string
@@ -404,6 +446,13 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 		r := runner.NewLocalRunner()
 		if linterConfig.DockerAsRunner.Image != "" {
 			r = s.dockerRunner
+		}
+		if linterConfig.KubernetesAsRunner.Image != "" {
+			k8sRunner, err := runner.NewKubenertesRunner(linterConfig.KubernetesAsRunner.KubeConfigPath)
+			if err != nil {
+				log.Fatalf("failed to init kube runner: %v", err)
+			}
+			r = k8sRunner
 		}
 		agent.Runner = r
 		agent.Storage = s.storage
