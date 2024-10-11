@@ -156,48 +156,6 @@ spec:
     app: reviewbot
   type: ClusterIP
 ---
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  annotations:
-    kubernetes.io/ingress.class: nginx
-  labels:
-    app: reviewbot
-  name: reviewbot
-  namespace: reviewbot
-spec:
-  rules:
-    - host: cr-bot.qiniu.io
-      http:
-        paths:
-          - backend:
-              service:
-                name: reviewbot
-                port:
-                  number: 8888
-            path: /
-            pathType: Prefix
-    - host: cr-bot.qiniu.io
-      http:
-        paths:
-          - backend:
-              service:
-                name: reviewbot
-                port:
-                  number: 8888
-            path: /hook
-            pathType: Prefix
-    - host: qiniu-x.jfcs-k8s-qa1.qiniu.io
-      http:
-        paths:
-          - backend:
-              service:
-                name: reviewbot
-                port:
-                  number: 8888
-            path: /view
-            pathType: Prefix
----
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:

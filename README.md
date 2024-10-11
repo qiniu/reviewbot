@@ -62,6 +62,11 @@ Reviewbot is developed using Golang, featuring simple logic and clear code, maki
 
 Please refer to the [getting started guide](https://reviewbot-x.netlify.app/getting-started/installation).
 
+The following are internal usage practices at Qiniu, which may provide you with more inspiration:
+
+- Deployed in a [Kubernetes cluster](https://github.com/qiniu/reviewbot/tree/master/deploy/reviewbot.yaml)
+- Using this [Dockerfile](https://github.com/qiniu/reviewbot/tree/master/Dockerfile) to build the Reviewbot image
+
 ## Supported Linters
 
 ### Go
