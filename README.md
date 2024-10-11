@@ -24,6 +24,8 @@ All issues are reported during the Pull Request stage, either as `Review Comment
 
 This approach helps PR authors avoid searching for issues in lengthy console logs, significantly facilitating problem resolution.
 
+[see introduction blog](https://medium.com/@dacarl.ji/reviewbot-boost-your-code-quality-with-self-hosted-automated-analysis-and-review-83d8a459eb70)
+
 ## Table of Contents
 
 - [Why Reviewbot](#why-reviewbot)
