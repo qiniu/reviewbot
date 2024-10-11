@@ -57,7 +57,12 @@ Reviewbot 基于 golang 开发，逻辑简单，代码清晰，容易理解和�
 
 ## 安装
 
-请参考 [getting started guide](https://reviewbot-x.netlify.app/getting-started/installation).
+相关信息请参考 [getting started guide](https://reviewbot-x.netlify.app/getting-started/installation).
+
+以下是七牛内部使用姿势，也许可以给你更多启发:
+
+- 部署在 [Kubernetes 集群中](https://github.com/qiniu/reviewbot/tree/master/deploy/reviewbot.yaml)
+- 使用的 [Dockerfile](https://github.com/qiniu/reviewbot/tree/master/Dockerfile) 构建 Reviewbot 镜像
 
 ### 已支持的 linters
 
