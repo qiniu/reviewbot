@@ -46,9 +46,9 @@ func pmdCheckHandler(ctx context.Context, a linters.Agent) error {
 	plog := lintersutil.FromContext(ctx)
 	var javaFiles []string
 	rulePath := a.LinterConfig.ConfigPath
-	for _, arg := range a.PullRequestChangedFiles {
-		if strings.HasSuffix(arg.GetFilename(), ".java") {
-			javaFiles = append(javaFiles, arg.GetFilename())
+	for _, arg := range a.Provider.GetFiles(nil) {
+		if strings.HasSuffix(arg, ".java") {
+			javaFiles = append(javaFiles, arg)
 		}
 	}
 	if len(javaFiles) == 0 {

@@ -20,15 +20,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"net/http"
 	"regexp"
 	"strings"
 	"text/template"
 
-	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/reviewbot/internal/lintersutil"
-	"github.com/qiniu/x/log"
 )
 
 const lintName = "commit-check"
@@ -47,12 +44,12 @@ func commitMessageCheckHandler(ctx context.Context, a linters.Agent) error {
 		author = a.PullRequestEvent.GetPullRequest().GetUser().GetLogin()
 	)
 
-	commits, err := listCommits(ctx, a, org, repo, number)
+	commits, err := a.Provider.ListCommits(ctx, org, repo, number)
 	if err != nil {
 		return err
 	}
 
-	existedComments, err := listExistedComments(context.Background(), a, org, repo, number)
+	existedComments, err := a.Provider.ListComments(ctx, org, repo, number)
 	if err != nil {
 		return err
 	}
@@ -73,51 +70,8 @@ func commitMessageCheckHandler(ctx context.Context, a linters.Agent) error {
 	return handle(ctx, a, org, repo, author, number, toComments, existedComments)
 }
 
-func listCommits(ctx context.Context, agent linters.Agent, org, repo string, number int) ([]*github.RepositoryCommit, error) {
-	opts := &github.ListOptions{
-		PerPage: 100,
-	}
-	var allCommits []*github.RepositoryCommit
-
-	for {
-		commits, resp, err := agent.GithubClient.PullRequests.ListCommits(ctx, org, repo, number, opts)
-		if err != nil {
-			return nil, fmt.Errorf("listing commits: %w", err)
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			return nil, fmt.Errorf("list commits failed with status %d: %v", resp.StatusCode, resp.Body)
-		}
-
-		allCommits = append(allCommits, commits...)
-
-		if resp.NextPage == 0 {
-			break
-		}
-		opts.Page = resp.NextPage
-	}
-
-	return allCommits, nil
-}
-
-func listExistedComments(ctx context.Context, agent linters.Agent, org, repo string, number int) ([]*github.IssueComment, error) {
-	comments, resp, err := agent.GithubClient.Issues.ListComments(ctx, org, repo, number, &github.IssueListCommentsOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != 200 {
-		log.Errorf("list comments failed: %v", resp)
-		return nil, fmt.Errorf("list comments failed: %v", resp.Body)
-	}
-
-	return comments, nil
-}
-
-// Deprecated: this is old version of commit check, which is not used anymore. Remove this after a while.
 const (
-	rebaseSuggestionFlag = "REBASE SUGGESTION"
-	commitCheckFlag      = "[Git-flow]"
+	commitCheckFlag = "[Git-flow]"
 )
 
 const commentTmpl = `**{{.Flag}}** Hi @{{.Author}}, There are some suggestions for your information:
@@ -138,7 +92,7 @@ type RebaseSuggestion struct {
 	TargetCommits []string
 }
 
-func handle(ctx context.Context, agent linters.Agent, org, repo, author string, number int, comments []string, existedComments []*github.IssueComment) error {
+func handle(ctx context.Context, agent linters.Agent, org, repo, author string, number int, comments []string, existedComments []linters.Comment) error {
 	log := lintersutil.FromContext(ctx)
 	data := struct {
 		Flag     string
@@ -166,28 +120,16 @@ func handle(ctx context.Context, agent linters.Agent, org, repo, author string, 
 
 	// check if comment already existed
 	for _, comment := range existedComments {
-		if comment.Body != nil && *comment.Body == expectedComment {
+		if comment.Body == expectedComment {
 			// comment already existed, no need to create again
 			return nil
 		}
 	}
 
-	// remove comments with old rebaseSuggestion flag
-	// TODO: remove this after a while
-	for _, comment := range existedComments {
-		if comment.Body != nil && strings.Contains(*comment.Body, rebaseSuggestionFlag) {
-			_, err := agent.GithubClient.Issues.DeleteComment(context.Background(), org, repo, *comment.ID)
-			if err != nil {
-				log.Warnf("delete comment failed: %v", err)
-				continue
-			}
-		}
-	}
-
 	// remove old comments
 	for _, comment := range existedComments {
-		if comment.Body != nil && strings.Contains(*comment.Body, commitCheckFlag) {
-			_, err := agent.GithubClient.Issues.DeleteComment(context.Background(), org, repo, *comment.ID)
+		if strings.Contains(comment.Body, commitCheckFlag) {
+			err := agent.Provider.DeleteComment(ctx, org, repo, comment.ID)
 			if err != nil {
 				log.Warnf("delete comment failed: %v", err)
 				continue
@@ -197,27 +139,22 @@ func handle(ctx context.Context, agent linters.Agent, org, repo, author string, 
 
 	// add new comment
 	if len(comments) > 0 {
-		c, resp, err := agent.GithubClient.Issues.CreateComment(context.Background(), org, repo, number, &github.IssueComment{
-			Body: &expectedComment,
+		c, err := agent.Provider.CreateComment(ctx, org, repo, number, &linters.Comment{
+			Body: expectedComment,
 		})
 		if err != nil {
 			return err
 		}
-		if resp.StatusCode != 201 {
-			log.Errorf("create comment failed: %v", resp)
-			return fmt.Errorf("create comment failed: %v", resp.Body)
-		}
-
 		log.Infof("create comment success: %v", c)
 	}
 
 	return nil
 }
 
-// Ruler is a function to check if commit messages match some rules
-// The message returned via Ruler will be added as part of the comment
-// so, It's recommended to use template rulerTmpl to generate a unified format message
-type Ruler func(ctx context.Context, commits []*github.RepositoryCommit) (string, error)
+// Ruler is a function to check if commit messages match some rules.
+// The message returned via Ruler will be added as part of the comment.
+// So, It's recommended to use template rulerTmpl to generate a unified format message.
+type Ruler func(ctx context.Context, commits []linters.Commit) (string, error)
 
 const rulerTmpl = `
 ### {{.Header}}
@@ -234,21 +171,19 @@ const (
 
 var mergeMsgRegex = regexp.MustCompile(pattern)
 
-// RebaseCheckRule checks if there are merge commit messages or duplicate messages in the PR
-// If there are, it will return a suggestion message to do git rebase
-func rebaseCheck(ctx context.Context, commits []*github.RepositoryCommit) (string, error) {
+// RebaseCheckRule checks if there are merge commit messages or duplicate messages in the PR.
+// If there are, it will return a suggestion message to do git rebase.
+func rebaseCheck(ctx context.Context, commits []linters.Commit) (string, error) {
 	var mergeTypeCommits []string
 	// filter out duplicated commit messages
 	msgs := make(map[string]int, 0)
 
 	// filter out merge commit messages
 	for _, commit := range commits {
-		if commit.Commit != nil && commit.Commit.Message != nil {
-			if mergeMsgRegex.MatchString(*commit.Commit.Message) {
-				mergeTypeCommits = append(mergeTypeCommits, *commit.Commit.Message)
-			}
-			msgs[*commit.Commit.Message]++
+		if mergeMsgRegex.MatchString(commit.Message) {
+			mergeTypeCommits = append(mergeTypeCommits, commit.Message)
 		}
+		msgs[commit.Message]++
 	}
 
 	var finalComments string

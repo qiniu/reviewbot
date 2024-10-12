@@ -27,7 +27,7 @@ func TestParsePatch(t *testing.T) {
 }
 
 func TestInHunk(t *testing.T) {
-	c := GithubCommitFileHunkChecker{
+	c := FileHunkChecker{
 		Hunks: map[string][]Hunk{
 			"testfilename": {
 				{

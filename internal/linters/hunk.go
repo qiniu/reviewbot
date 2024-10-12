@@ -29,12 +29,12 @@ type HunkChecker interface {
 	InHunk(file string, line int) bool
 }
 
-type GithubCommitFileHunkChecker struct {
+type FileHunkChecker struct {
 	// map[file][]hunks
 	Hunks map[string][]Hunk
 }
 
-func NewGithubCommitFileHunkChecker(commitFiles []*github.CommitFile) (*GithubCommitFileHunkChecker, error) {
+func NewFileHunkChecker(commitFiles []*github.CommitFile) (*FileHunkChecker, error) {
 	hunks := make(map[string][]Hunk)
 	for _, commitFile := range commitFiles {
 		if commitFile == nil || commitFile.GetPatch() == "" {
@@ -59,12 +59,12 @@ func NewGithubCommitFileHunkChecker(commitFiles []*github.CommitFile) (*GithubCo
 		hunks[commitFile.GetFilename()] = fileHunks
 	}
 
-	return &GithubCommitFileHunkChecker{
+	return &FileHunkChecker{
 		Hunks: hunks,
 	}, nil
 }
 
-func (c *GithubCommitFileHunkChecker) InHunk(file string, line, startLine int) bool {
+func (c *FileHunkChecker) InHunk(file string, line, startLine int) bool {
 	if hunks, ok := c.Hunks[file]; ok {
 		for _, hunk := range hunks {
 			if startLine != 0 {

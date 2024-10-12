@@ -44,10 +44,10 @@ func init() {
 func noteCheckHandler(ctx context.Context, a linters.Agent) error {
 	outputs := make(map[string][]linters.LinterOutput)
 
-	for _, file := range a.PullRequestChangedFiles {
-		fileName := file.GetFilename()
+	for _, file := range a.Provider.GetFiles(nil) {
+		fileName := file
 		// Only check go files
-		if filepath.Ext(fileName) != ".go" || file.GetStatus() == "removed" {
+		if filepath.Ext(fileName) != ".go" {
 			continue
 		}
 

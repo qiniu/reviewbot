@@ -53,6 +53,7 @@ issues:
         - goconst
         - noctx
         - revive
+        - gocognit
 
 linters:
   # Enable all available linters.
@@ -81,3 +82,4 @@ linters:
     - gochecknoinits # see too many false positives
     - gofumpt # see too many false positives
     - tagliatelle # see too many false positives
+    - intrange # see too many false positives

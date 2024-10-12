@@ -31,17 +31,15 @@ func TestGoModCheck(t *testing.T) {
 	tcs := []struct {
 		id      string
 		content []byte
-		input   linters.Agent
+		input   []*github.CommitFile
 		want    map[string][]linters.LinterOutput
 	}{
 		{
 			id:      "case1 : cross-repository local replacement ",
 			content: []byte("replace github.com/a/c v0.0.0 => ../../github.com/c/d"),
-			input: linters.Agent{
-				PullRequestChangedFiles: []*github.CommitFile{
-					{
-						Filename: github.String("c/go.mod"),
-					},
+			input: []*github.CommitFile{
+				{
+					Filename: github.String("c/go.mod"),
 				},
 			},
 			want: map[string][]linters.LinterOutput{
@@ -58,11 +56,9 @@ func TestGoModCheck(t *testing.T) {
 		{
 			id:      "case2 : valid local replacement ",
 			content: []byte("replace github.com/a/b v0.0.0 => ../github.com/c/d"),
-			input: linters.Agent{
-				PullRequestChangedFiles: []*github.CommitFile{
-					{
-						Filename: github.String("c/go.mod"),
-					},
+			input: []*github.CommitFile{
+				{
+					Filename: github.String("c/go.mod"),
 				},
 			},
 			want: map[string][]linters.LinterOutput{},
@@ -70,11 +66,9 @@ func TestGoModCheck(t *testing.T) {
 		{
 			id:      "case3 : valid non-local replacement ",
 			content: []byte("replace github.com/a/b v0.0.0 => github.com/c/d v1.1.1"),
-			input: linters.Agent{
-				PullRequestChangedFiles: []*github.CommitFile{
-					{
-						Filename: github.String("c/go.mod"),
-					},
+			input: []*github.CommitFile{
+				{
+					Filename: github.String("c/go.mod"),
 				},
 			},
 			want: map[string][]linters.LinterOutput{},
@@ -82,14 +76,12 @@ func TestGoModCheck(t *testing.T) {
 		{
 			id:      "case4 : multiple go.mod files",
 			content: []byte("replace github.com/a/b v0.0.0 => ../../github.com/c/d"),
-			input: linters.Agent{
-				PullRequestChangedFiles: []*github.CommitFile{
-					{
-						Filename: github.String("c/go.mod"),
-					},
-					{
-						Filename: github.String("d/go.mod"),
-					},
+			input: []*github.CommitFile{
+				{
+					Filename: github.String("c/go.mod"),
+				},
+				{
+					Filename: github.String("d/go.mod"),
 				},
 			},
 			want: map[string][]linters.LinterOutput{
@@ -115,9 +107,14 @@ func TestGoModCheck(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.id, func(t *testing.T) {
+			p, err := linters.NewGithubProvider(nil, nil, tc.input, github.PullRequestEvent{})
+			if err != nil {
+				t.Errorf("Error creating github provider: %v", err)
+				return
+			}
 			// prepare go.mod files
-			for _, file := range tc.input.PullRequestChangedFiles {
-				filename := file.GetFilename()
+			for _, file := range p.GetFiles(nil) {
+				filename := file
 				dir := filepath.Dir(filename)
 				err := os.MkdirAll(dir, 0o755)
 				if err != nil {
@@ -133,7 +130,9 @@ func TestGoModCheck(t *testing.T) {
 				}
 			}
 
-			output, err := goModCheckOutput(&xlog.Logger{}, tc.input)
+			output, err := goModCheckOutput(&xlog.Logger{}, linters.Agent{
+				Provider: p,
+			})
 			if err != nil {
 				t.Errorf("Error execute goModCheckOutput : %v", err)
 			}

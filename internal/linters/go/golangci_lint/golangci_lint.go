@@ -25,7 +25,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/reviewbot/internal/lintersutil"
@@ -281,7 +280,7 @@ func findGoModDirs(a linters.Agent) []string {
 	}
 
 	var goModDirs []string
-	dirs := extractDirs(a.PullRequestChangedFiles)
+	dirs := extractDirs(a.Provider.GetFiles(nil))
 	for _, dir := range dirs {
 		goModFile := filepath.Join(a.RepoDir, dir, "go.mod")
 		if _, exist := lintersutil.FileExists(goModFile); exist {
@@ -291,14 +290,14 @@ func findGoModDirs(a linters.Agent) []string {
 	return goModDirs
 }
 
-func extractDirs(commitFiles []*github.CommitFile) []string {
+func extractDirs(files []string) []string {
 	directorySet := make(map[string]bool)
 
-	for _, file := range commitFiles {
-		if filepath.Ext(file.GetFilename()) != ".go" && filepath.Ext(file.GetFilename()) != ".mod" && filepath.Ext(file.GetFilename()) != ".sum" {
+	for _, file := range files {
+		if filepath.Ext(file) != ".go" && filepath.Ext(file) != ".mod" && filepath.Ext(file) != ".sum" {
 			continue
 		}
-		dir := filepath.Dir(file.GetFilename())
+		dir := filepath.Dir(file)
 
 		// Split the directory path into individual directories
 		dirs := strings.Split(dir, string(filepath.Separator))
