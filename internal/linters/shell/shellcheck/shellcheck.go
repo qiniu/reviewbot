@@ -36,9 +36,9 @@ func init() {
 func shellcheck(ctx context.Context, a linters.Agent) error {
 	log := lintersutil.FromContext(ctx)
 	var shellFiles []string
-	for _, arg := range a.PullRequestChangedFiles {
-		if strings.HasSuffix(arg.GetFilename(), ".sh") {
-			shellFiles = append(shellFiles, arg.GetFilename())
+	for _, arg := range a.Provider.GetFiles(nil) {
+		if strings.HasSuffix(arg, ".sh") {
+			shellFiles = append(shellFiles, arg)
 		}
 	}
 

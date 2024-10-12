@@ -35,7 +35,6 @@ import (
 	"github.com/qiniu/reviewbot/internal/storage"
 	"github.com/qiniu/x/log"
 	"github.com/qiniu/x/xlog"
-	gitv2 "sigs.k8s.io/prow/pkg/git/v2"
 )
 
 var (
@@ -110,19 +109,15 @@ type Agent struct {
 	Storage storage.Storage
 	// Runner is the way to run the linter.	like docker, local, etc.
 	Runner runner.Runner
-	// GitHubClient is the GitHub client.
-	GithubClient *github.Client
-	// GitClient is the Git client factory.
-	GitClient gitv2.ClientFactory
+	// Provider knows how to interact with the git provider. such as github, gitlab, etc.
+	Provider Provider
+
 	// LinterConfig is the linter configuration.
-	LinterConfig config.Linter
-	// PullRequestEvent is the event of a pull request.
+	LinterConfig     config.Linter
 	PullRequestEvent github.PullRequestEvent
-	// PullRequestChangedFiles is the changed files of a pull request.
-	PullRequestChangedFiles []*github.CommitFile
+
 	// RepoDir is the repo directory.
 	RepoDir string
-
 	// GenLogKey generates the log key.
 	GenLogKey func() string
 	// GenLogViewUrl generates the log view url.
@@ -214,8 +209,6 @@ func Report(ctx context.Context, a Agent, lintResults map[string][]LinterOutput)
 	log := lintersutil.FromContext(ctx)
 	var (
 		num        = a.PullRequestEvent.GetNumber()
-		org        = a.PullRequestEvent.Repo.GetOwner().GetLogin()
-		repo       = a.PullRequestEvent.Repo.GetName()
 		orgRepo    = a.PullRequestEvent.Repo.GetFullName()
 		linterName = a.LinterConfig.Name
 	)
@@ -232,65 +225,7 @@ func Report(ctx context.Context, a Agent, lintResults map[string][]LinterOutput)
 		metric.IncIssueCounter(orgRepo, linterName, a.PullRequestEvent.PullRequest.GetHTMLURL(), a.PullRequestEvent.GetPullRequest().GetHead().GetSHA(), float64(countLinterErrors(lintResults)))
 	}
 
-	switch a.LinterConfig.ReportFormat {
-	case config.GithubCheckRuns:
-		ch, err := CreateGithubChecks(ctx, a, lintResults)
-		if err != nil {
-			if !errors.Is(err, context.Canceled) {
-				log.Errorf("failed to create github checks: %v", err)
-			}
-			return err
-		}
-		log.Infof("[%s] create check run success, HTML_URL: %v", linterName, ch.GetHTMLURL())
-
-		metric.NotifyWebhookByText(ConstructGotchaMsg(linterName, a.PullRequestEvent.GetPullRequest().GetHTMLURL(), ch.GetHTMLURL(), lintResults))
-	case config.GithubPRReview:
-		// List existing comments
-		existedComments, err := ListPullRequestsComments(ctx, a.GithubClient, org, repo, num)
-		if err != nil {
-			if !errors.Is(err, context.Canceled) {
-				log.Errorf("failed to list comments: %v", err)
-			}
-			return err
-		}
-
-		// filter out the comments that are not related to the linter
-		var existedCommentsToKeep []*github.PullRequestComment
-		linterFlag := linterNamePrefix(linterName)
-		for _, comment := range existedComments {
-			if strings.HasPrefix(comment.GetBody(), linterFlag) {
-				existedCommentsToKeep = append(existedCommentsToKeep, comment)
-			}
-		}
-		log.Infof("%s found %d existed comments for this PR %d (%s) \n", linterFlag, len(existedCommentsToKeep), num, orgRepo)
-
-		toAdds, toDeletes := filterLinterOutputs(lintResults, existedCommentsToKeep)
-		if err := DeletePullReviewComments(ctx, a.GithubClient, org, repo, toDeletes); err != nil {
-			log.Errorf("failed to delete comments: %v", err)
-			return err
-		}
-		log.Infof("%s delete %d comments for this PR %d (%s) \n", linterFlag, len(toDeletes), num, orgRepo)
-
-		comments := constructPullRequestComments(toAdds, linterFlag, a.PullRequestEvent.GetPullRequest().GetHead().GetSHA())
-		if len(comments) == 0 {
-			return nil
-		}
-
-		// Add the comments
-		addedCmts, err := CreatePullReviewComments(ctx, a.GithubClient, org, repo, num, comments)
-		if err != nil {
-			log.Errorf("failed to post comments: %v", err)
-			return err
-		}
-		log.Infof("[%s] add %d comments for this PR %d (%s) \n", linterName, len(addedCmts), num, orgRepo)
-		metric.NotifyWebhookByText(ConstructGotchaMsg(linterName, a.PullRequestEvent.GetPullRequest().GetHTMLURL(), addedCmts[0].GetHTMLURL(), lintResults))
-	case config.Quiet:
-		return nil
-	default:
-		log.Errorf("unsupported report format: %v", a.LinterConfig.ReportFormat)
-	}
-
-	return nil
+	return a.Provider.Report(ctx, a, lintResults)
 }
 
 // LineParser is a function that parses a line of linter output.

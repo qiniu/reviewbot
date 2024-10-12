@@ -309,6 +309,7 @@ func TestFindGoModsPaths(t *testing.T) {
 		id            string
 		currentDir    string
 		input         linters.Agent
+		changedFiles  []*github.CommitFile
 		wantDir       string
 		createModPath []string
 		isGoMod       bool
@@ -320,18 +321,18 @@ func TestFindGoModsPaths(t *testing.T) {
 				LinterConfig: config.Linter{
 					WorkDir: "repo1/",
 				},
-				PullRequestChangedFiles: []*github.CommitFile{
-					{
-						Filename: &filename1,
-					},
-					{
-						Filename: &filename2,
-					},
-					{
-						Filename: &filename3,
-					},
-				},
 				RepoDir: "repo1/",
+			},
+			changedFiles: []*github.CommitFile{
+				{
+					Filename: &filename1,
+				},
+				{
+					Filename: &filename2,
+				},
+				{
+					Filename: &filename3,
+				},
 			},
 			createModPath: []string{
 				"test1/go.mod",
@@ -346,18 +347,18 @@ func TestFindGoModsPaths(t *testing.T) {
 				LinterConfig: config.Linter{
 					WorkDir: "repo2/",
 				},
-				PullRequestChangedFiles: []*github.CommitFile{
-					{
-						Filename: &filename1,
-					},
-					{
-						Filename: &filename2,
-					},
-					{
-						Filename: &filename3,
-					},
-				},
 				RepoDir: "repo2/",
+			},
+			changedFiles: []*github.CommitFile{
+				{
+					Filename: &filename1,
+				},
+				{
+					Filename: &filename2,
+				},
+				{
+					Filename: &filename3,
+				},
 			},
 			goModFileNum: 0,
 			isGoMod:      false,
@@ -368,18 +369,18 @@ func TestFindGoModsPaths(t *testing.T) {
 				LinterConfig: config.Linter{
 					WorkDir: "repo3/",
 				},
-				PullRequestChangedFiles: []*github.CommitFile{
-					{
-						Filename: &filename1,
-					},
-					{
-						Filename: &filename2,
-					},
-					{
-						Filename: &filename4,
-					},
-				},
 				RepoDir: "repo3/",
+			},
+			changedFiles: []*github.CommitFile{
+				{
+					Filename: &filename1,
+				},
+				{
+					Filename: &filename2,
+				},
+				{
+					Filename: &filename4,
+				},
 			},
 			createModPath: []string{
 				"test1/go.mod",
@@ -414,7 +415,11 @@ func TestFindGoModsPaths(t *testing.T) {
 					defer file.Close()
 				}
 			}
-
+			p, err := linters.NewGithubProvider(nil, nil, tc.changedFiles, github.PullRequestEvent{})
+			if err != nil {
+				t.Errorf("Error creating github provider: %v", err)
+			}
+			tc.input.Provider = p
 			goModFiles := findGoModDirs(tc.input)
 
 			if len(goModFiles) != tc.goModFileNum {
@@ -427,33 +432,21 @@ func TestFindGoModsPaths(t *testing.T) {
 func TestExtractDirs(t *testing.T) {
 	tcs := []struct {
 		id            string
-		commitFiles   []*github.CommitFile
+		commitFiles   []string
 		wantDirectory []string
 	}{
 		{
-			id: "case1 - no go file",
-			commitFiles: []*github.CommitFile{
-				{
-					Filename: nil,
-				},
-			},
+			id:            "case1 - no go file",
+			commitFiles:   []string{},
 			wantDirectory: []string{},
 		},
 		{
 			id: "case2 - go files",
-			commitFiles: []*github.CommitFile{
-				{
-					Filename: github.String("a/b/c/a.go"),
-				},
-				{
-					Filename: github.String("e/f/g/b.go"),
-				},
-				{
-					Filename: github.String("a/b/c/d/e.go"),
-				},
-				{
-					Filename: github.String("c/g/h/i/e.java"),
-				},
+			commitFiles: []string{
+				"a/b/c/a.go",
+				"e/f/g/b.go",
+				"a/b/c/d/e.go",
+				"c/g/h/i/e.java",
 			},
 			wantDirectory: []string{".", "a", "a/b", "a/b/c", "e", "e/f", "e/f/g", "a/b/c/d"},
 		},

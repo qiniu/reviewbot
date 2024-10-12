@@ -47,8 +47,8 @@ func goModCheckHandler(ctx context.Context, a linters.Agent) error {
 
 func goModCheckOutput(log *xlog.Logger, a linters.Agent) (map[string][]linters.LinterOutput, error) {
 	output := make(map[string][]linters.LinterOutput)
-	for _, file := range a.PullRequestChangedFiles {
-		fName := file.GetFilename()
+	for _, file := range a.Provider.GetFiles(nil) {
+		fName := file
 		if !strings.HasSuffix(fName, "go.mod") {
 			continue
 		}

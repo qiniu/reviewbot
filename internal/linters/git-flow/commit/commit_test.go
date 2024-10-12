@@ -17,98 +17,75 @@
 package commit
 
 import (
+	"context"
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v57/github"
+	"github.com/qiniu/reviewbot/internal/linters"
 )
 
 func TestRebaseCheckRule(t *testing.T) {
 	tcs := []struct {
 		title    string
-		commits  []*github.RepositoryCommit
+		commits  []linters.Commit
 		expected string
 	}{
 		{
 			title: "filter merge commits",
-			commits: []*github.RepositoryCommit{
+			commits: []linters.Commit{
 				{
-					Commit: &github.Commit{
-						Message: github.String("feat: add feature 1"),
-					},
+					Message: "feat: add feature 1",
 				},
 				{
-					Commit: &github.Commit{
-						Message: github.String("Merge a into b"),
-					},
+					Message: "Merge a into b",
 				},
 				{
-					Commit: &github.Commit{
-						Message: github.String("fix: fix bug 2"),
-					},
+					Message: "fix: fix bug 2",
 				},
 				{
-					Commit: &github.Commit{
-						Message: github.String("Merge xxx into xxx"),
-					},
+					Message: "Merge xxx into xxx",
 				},
 			},
 			expected: "git merge",
 		},
 		{
 			title: "filter duplicate commits",
-			commits: []*github.RepositoryCommit{
+			commits: []linters.Commit{
 				{
-					Commit: &github.Commit{
-						Message: github.String("feat: add feature 1"),
-					},
+					Message: "feat: add feature 1",
 				},
 				{
-					Commit: &github.Commit{
-						Message: github.String("feat: add feature 1"),
-					},
+					Message: "feat: add feature 1",
 				},
 				{
-					Commit: &github.Commit{
-						Message: github.String("fix: fix bug 2"),
-					},
+					Message: "fix: fix bug 2",
 				},
 			},
 			expected: "duplicated",
 		},
 		{
 			title: "filter duplicate and merge commits",
-			commits: []*github.RepositoryCommit{
+			commits: []linters.Commit{
 				{
-					Commit: &github.Commit{
-						Message: github.String("feat: add feature 1"),
-					},
+					Message: "feat: add feature 1",
 				},
 				{
-					Commit: &github.Commit{
-						Message: github.String("feat: add feature 1"),
-					},
+					Message: "feat: add feature 1",
 				},
 				{
-					Commit: &github.Commit{
-						Message: github.String("Merge xxx into xxx"),
-					},
+					Message: "Merge xxx into xxx",
 				},
 			},
 			expected: "feat: add feature 1",
 		},
 		{
 			title: "filter duplicate and merge commits",
-			commits: []*github.RepositoryCommit{
+			commits: []linters.Commit{
 				{
-					Commit: &github.Commit{
-						Message: github.String("feat: add feature 1"),
-					},
+					Message: "feat: add feature 1",
 				},
 				{
-					Commit: &github.Commit{
-						Message: github.String("feat: add feature 2"),
-					},
+					Message: "feat: add feature 2",
 				},
 			},
 			expected: "",
@@ -117,7 +94,7 @@ func TestRebaseCheckRule(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.title, func(t *testing.T) {
-			comments, err := rebaseCheck(nil, tc.commits)
+			comments, err := rebaseCheck(context.Background(), tc.commits)
 			if err != nil {
 				t.Fatal(err)
 			}

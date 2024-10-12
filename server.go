@@ -386,15 +386,19 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 		log.Infof("[%s] config on repo %v: %+v", name, orgRepo, linterConfig)
 
 		agent := linters.Agent{
-			GithubClient:            s.GithubClient(installationID),
-			LinterConfig:            linterConfig,
-			GitClient:               s.gitClientFactory,
-			PullRequestEvent:        *event,
-			PullRequestChangedFiles: pullRequestAffectedFiles,
-			RepoDir:                 r.Directory(),
-			Context:                 ctx,
-			ID:                      lintersutil.GetEventGUID(ctx),
+			LinterConfig:     linterConfig,
+			PullRequestEvent: *event,
+			RepoDir:          r.Directory(),
+			Context:          ctx,
+			ID:               lintersutil.GetEventGUID(ctx),
 		}
+
+		provider, err := linters.NewGithubProvider(s.GithubClient(installationID), s.gitClientFactory, pullRequestAffectedFiles, *event)
+		if err != nil {
+			log.Errorf("failed to create provider: %v", err)
+			return err
+		}
+		agent.Provider = provider
 
 		if !linters.LinterRelated(name, agent) {
 			log.Infof("[%s] linter is not related to the PR, skipping", name)
