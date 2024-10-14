@@ -50,8 +50,9 @@ type Server struct {
 	// e.g. https://domain
 	serverAddr string
 
-	dockerRunner runner.Runner
-	storage      storage.Storage
+	dockerRunner     runner.Runner
+	KubenertesRunner runner.Runner
+	storage          storage.Storage
 
 	webhookSecret []byte
 
@@ -70,6 +71,42 @@ var (
 	mu    sync.Mutex
 	prMap = make(map[string]context.CancelFunc)
 )
+
+func (s *Server) checkKubenertes(kubeconfig string) {
+	var namespaces []string
+	for _, customConfig := range s.config.CustomConfig {
+		for _, linter := range customConfig.Linters {
+			if linter.KubernetesAsRunner.Namespace != "" {
+				namespaces = append(namespaces, linter.KubernetesAsRunner.Namespace)
+			}
+
+		}
+	}
+
+	if len(namespaces) > 0 {
+		k8sRunner, err := runner.NewKubenertesRunner(kubeconfig)
+		if err != nil {
+			log.Fatalf("failed to init kube runner: %v", err)
+		}
+		s.KubenertesRunner = k8sRunner
+	}
+	go func() {
+		ctx := context.Background()
+		for _, ns := range namespaces {
+			linterConfig := &config.Linter{
+				KubernetesAsRunner: config.KubernetesAsRunner{
+					Namespace: ns,
+				},
+			}
+			err := s.KubenertesRunner.Prepare(ctx, linterConfig)
+			if err != nil {
+				log.Fatalf("check namespace(%s) failed : %v", ns, err)
+			}
+			log.Infof("check namespace(%s) success", ns)
+		}
+	}()
+
+}
 
 func (s *Server) initDockerRunner() {
 	var images []string
@@ -403,6 +440,9 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 		r := runner.NewLocalRunner()
 		if linterConfig.DockerAsRunner.Image != "" {
 			r = s.dockerRunner
+		}
+		if linterConfig.KubernetesAsRunner.Image != "" {
+			r = s.KubenertesRunner
 		}
 		agent.Runner = r
 		agent.Storage = s.storage

@@ -72,6 +72,8 @@ type options struct {
 	// server addr which is used to generate the log view url
 	// e.g. https://domain
 	serverAddr string
+	// kube config directory
+	kubeConfigPath string
 }
 
 func (o options) Validate() error {
@@ -107,6 +109,7 @@ func gatherOptions() options {
 	fs.StringVar(&o.logDir, "log-dir", "/tmp", "log storage dir for local storage")
 	fs.StringVar(&o.serverAddr, "server-addr", "", "server addr which is used to generate the log view url")
 	fs.StringVar(&o.S3CredentialsFile, "s3-credentials-file", "", "File where s3 credentials are stored. For the exact format see http://xxxx/doc")
+	fs.StringVar(&o.kubeConfigPath, "kube-config-path", "", "kube config directory")
 
 	err := fs.Parse(os.Args[1:])
 	if err != nil {
@@ -233,6 +236,7 @@ func main() {
 	}
 
 	go s.initDockerRunner()
+	go s.checkKubenertes(o.kubeConfigPath)
 
 	if o.S3CredentialsFile != "" {
 		s.storage, err = storage.NewS3Storage(o.S3CredentialsFile)
