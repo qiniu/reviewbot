@@ -386,11 +386,10 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 		log.Infof("[%s] config on repo %v: %+v", name, orgRepo, linterConfig)
 
 		agent := linters.Agent{
-			LinterConfig:     linterConfig,
-			PullRequestEvent: *event,
-			RepoDir:          r.Directory(),
-			Context:          ctx,
-			ID:               lintersutil.GetEventGUID(ctx),
+			LinterConfig: linterConfig,
+			RepoDir:      r.Directory(),
+			Context:      ctx,
+			ID:           lintersutil.GetEventGUID(ctx),
 		}
 
 		provider, err := linters.NewGithubProvider(s.GithubClient(installationID), s.gitClientFactory, pullRequestAffectedFiles, *event)
@@ -412,7 +411,7 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 		agent.Runner = r
 		agent.Storage = s.storage
 		agent.GenLogKey = func() string {
-			return fmt.Sprintf("%s/%s/%s", agent.LinterConfig.Name, agent.PullRequestEvent.Repo.GetFullName(), agent.ID)
+			return fmt.Sprintf("%s/%s/%s", agent.LinterConfig.Name, agent.Provider.GetCodeReviewInfo().Org+"/"+agent.Provider.GetCodeReviewInfo().Repo, agent.ID)
 		}
 		agent.GenLogViewUrl = func() string {
 			// if serverAddr is not provided, return empty string
