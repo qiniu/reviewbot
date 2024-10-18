@@ -76,10 +76,12 @@ type GlobalConfig struct {
 	CopySSHKeyToContainer string `json:"copySSHKeyToContainer,omitempty"`
 }
 
+// DockerAsRunner provides the way to run the linter using the docker.
 type DockerAsRunner struct {
 	Image                string `json:"image"`
 	CopyLinterFromOrigin bool   `json:"copyLinterFromOrigin,omitempty"`
 	// CopySSHKeyToContainer is the path of the ssh key file to copy to the container.
+	// This key may be needed when go mod tidy to download the private repository or other similar cases.
 	// optional, if not empty, copy the ssh key to the container.
 	// format can be:
 	// 1. /path/to/ssh/key => will copy the key to the same path(/path/to/ssh/key) in the container
@@ -91,10 +93,21 @@ type DockerAsRunner struct {
 	CopySSHKeyToContainer string `json:"copySSHKeyToContainer,omitempty"`
 }
 
+// KubernetesAsRunner provides the way to run the linter using the kubernetes.
 type KubernetesAsRunner struct {
-	Namespace   string `json:"namespace"`
-	Image       string `json:"image"`
-	SSHKeyMount string `json:"sshkeyMount,omitempty"`
+	// Namespace is the namespace of the kubernetes.
+	// if not set, use the default namespace.
+	Namespace string `json:"namespace,omitempty"`
+	// Image is the image to start the pod, which is used to run the linter.
+	Image string `json:"image"`
+	// CopySSHKeyToPod is the path of the ssh key file to copy to the pod.
+	// This key may be needed when go mod tidy to download the private repository or other similar cases.
+	// optional, if not empty, copy the ssh key to the pod.
+	// format can be:
+	// 1. /path/to/ssh/key => will copy the key to the same path(/path/to/ssh/key) in the pod
+	// 2. /path/to/ssh/key:/another/path/to/ssh/key => will copy the key to the target path(/another/path/to/ssh/key) in the pod
+	// The destination directory will be created via mounting a emptyDir volume in the pod.
+	CopySSHKeyToPod string `json:"copySSHKeyToPod,omitempty"`
 }
 type Linter struct {
 	// Name is the linter name.
@@ -105,8 +118,8 @@ type Linter struct {
 	// Optional, if not empty, use the docker image to run the linter.
 	// e.g. "golang:1.23.4"
 	DockerAsRunner DockerAsRunner `json:"dockerAsRunner,omitempty"`
-	// KubernetesAsRunner is the kubenertes pod to run the linter.
-	// Optional, if not empty, use the kubenertes pod  to run the linter.
+	// KubernetesAsRunner is the kubernetes pod to run the linter.
+	// Optional, if not empty, use the kubernetes pod to run the linter.
 	KubernetesAsRunner KubernetesAsRunner `json:"kubernetesAsRunner,omitempty"`
 	// WorkDir is the working directory of the linter.
 	WorkDir string `json:"workDir,omitempty"`
@@ -218,7 +231,6 @@ func (c Config) GetLinterConfig(org, repo, ln string) Linter {
 	// set copy ssh key to container
 	if c.GlobalDefaultConfig.CopySSHKeyToContainer != "" {
 		linter.DockerAsRunner.CopySSHKeyToContainer = c.GlobalDefaultConfig.CopySSHKeyToContainer
-		linter.KubernetesAsRunner.SSHKeyMount = c.GlobalDefaultConfig.CopySSHKeyToContainer
 	}
 
 	if orgConfig, ok := c.CustomConfig[org]; ok {
@@ -281,8 +293,13 @@ func applyCustomConfig(legacy, custom Linter) Linter {
 	if custom.KubernetesAsRunner.Namespace != "" {
 		legacy.KubernetesAsRunner.Namespace = custom.KubernetesAsRunner.Namespace
 	}
-	if custom.KubernetesAsRunner.SSHKeyMount != "" {
-		legacy.KubernetesAsRunner.SSHKeyMount = custom.KubernetesAsRunner.SSHKeyMount
+	if custom.KubernetesAsRunner.CopySSHKeyToPod != "" {
+		legacy.KubernetesAsRunner.CopySSHKeyToPod = custom.KubernetesAsRunner.CopySSHKeyToPod
+	}
+
+	// if no namespace is set, use the default namespace
+	if legacy.KubernetesAsRunner.Image != "" && legacy.KubernetesAsRunner.Namespace == "" {
+		legacy.KubernetesAsRunner.Namespace = "default"
 	}
 
 	if custom.Name != "" {
