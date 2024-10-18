@@ -63,7 +63,7 @@ func shellcheck(ctx context.Context, a linters.Agent) error {
 		if len(unexpected) > 0 {
 			msg := lintersutil.LimitJoin(unexpected, 1000)
 			log.Warnf("unexpected output: %v", msg)
-			metric.NotifyWebhookByText(linters.ConstructUnknownMsg(linterName, a.PullRequestEvent.Repo.GetFullName(), a.PullRequestEvent.PullRequest.GetHTMLURL(), log.ReqId, msg))
+			metric.NotifyWebhookByText(linters.ConstructUnknownMsg(linterName, a.Provider.GetCodeReviewInfo().Org+"/"+a.Provider.GetCodeReviewInfo().Repo, a.Provider.GetCodeReviewInfo().URL, log.ReqId, msg))
 		}
 
 		lintResults = results

@@ -27,7 +27,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/reviewbot/internal/metric"
@@ -111,11 +110,8 @@ type Agent struct {
 	Runner runner.Runner
 	// Provider knows how to interact with the git provider. such as github, gitlab, etc.
 	Provider Provider
-
 	// LinterConfig is the linter configuration.
-	LinterConfig     config.Linter
-	PullRequestEvent github.PullRequestEvent
-
+	LinterConfig config.Linter
 	// RepoDir is the repo directory.
 	RepoDir string
 	// GenLogKey generates the log key.
@@ -157,7 +153,7 @@ func GeneralHandler(ctx context.Context, log *xlog.Logger, a Agent, execRun func
 		if msg != "" {
 			// just log the unexpected lines and notify the webhook, no need to return error
 			log.Warnf("unexpected lines: %v", msg)
-			metric.NotifyWebhookByText(ConstructUnknownMsg(linterName, a.PullRequestEvent.Repo.GetFullName(), a.PullRequestEvent.PullRequest.GetHTMLURL(), log.ReqId, msg))
+			metric.NotifyWebhookByText(ConstructUnknownMsg(linterName, a.Provider.GetCodeReviewInfo().Org+"/"+a.Provider.GetCodeReviewInfo().Repo, a.Provider.GetCodeReviewInfo().URL, log.ReqId, msg))
 		}
 	}
 
@@ -208,8 +204,8 @@ func GeneralParse(log *xlog.Logger, output []byte) (map[string][]LinterOutput, [
 func Report(ctx context.Context, a Agent, lintResults map[string][]LinterOutput) error {
 	log := lintersutil.FromContext(ctx)
 	var (
-		num        = a.PullRequestEvent.GetNumber()
-		orgRepo    = a.PullRequestEvent.Repo.GetFullName()
+		num        = a.Provider.GetCodeReviewInfo().Number
+		orgRepo    = a.Provider.GetCodeReviewInfo().Org + "/" + a.Provider.GetCodeReviewInfo().Repo
 		linterName = a.LinterConfig.Name
 	)
 	log.Infof("[%s] found total %d files with %d lint errors on repo %v", linterName, len(lintResults), countLinterErrors(lintResults), orgRepo)
@@ -222,7 +218,7 @@ func Report(ctx context.Context, a Agent, lintResults map[string][]LinterOutput)
 	log.Infof("[%s] found %d files with valid %d linter errors related to this PR %d (%s) \n", linterName, len(lintResults), countLinterErrors(lintResults), num, orgRepo)
 
 	if len(lintResults) > 0 {
-		metric.IncIssueCounter(orgRepo, linterName, a.PullRequestEvent.PullRequest.GetHTMLURL(), a.PullRequestEvent.GetPullRequest().GetHead().GetSHA(), float64(countLinterErrors(lintResults)))
+		metric.IncIssueCounter(orgRepo, linterName, a.Provider.GetCodeReviewInfo().URL, a.Provider.GetCodeReviewInfo().HeadSHA, float64(countLinterErrors(lintResults)))
 	}
 
 	return a.Provider.Report(ctx, a, lintResults)

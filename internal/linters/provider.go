@@ -30,6 +30,9 @@ type Provider interface {
 	DeleteComment(ctx context.Context, org, repo string, commentID int64) error
 	// CreateComment creates a comment in the PR/MR.
 	CreateComment(ctx context.Context, org, repo string, number int, comment *Comment) (*Comment, error)
+
+	// GetCodeReviewInfo gets the code review information for the PR/MR.
+	GetCodeReviewInfo() CodeReview
 }
 
 // Commit represents a Git commit.
@@ -46,4 +49,15 @@ type Comment struct {
 	URL       string    `json:"url,omitempty"`
 	HTMLURL   string    `json:"html_url,omitempty"`
 	IssueURL  string    `json:"issue_url,omitempty"`
+}
+
+// CodeReview has the information of a PR/MR.
+type CodeReview struct {
+	Org       string    `json:"org,omitempty"`
+	Repo      string    `json:"repo,omitempty"`
+	Number    int       `json:"number,omitempty"`
+	URL       string    `json:"url,omitempty"`
+	Author    string    `json:"author,omitempty"`
+	HeadSHA   string    `json:"head_sha,omitempty"`
+	UpdatedAt time.Time `json:"updated_at,omitempty"`
 }

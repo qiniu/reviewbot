@@ -37,11 +37,12 @@ func init() {
 }
 
 func commitMessageCheckHandler(ctx context.Context, a linters.Agent) error {
+	info := a.Provider.GetCodeReviewInfo()
 	var (
-		org    = a.PullRequestEvent.GetRepo().GetOwner().GetLogin()
-		repo   = a.PullRequestEvent.GetRepo().GetName()
-		number = a.PullRequestEvent.GetNumber()
-		author = a.PullRequestEvent.GetPullRequest().GetUser().GetLogin()
+		org    = info.Org
+		repo   = info.Repo
+		number = info.Number
+		author = info.Author
 	)
 
 	commits, err := a.Provider.ListCommits(ctx, org, repo, number)

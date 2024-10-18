@@ -250,9 +250,9 @@ func (g *GithubProvider) HandleComments(ctx context.Context, outputs map[string]
 
 func (g *GithubProvider) Report(ctx context.Context, a Agent, lintResults map[string][]LinterOutput) error {
 	linterName := a.LinterConfig.Name
-	org := a.PullRequestEvent.Repo.GetOwner().GetLogin()
-	repo := a.PullRequestEvent.Repo.GetName()
-	num := a.PullRequestEvent.GetPullRequest().GetNumber()
+	org := a.Provider.GetCodeReviewInfo().Org
+	repo := a.Provider.GetCodeReviewInfo().Repo
+	num := a.Provider.GetCodeReviewInfo().Number
 	orgRepo := fmt.Sprintf("%s/%s", org, repo)
 
 	switch a.LinterConfig.ReportFormat {
@@ -266,7 +266,7 @@ func (g *GithubProvider) Report(ctx context.Context, a Agent, lintResults map[st
 		}
 		log.Infof("[%s] create check run success, HTML_URL: %v", linterName, ch.GetHTMLURL())
 
-		metric.NotifyWebhookByText(ConstructGotchaMsg(linterName, a.PullRequestEvent.GetPullRequest().GetHTMLURL(), ch.GetHTMLURL(), lintResults))
+		metric.NotifyWebhookByText(ConstructGotchaMsg(linterName, a.Provider.GetCodeReviewInfo().URL, ch.GetHTMLURL(), lintResults))
 	case config.GithubPRReview:
 		// List existing comments
 		existedComments, err := g.ListPullRequestsComments(ctx, org, repo, num)
@@ -294,7 +294,7 @@ func (g *GithubProvider) Report(ctx context.Context, a Agent, lintResults map[st
 		}
 		log.Infof("%s delete %d comments for this PR %d (%s) \n", linterFlag, len(toDeletes), num, orgRepo)
 
-		comments := constructPullRequestComments(toAdds, linterFlag, a.PullRequestEvent.GetPullRequest().GetHead().GetSHA())
+		comments := constructPullRequestComments(toAdds, linterFlag, a.Provider.GetCodeReviewInfo().HeadSHA)
 		if len(comments) == 0 {
 			return nil
 		}
@@ -306,7 +306,7 @@ func (g *GithubProvider) Report(ctx context.Context, a Agent, lintResults map[st
 			return err
 		}
 		log.Infof("[%s] add %d comments for this PR %d (%s) \n", linterName, len(addedCmts), num, orgRepo)
-		metric.NotifyWebhookByText(ConstructGotchaMsg(linterName, a.PullRequestEvent.GetPullRequest().GetHTMLURL(), addedCmts[0].GetHTMLURL(), lintResults))
+		metric.NotifyWebhookByText(ConstructGotchaMsg(linterName, a.Provider.GetCodeReviewInfo().URL, addedCmts[0].GetHTMLURL(), lintResults))
 	case config.Quiet:
 		return nil
 	default:
@@ -411,10 +411,10 @@ func (g *GithubProvider) CreatePullReviewComments(ctx context.Context, owner str
 // CreateGithubChecks creates github checks for the specified pull request.
 func (g *GithubProvider) CreateGithubChecks(ctx context.Context, a Agent, lintErrs map[string][]LinterOutput) (*github.CheckRun, error) {
 	var (
-		headSha    = a.PullRequestEvent.GetPullRequest().GetHead().GetSHA()
-		owner      = a.PullRequestEvent.Repo.GetOwner().GetLogin()
-		repo       = a.PullRequestEvent.Repo.GetName()
-		startTime  = a.PullRequestEvent.GetPullRequest().GetUpdatedAt()
+		headSha    = a.Provider.GetCodeReviewInfo().HeadSHA
+		owner      = a.Provider.GetCodeReviewInfo().Org
+		repo       = a.Provider.GetCodeReviewInfo().Repo
+		startTime  = a.Provider.GetCodeReviewInfo().UpdatedAt
 		linterName = a.LinterConfig.Name
 	)
 	log := lintersutil.FromContext(ctx)
@@ -425,10 +425,12 @@ func (g *GithubProvider) CreateGithubChecks(ctx context.Context, a Agent, lintEr
 		annotations = annotations[:50]
 	}
 	check := github.CreateCheckRunOptions{
-		Name:      linterName,
-		HeadSHA:   headSha,
-		Status:    github.String("completed"),
-		StartedAt: &startTime,
+		Name:    linterName,
+		HeadSHA: headSha,
+		Status:  github.String("completed"),
+		StartedAt: &github.Timestamp{
+			Time: startTime,
+		},
 		CompletedAt: &github.Timestamp{
 			Time: time.Now(),
 		},
@@ -563,4 +565,16 @@ func (g *GithubProvider) CreateComment(ctx context.Context, owner string, repo s
 		HTMLURL:   c.GetHTMLURL(),
 		IssueURL:  c.GetIssueURL(),
 	}, nil
+}
+
+func (g *GithubProvider) GetCodeReviewInfo() CodeReview {
+	return CodeReview{
+		Org:       g.PullRequestEvent.Repo.GetOwner().GetLogin(),
+		Repo:      g.PullRequestEvent.Repo.GetName(),
+		Number:    g.PullRequestEvent.GetPullRequest().GetNumber(),
+		Author:    g.PullRequestEvent.GetPullRequest().GetUser().GetLogin(),
+		URL:       g.PullRequestEvent.GetPullRequest().GetHTMLURL(),
+		HeadSHA:   g.PullRequestEvent.GetPullRequest().GetHead().GetSHA(),
+		UpdatedAt: g.PullRequestEvent.GetPullRequest().GetUpdatedAt().Time,
+	}
 }
