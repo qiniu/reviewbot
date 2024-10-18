@@ -52,7 +52,7 @@ type Server struct {
 	serverAddr string
 
 	dockerRunner     runner.Runner
-	KubenertesRunner runner.Runner
+	kubernetesRunner runner.Runner
 	storage          storage.Storage
 
 	webhookSecret []byte
@@ -66,6 +66,7 @@ type Server struct {
 	debug bool
 
 	repoCacheDir string
+	kubeConfig   string
 }
 
 var (
@@ -73,40 +74,35 @@ var (
 	prMap = make(map[string]context.CancelFunc)
 )
 
-func (s *Server) checkKubenertes(kubeconfig string) {
-	var namespaces []string
+func (s *Server) initKubernetesRunner() {
+	var toChecks []config.KubernetesAsRunner
 	for _, customConfig := range s.config.CustomConfig {
 		for _, linter := range customConfig.Linters {
-			if linter.KubernetesAsRunner.Namespace != "" {
-				namespaces = append(namespaces, linter.KubernetesAsRunner.Namespace)
+			if linter.KubernetesAsRunner.Image != "" {
+				toChecks = append(toChecks, linter.KubernetesAsRunner)
 			}
-
 		}
 	}
 
-	if len(namespaces) > 0 {
-		k8sRunner, err := runner.NewKubenertesRunner(kubeconfig)
-		if err != nil {
-			log.Fatalf("failed to init kube runner: %v", err)
-		}
-		s.KubenertesRunner = k8sRunner
+	if len(toChecks) == 0 {
+		return
 	}
-	go func() {
-		ctx := context.Background()
-		for _, ns := range namespaces {
-			linterConfig := &config.Linter{
-				KubernetesAsRunner: config.KubernetesAsRunner{
-					Namespace: ns,
-				},
-			}
-			err := s.KubenertesRunner.Prepare(ctx, linterConfig)
-			if err != nil {
-				log.Fatalf("check namespace(%s) failed : %v", ns, err)
-			}
-			log.Infof("check namespace(%s) success", ns)
-		}
-	}()
 
+	kubeRunner, err := runner.NewKubernetesRunner(s.kubeConfig)
+	if err != nil {
+		log.Fatalf("failed to init kubernetes runner: %v", err)
+	}
+	s.kubernetesRunner = kubeRunner
+
+	for _, toCheck := range toChecks {
+		if err := s.kubernetesRunner.Prepare(context.Background(), &config.Linter{
+			KubernetesAsRunner: toCheck,
+		}); err != nil {
+			log.Fatalf("failed to check permission for kubeconfig: %v", err)
+		}
+	}
+
+	// TODO(CarlJi): check kubectl installed since kubernetes runner depends on it.
 }
 
 func (s *Server) initDockerRunner() {
@@ -441,12 +437,14 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 			continue
 		}
 
-		r := runner.NewLocalRunner()
-		if linterConfig.DockerAsRunner.Image != "" {
+		var r runner.Runner
+		switch {
+		case linterConfig.DockerAsRunner.Image != "":
 			r = s.dockerRunner
-		}
-		if linterConfig.KubernetesAsRunner.Image != "" {
-			r = s.KubenertesRunner
+		case linterConfig.KubernetesAsRunner.Image != "":
+			r = s.kubernetesRunner
+		default:
+			r = runner.NewLocalRunner()
 		}
 		agent.Runner = r
 		agent.Storage = s.storage
