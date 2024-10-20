@@ -6,27 +6,30 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/lintersutil"
 	authorizationv1 "k8s.io/api/authorization/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/retry"
 )
 
 var (
-	ErrPermissionDenied = errors.New("permission check failed: not allowed to create Job in the specified namespace")
+	ErrPermissionDenied    = errors.New("permission check failed: not allowed to create Job in the specified namespace")
+	ErrInvalidCopySSHKey   = errors.New("invalid copy ssh key format")
+	ErrUnexpectedPodStatus = errors.New("unexpected pod status")
 )
 
 type KubernetesRunner struct {
@@ -68,20 +71,21 @@ func (k *KubernetesRunner) Run(ctx context.Context, cfg *config.Linter) (io.Read
 	log.Infof("Script content: \n%s", scriptContent)
 	k.script = scriptContent
 
-	// create default config
-	// TODO(wwcchh0123): support unmarshalling YAML into structures in the future
-	job := k.initDefaultPodConfig(cfg)
+	job := k.newJob(cfg)
+	job.Name = strings.ToLower(fmt.Sprintf("%s-%s-%s-%d-%s", cfg.Org, cfg.Repo, cfg.Name, cfg.Number, log.ReqId))
 	containerName := job.Spec.Template.Spec.Containers[0].Name
 
 	var srcPath, dstPath string
 	if cfg.KubernetesAsRunner.CopySSHKeyToPod != "" {
 		paths := strings.Split(cfg.KubernetesAsRunner.CopySSHKeyToPod, ":")
-		if len(paths) == 2 {
+		switch len(paths) {
+		case 2:
 			srcPath, dstPath = paths[0], paths[1]
-		} else if len(paths) == 1 {
+		case 1:
 			srcPath, dstPath = paths[0], paths[0]
-		} else {
-			return nil, fmt.Errorf("invalid copy ssh key format: %s", cfg.DockerAsRunner.CopySSHKeyToContainer)
+		default:
+			log.Errorf("invalid copy ssh key format: %s", cfg.KubernetesAsRunner.CopySSHKeyToPod)
+			return nil, ErrInvalidCopySSHKey
 		}
 
 		log.Infof("copy ssh key to pod: src: %s, dst: %s", srcPath, dstPath)
@@ -99,13 +103,12 @@ func (k *KubernetesRunner) Run(ctx context.Context, cfg *config.Linter) (io.Read
 		})
 	}
 
-	createdJob, err := k.client.BatchV1().Jobs(cfg.KubernetesAsRunner.Namespace).Create(ctx, job, metav1.CreateOptions{})
+	createdJob, err := k.createOrRecreateJobAndWaitForPod(ctx, job, cfg.KubernetesAsRunner.Namespace)
 	if err != nil {
-		log.Errorf("create pod failed: %v", err)
 		return nil, err
 	}
 
-	podName := k.getJobNameWithPrefix(ctx, cfg.KubernetesAsRunner.Namespace, createdJob.Name)
+	podName := k.getPodName(ctx, cfg.KubernetesAsRunner.Namespace, createdJob.Name)
 	namespace := cfg.KubernetesAsRunner.Namespace
 
 	// copy ssh to pod
@@ -128,7 +131,7 @@ func (k *KubernetesRunner) Run(ctx context.Context, cfg *config.Linter) (io.Read
 	// execute command
 	err = k.execCommandOnPod(ctx, namespace, podName, containerName, cfg.WorkDir, scriptContent)
 	if err != nil {
-		log.Errorf("failed to exec commannd to pod :%v", err)
+		log.Errorf("failed to exec command to pod :%v", err)
 		return nil, err
 	}
 
@@ -208,18 +211,23 @@ func copyToPod(ctx context.Context, namespace, podName, containerName, srcPath, 
 	return nil
 }
 
-func (k *KubernetesRunner) getJobNameWithPrefix(ctx context.Context, namespace string, prefix string) string {
-	time.Sleep(10 * time.Second)
-	jobs, err := k.client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+func (k *KubernetesRunner) getPodName(ctx context.Context, namespace string, jobName string) string {
+	log := lintersutil.FromContext(ctx)
+
+	labelSelector := "job-name=" + jobName
+	pods, err := k.client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: labelSelector,
+	})
 	if err != nil {
-		log.Fatalf("Failed to list jobs: %v", err)
+		log.Errorf("failed to get pod list: %v", err)
+		return ""
 	}
 
-	for _, job := range jobs.Items {
-		if strings.HasPrefix(job.Name, prefix) {
-			return job.Name
-		}
+	if len(pods.Items) > 0 {
+		return pods.Items[0].Name
 	}
+
+	log.Errorf("no pod found for job: %s", jobName)
 	return ""
 }
 
@@ -230,10 +238,10 @@ func (k *KubernetesRunner) execCommandOnPod(ctx context.Context, namespace, podN
 	cmd := exec.CommandContext(ctx, "kubectl", "exec", "-n", namespace, podName, "-c", containerName, "--", "bash", "-c", fmt.Sprintf("echo '%s' > %s/script.sh && chmod +x %s/script.sh", commandStr, workDir, workDir))
 	log.Infof("Executing command: %s\n", cmd.Args)
 
-	_, execErr := cmd.CombinedOutput()
+	output, execErr := cmd.CombinedOutput()
 	if execErr != nil {
-		log.Errorf("Error executing command,marked and continue: %v\n", execErr)
-		return execErr
+		log.Errorf("Error executing command,marked and continue: %v\n, output:\n%s\n", execErr, output)
+		// just marked and continue
 	}
 
 	// exec command script
@@ -243,19 +251,32 @@ func (k *KubernetesRunner) execCommandOnPod(ctx context.Context, namespace, podN
 	c.Stderr = &b
 	err := c.Run()
 	if err != nil {
-		log.Errorf("Error executing command,marked and continue: %v\n", err)
+		log.Errorf("Error executing command, marked and continue, err: %v, output:\n%s\n", err, b.String())
+		// just marked and continue
 	}
 	return nil
 }
 
-func (k *KubernetesRunner) initDefaultPodConfig(cfg *config.Linter) *batchv1.Job {
+func (k *KubernetesRunner) newJob(cfg *config.Linter) *batchv1.Job {
+	currentTime := time.Now().UTC().Format(time.RFC3339)
+	// see https://github.com/kubefree/kubefree
+	kubefreeLabel := "sleepmode.kubefree.com/delete-after"
+	kubefreeAnnotation := "sleepmode.kubefree.com/activity-status"
+
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      uuid.New().String(),
 			Namespace: cfg.KubernetesAsRunner.Namespace,
 		},
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						kubefreeLabel: "24h",
+					},
+					Annotations: map[string]string{
+						kubefreeAnnotation: fmt.Sprintf(`{"LastActivityTime": "%s"}`, currentTime),
+					},
+				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
@@ -286,4 +307,86 @@ func (k *KubernetesRunner) initDefaultPodConfig(cfg *config.Linter) *batchv1.Job
 			BackoffLimit: int32Ptr(0),
 		},
 	}
+}
+
+func (k *KubernetesRunner) createOrRecreateJobAndWaitForPod(ctx context.Context, job *batchv1.Job, namespace string) (*batchv1.Job, error) {
+	log := lintersutil.FromContext(ctx)
+
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+
+	var createdJob *batchv1.Job
+	_, err := k.client.BatchV1().Jobs(namespace).Get(ctx, job.Name, metav1.GetOptions{})
+	if err != nil {
+		if !k8serrors.IsNotFound(err) {
+			return nil, err
+		}
+	} else {
+		// job already exists, delete it first
+		deletePolicy := metav1.DeletePropagationForeground
+		deleteOptions := metav1.DeleteOptions{PropagationPolicy: &deletePolicy}
+		err = k.client.BatchV1().Jobs(namespace).Delete(ctx, job.Name, deleteOptions)
+		if err != nil {
+			return nil, err
+		}
+
+		// wait for job to be deleted
+		err = wait.PollUntilContextTimeout(ctx, time.Second, time.Minute, true, func(ctx context.Context) (bool, error) {
+			_, err := k.client.BatchV1().Jobs(namespace).Get(ctx, job.Name, metav1.GetOptions{})
+			if k8serrors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, err
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	err = retry.OnError(retry.DefaultRetry, k8serrors.IsServerTimeout, func() error {
+		createdJob, err = k.client.BatchV1().Jobs(namespace).Create(ctx, job, metav1.CreateOptions{})
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	log.Infof("created job: %s", createdJob.Name)
+
+	// wait for pod to be running
+	var pod corev1.Pod
+	err = wait.PollUntilContextTimeout(ctx, time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
+		podList, err := k.client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
+			LabelSelector: "job-name=" + createdJob.Name,
+		})
+		if err != nil {
+			return false, err
+		}
+
+		if len(podList.Items) == 0 {
+			return false, nil
+		}
+
+		pod = podList.Items[0]
+		switch pod.Status.Phase {
+		case corev1.PodRunning:
+			return true, nil
+		case corev1.PodFailed, corev1.PodSucceeded, corev1.PodUnknown:
+			log.Errorf("unexpected pod status: %s", pod.Status.Phase)
+			return false, ErrUnexpectedPodStatus
+		case corev1.PodPending:
+			return false, nil
+		default:
+			return false, nil
+		}
+	})
+
+	if err != nil {
+		log.Errorf("failed to wait for pod to be running: %v", err)
+		return nil, err
+	}
+
+	log.Infof("pod of job: %s is running", pod.GetName())
+
+	return createdJob, nil
 }

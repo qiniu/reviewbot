@@ -112,6 +112,12 @@ type KubernetesAsRunner struct {
 type Linter struct {
 	// Name is the linter name.
 	Name string
+	// Org is the organization which the linter will run on.
+	Org string `json:"-"`
+	// Repo is the repository which the linter will run on.
+	Repo string `json:"-"`
+	// Number is the number of PR or MR.
+	Number int `json:"-"`
 	// Enable is whether to enable this linter, if false, linter still run but not report.
 	Enable *bool `json:"enable,omitempty"`
 	// DockerAsRunner is the docker image to run the linter.
@@ -213,6 +219,8 @@ func (c Config) GetLinterConfig(org, repo, ln string) Linter {
 		ReportFormat: c.GlobalDefaultConfig.GithubReportType,
 		Modifier:     NewBaseModifier(),
 		Name:         ln,
+		Org:          org,
+		Repo:         repo,
 	}
 
 	// set golangci-lint config path if exists
