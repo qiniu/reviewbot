@@ -29,6 +29,7 @@ spec:
             - -debug=true
             - -s3-credentials-file=/root/.aws/credentials.json
             - -server-addr=http://qiniu-x.jfcs-k8s-qa1.qiniu.io # this is an intranet domain of qiniu.
+            - -kube-config=/root/.kube/config
           env:
             - name: GITHUB_WEBHOOK_SECRET
               valueFrom:
@@ -82,6 +83,9 @@ spec:
             - name: aws-credentials-volume
               mountPath: /root/.aws/credentials.json
               subPath: credentials.json
+            - name: kube-config
+              mountPath: /root/.kube/config
+              subPath: config
         - name: dind
           image: aslan-spock-register.qiniu.io/qa/docker:27.2.0-dind
           securityContext:
@@ -137,6 +141,9 @@ spec:
         - name: aws-credentials-volume
           configMap:
             name: s3credentials-cm
+        - name: kube-config
+          secret:
+            secretName: kube-config
 
 ---
 apiVersion: v1
