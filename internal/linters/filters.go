@@ -172,3 +172,16 @@ func languageRelated(linterName string, exts map[string]bool) bool {
 	}
 	return false
 }
+
+func referenceFilter(output string, a Agent) (string, bool) {
+	if a.LinterReference == nil {
+		return "", false
+	}
+
+	for re, value := range a.LinterReference {
+		if re.MatchString(output) {
+			return value, true
+		}
+	}
+	return "", false
+}

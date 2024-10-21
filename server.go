@@ -27,6 +27,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sync"
 	"time"
@@ -65,8 +66,9 @@ type Server struct {
 
 	debug bool
 
-	repoCacheDir string
-	kubeConfig   string
+	repoCacheDir    string
+	kubeConfig      string
+	linterReference map[*regexp.Regexp]string
 }
 
 var (
@@ -475,6 +477,8 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 			}
 			return s.serverAddr + "/view/" + agent.GenLogKey()
 		}
+
+		agent.LinterReference = s.linterReference
 
 		if err := fn(ctx, agent); err != nil {
 			if errors.Is(err, context.Canceled) {
