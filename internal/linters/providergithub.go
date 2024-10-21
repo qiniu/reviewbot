@@ -323,7 +323,10 @@ func (g *GithubProvider) IsRelated(file string, line int, startLine int) bool {
 func (g *GithubProvider) GetFiles(predicate func(filepath string) bool) []string {
 	var files []string
 	for _, file := range g.PullRequestChangedFiles {
-		if (predicate == nil && file.GetStatus() != "removed") || predicate(file.GetFilename()) {
+		if predicate == nil || predicate(file.GetFilename()) {
+			if file.GetStatus() == "removed" {
+				continue
+			}
 			files = append(files, file.GetFilename())
 		}
 	}

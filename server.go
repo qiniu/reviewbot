@@ -102,7 +102,22 @@ func (s *Server) initKubernetesRunner() {
 		}
 	}
 
-	// TODO(CarlJi): check kubectl installed since kubernetes runner depends on it.
+	// check kubectl installed
+	msg := "kubectl not installed or cannot be executed, please install kubectl first since your reviewbot config(%s) depends on it"
+	if err := checkKubectlInstalled(); err != nil {
+		log.Fatalf(msg, s.kubeConfig)
+	}
+
+	log.Infof("init kubernetes runner success")
+}
+
+// check kubectl installed
+func checkKubectlInstalled() error {
+	cmd := exec.Command("kubectl", "version", "--client")
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *Server) initDockerRunner() {
@@ -134,6 +149,8 @@ func (s *Server) initDockerRunner() {
 			s.pullImageWithRetry(ctx, image)
 		}
 	}()
+
+	log.Infof("init docker runner success")
 }
 
 func (s *Server) pullImageWithRetry(ctx context.Context, image string) {
