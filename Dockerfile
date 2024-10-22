@@ -46,7 +46,7 @@ COPY reviewbot /reviewbot
 
 # install kubectl
 ARG KUBECTL_VERSION=v1.28.3
-RUN curl -fsSL -o kubectl https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl \
+RUN curl -fsSL -o kubectl https://dl.k8s.io/release/v1.28.3/bin/linux/amd64/kubectl \
     && chmod +x kubectl \
     && mv kubectl /usr/local/bin/
 

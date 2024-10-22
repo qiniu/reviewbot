@@ -71,8 +71,15 @@ func (k *KubernetesRunner) Run(ctx context.Context, cfg *config.Linter) (io.Read
 	log.Infof("Script content: \n%s", scriptContent)
 	k.script = scriptContent
 
-	job := k.newJob(cfg)
-	job.Name = strings.ToLower(fmt.Sprintf("%s-%s-%s-%d-%s", cfg.Org, cfg.Repo, cfg.Name, cfg.Number, log.ReqId))
+	// create script configmap
+	cmName := strings.ToLower(fmt.Sprintf("%s-%s-%s-%d-%s", cfg.Org, cfg.Repo, cfg.Name, cfg.Number, log.ReqId))
+	scriptConfigMap, err := k.createScriptConfigMap(ctx, cfg, cmName, scriptContent)
+	if err != nil {
+		return nil, err
+	}
+
+	jobName := strings.ToLower(fmt.Sprintf("%s-%s-%s-%d-%s", cfg.Org, cfg.Repo, cfg.Name, cfg.Number, log.ReqId))
+	job := k.newJob(cfg, jobName, scriptConfigMap.Name)
 	containerName := job.Spec.Template.Spec.Containers[0].Name
 
 	var srcPath, dstPath string
@@ -121,26 +128,20 @@ func (k *KubernetesRunner) Run(ctx context.Context, cfg *config.Linter) (io.Read
 	}
 
 	// copy repo code to pod
-	copyPath := filepath.Dir(cfg.WorkDir)
-	err = copyToPod(ctx, namespace, podName, containerName, copyPath+"/.", copyPath)
+	err = k.copyCodeToPod(ctx, cfg.WorkDir, namespace, podName, cfg.WorkDir)
 	if err != nil {
-		log.Errorf("failed to copy code to pod :%v", err)
+		log.Errorf("failed to copy code to pod: %v", err)
 		return nil, err
 	}
 
-	// execute command
-	err = k.execCommandOnPod(ctx, namespace, podName, containerName, cfg.WorkDir, scriptContent)
+	// wait for job completion
+	err = k.waitForJobCompletion(ctx, cfg.KubernetesAsRunner.Namespace, createdJob.Name)
 	if err != nil {
-		log.Errorf("failed to exec command to pod :%v", err)
+		log.Errorf("wait for job completion failed: %v", err)
 		return nil, err
 	}
 
-	logs, err := k.client.CoreV1().Pods(cfg.KubernetesAsRunner.Namespace).GetLogs(podName, &corev1.PodLogOptions{}).Do(ctx).Raw()
-	if err != nil {
-		return nil, err
-	}
-
-	return io.NopCloser(bytes.NewReader(logs)), nil
+	return k.getPodLogs(ctx, cfg.KubernetesAsRunner.Namespace, podName)
 }
 
 func (k *KubernetesRunner) GetFinalScript() string {
@@ -196,6 +197,28 @@ func loadClusterConfig(masterURL, kubeConfig string) (*rest.Config, error) {
 func int32Ptr(i int32) *int32 {
 	return &i
 }
+func (k *KubernetesRunner) copyCodeToPod(ctx context.Context, srcPath, namespace, podName, destPath string) error {
+	log := lintersutil.FromContext(ctx)
+	// ensure srcPath ends with "/" so that it copies the directory contents instead of the directory itself
+	if !strings.HasSuffix(srcPath, "/.") {
+		srcPath += "/."
+	}
+
+	log.Infof("copy code to pod: src: %s, dest: %s", srcPath, destPath)
+	cmd := exec.CommandContext(ctx, "kubectl", "cp", srcPath, fmt.Sprintf("%s/%s:%s", namespace, podName, destPath), "-c", "wait-for-code")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		log.Errorf("failed to copy code to pod: %v, output: %s, command: %s", err, string(out), cmd.Args)
+		return err
+	}
+
+	// create a marker file to indicate that the code has been copied
+	cmd = exec.CommandContext(ctx, "kubectl", "exec", "-n", namespace, podName, "-c", "wait-for-code", "--", "touch", "/workspace/.code-copied")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		log.Errorf("failed to create code-copied marker file: %v, output: %s, command: %s", err, string(out), cmd.Args)
+		return err
+	}
+	return nil
+}
 
 func copyToPod(ctx context.Context, namespace, podName, containerName, srcPath, dstPath string) error {
 	log := lintersutil.FromContext(ctx)
@@ -209,6 +232,52 @@ func copyToPod(ctx context.Context, namespace, podName, containerName, srcPath, 
 	}
 
 	return nil
+}
+
+func (k *KubernetesRunner) waitForJobCompletion(ctx context.Context, namespace, jobName string) error {
+	return wait.PollUntilContextTimeout(ctx, time.Second, 10*time.Minute, true, func(ctx context.Context) (bool, error) {
+		job, err := k.client.BatchV1().Jobs(namespace).Get(ctx, jobName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		if job.Status.Succeeded > 0 || job.Status.Failed > 0 {
+			return true, nil
+		}
+		return false, nil
+	})
+}
+
+func (k *KubernetesRunner) createScriptConfigMap(ctx context.Context, cfg *config.Linter, name, scriptContent string) (*corev1.ConfigMap, error) {
+	_, err := k.client.CoreV1().ConfigMaps(cfg.KubernetesAsRunner.Namespace).Get(ctx, name, metav1.GetOptions{})
+	if err == nil {
+		err = k.client.CoreV1().ConfigMaps(cfg.KubernetesAsRunner.Namespace).Delete(ctx, name, metav1.DeleteOptions{})
+		if err != nil {
+			return nil, err
+		}
+	} else if !k8serrors.IsNotFound(err) {
+		return nil, err
+	}
+
+	// create new configmap
+	configMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: cfg.KubernetesAsRunner.Namespace,
+		},
+		Data: map[string]string{
+			"script.sh": scriptContent,
+		},
+	}
+
+	return k.client.CoreV1().ConfigMaps(cfg.KubernetesAsRunner.Namespace).Create(ctx, configMap, metav1.CreateOptions{})
+}
+
+func (k *KubernetesRunner) getPodLogs(ctx context.Context, namespace, podName string) (io.ReadCloser, error) {
+	logs, err := k.client.CoreV1().Pods(namespace).GetLogs(podName, &corev1.PodLogOptions{}).Do(ctx).Raw()
+	if err != nil {
+		return nil, err
+	}
+	return io.NopCloser(bytes.NewReader(logs)), nil
 }
 
 func (k *KubernetesRunner) getPodName(ctx context.Context, namespace string, jobName string) string {
@@ -231,84 +300,6 @@ func (k *KubernetesRunner) getPodName(ctx context.Context, namespace string, job
 	return ""
 }
 
-func (k *KubernetesRunner) execCommandOnPod(ctx context.Context, namespace, podName, containerName, workDir, commandStr string) error {
-	log := lintersutil.FromContext(ctx)
-
-	// create command script on pod
-	cmd := exec.CommandContext(ctx, "kubectl", "exec", "-n", namespace, podName, "-c", containerName, "--", "bash", "-c", fmt.Sprintf("echo '%s' > %s/script.sh && chmod +x %s/script.sh", commandStr, workDir, workDir))
-	log.Infof("Executing command: %s\n", cmd.Args)
-
-	output, execErr := cmd.CombinedOutput()
-	if execErr != nil {
-		log.Errorf("Error executing command,marked and continue: %v\n, output:\n%s\n", execErr, output)
-		// just marked and continue
-	}
-
-	// exec command script
-	c := exec.CommandContext(ctx, "kubectl", "exec", "-n", namespace, podName, "-c", containerName, "--", "bash", "-c", fmt.Sprintf("bash %s/script.sh  > /proc/1/fd/1", workDir))
-	var b bytes.Buffer
-	c.Stdout = &b
-	c.Stderr = &b
-	err := c.Run()
-	if err != nil {
-		log.Errorf("Error executing command, marked and continue, err: %v, output:\n%s\n", err, b.String())
-		// just marked and continue
-	}
-	return nil
-}
-
-func (k *KubernetesRunner) newJob(cfg *config.Linter) *batchv1.Job {
-	currentTime := time.Now().UTC().Format(time.RFC3339)
-	// see https://github.com/kubefree/kubefree
-	kubefreeLabel := "sleepmode.kubefree.com/delete-after"
-	kubefreeAnnotation := "sleepmode.kubefree.com/activity-status"
-
-	return &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: cfg.KubernetesAsRunner.Namespace,
-		},
-		Spec: batchv1.JobSpec{
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						kubefreeLabel: "24h",
-					},
-					Annotations: map[string]string{
-						kubefreeAnnotation: fmt.Sprintf(`{"LastActivityTime": "%s"}`, currentTime),
-					},
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:       "runner",
-							Image:      cfg.KubernetesAsRunner.Image,
-							Command:    []string{"/bin/sh", "-c"},
-							Args:       []string{"sleep 3600"},
-							WorkingDir: cfg.WorkDir,
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "code-dir",
-									MountPath: cfg.WorkDir,
-								},
-							},
-						},
-					},
-					RestartPolicy: corev1.RestartPolicyNever,
-					Volumes: []corev1.Volume{
-						{
-							Name: "code-dir",
-							VolumeSource: corev1.VolumeSource{
-								EmptyDir: &corev1.EmptyDirVolumeSource{},
-							},
-						},
-					},
-				},
-			},
-			BackoffLimit: int32Ptr(0),
-		},
-	}
-}
-
 func (k *KubernetesRunner) createOrRecreateJobAndWaitForPod(ctx context.Context, job *batchv1.Job, namespace string) (*batchv1.Job, error) {
 	log := lintersutil.FromContext(ctx)
 
@@ -322,7 +313,7 @@ func (k *KubernetesRunner) createOrRecreateJobAndWaitForPod(ctx context.Context,
 			return nil, err
 		}
 	} else {
-		// job already exists, delete it first
+		log.Infof("job %s already exists, delete it first", job.Name)
 		deletePolicy := metav1.DeletePropagationForeground
 		deleteOptions := metav1.DeleteOptions{PropagationPolicy: &deletePolicy}
 		err = k.client.BatchV1().Jobs(namespace).Delete(ctx, job.Name, deleteOptions)
@@ -353,7 +344,7 @@ func (k *KubernetesRunner) createOrRecreateJobAndWaitForPod(ctx context.Context,
 
 	log.Infof("created job: %s", createdJob.Name)
 
-	// wait for pod to be running
+	// wait for pod to be initialized
 	var pod corev1.Pod
 	err = wait.PollUntilContextTimeout(ctx, time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
 		podList, err := k.client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
@@ -368,25 +359,128 @@ func (k *KubernetesRunner) createOrRecreateJobAndWaitForPod(ctx context.Context,
 		}
 
 		pod = podList.Items[0]
-		switch pod.Status.Phase {
-		case corev1.PodRunning:
-			return true, nil
-		case corev1.PodFailed, corev1.PodSucceeded, corev1.PodUnknown:
+
+		// check init container status
+		for _, initStatus := range pod.Status.InitContainerStatuses {
+			if initStatus.State.Running != nil {
+				return true, nil
+			}
+		}
+
+		// if pod status is abnormal, return error
+		if pod.Status.Phase == corev1.PodFailed || pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodUnknown {
 			log.Errorf("unexpected pod status: %s", pod.Status.Phase)
 			return false, ErrUnexpectedPodStatus
-		case corev1.PodPending:
-			return false, nil
-		default:
-			return false, nil
 		}
+
+		// pod is still waiting or initializing
+		return false, nil
 	})
 
 	if err != nil {
-		log.Errorf("failed to wait for pod to be running: %v", err)
+		log.Errorf("failed to wait for pod to be ready: %v", err)
 		return nil, err
 	}
 
-	log.Infof("pod of job: %s is running", pod.GetName())
+	log.Infof("pod of job: %s is ready", pod.GetName())
 
 	return createdJob, nil
+}
+
+func (k *KubernetesRunner) newJob(cfg *config.Linter, jobName, scriptConfigMapName string) *batchv1.Job {
+	currentTime := time.Now().UTC().Format(time.RFC3339)
+	// see https://github.com/kubefree/kubefree
+	kubefreeLabel := "sleepmode.kubefree.com/delete-after"
+	kubefreeAnnotation := "sleepmode.kubefree.com/activity-status"
+	return &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: cfg.KubernetesAsRunner.Namespace,
+			Name:      jobName,
+		},
+		Spec: batchv1.JobSpec{
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						kubefreeLabel: "24h",
+					},
+					Annotations: map[string]string{
+						kubefreeAnnotation: fmt.Sprintf(`{"LastActivityTime": "%s"}`, currentTime),
+					},
+				},
+				Spec: corev1.PodSpec{
+					Volumes: []corev1.Volume{
+						{
+							Name: "code-mount",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						},
+						{
+							Name: "script-config",
+							VolumeSource: corev1.VolumeSource{
+								ConfigMap: &corev1.ConfigMapVolumeSource{
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: scriptConfigMapName,
+									},
+									Items: []corev1.KeyToPath{
+										{
+											Key:  "script.sh",
+											Path: "script.sh",
+										},
+									},
+									DefaultMode: int32Ptr(0755),
+								},
+							},
+						},
+						{
+							Name: "code-flag",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						},
+					},
+					InitContainers: []corev1.Container{
+						{
+							Name:       "wait-for-code",
+							Image:      cfg.KubernetesAsRunner.Image,
+							Command:    []string{"sh", "-c", "while [ ! -f /workspace/.code-copied ]; do sleep 1; done"},
+							WorkingDir: cfg.WorkDir,
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "code-mount",
+									MountPath: cfg.WorkDir,
+								},
+								{
+									Name:      "code-flag",
+									MountPath: "/workspace",
+								},
+							},
+						},
+					},
+					Containers: []corev1.Container{
+						{
+							Name:       "linter",
+							Image:      cfg.KubernetesAsRunner.Image,
+							Command:    []string{"/bin/sh", "-c"},
+							Args:       []string{"/scripts/script.sh"},
+							WorkingDir: cfg.WorkDir,
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "code-mount",
+									MountPath: cfg.WorkDir,
+								},
+								{
+									Name:      "script-config",
+									MountPath: "/scripts/script.sh",
+									SubPath:   "script.sh",
+								},
+							},
+						},
+					},
+					RestartPolicy: corev1.RestartPolicyNever,
+				},
+			},
+			BackoffLimit: int32Ptr(0),
+		},
+	}
 }
