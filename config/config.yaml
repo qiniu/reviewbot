@@ -117,5 +117,5 @@ customConfig: # custom config for specific orgs or repos
       golangci-lint:
         enable: true
         kubernetesAsRunner:
-          image: "aslan-spock-register.qiniu.io/reviewbot/base:golangci-lint.1.59.1"
+          image: "aslan-spock-register.qiniu.io/reviewbot/base:golangci-lint.1.61.0"
           namespace: "reviewbot"

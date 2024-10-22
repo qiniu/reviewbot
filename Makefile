@@ -33,10 +33,10 @@ staticcheck: check-staticcheck
 	staticcheck ./...
 
 build: check-go
-	CGO_ENABLED=0 go build -v -trimpath -ldflags "$(LDFLAGS)" -o ./reviewbot .
+	CGO_ENABLED=0 go build -v -ldflags "$(LDFLAGS)" -o ./reviewbot .
 
 linux-build: check-go
-	GOOS=linux CGO_ENABLED=0 go build -v -trimpath -ldflags "$(LDFLAGS)" -o ./reviewbot .
+	GOOS=linux CGO_ENABLED=0 go build -v -ldflags "$(LDFLAGS)" -o ./reviewbot .
 
 docker-build-latest: check-docker linux-build
 	docker builder build --push -t $(DOCKER_IMAGE):$(TAG) -t $(DOCKER_IMAGE):latest .
