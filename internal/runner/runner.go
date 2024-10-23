@@ -34,7 +34,8 @@ import (
 	"github.com/qiniu/reviewbot/internal/lintersutil"
 )
 
-// Runner defines the interface for how to run the linter.
+// Runner defines the interface for executing linters.
+// It is not concurrency-safe. Use Clone() to obtain a new instance for each linter when running concurrently.
 type Runner interface {
 	// Prepare prepares the linter for running.
 	Prepare(ctx context.Context, cfg *config.Linter) error
@@ -43,6 +44,9 @@ type Runner interface {
 	// GetFinalScript returns the final script to be executed.
 	// It should be called after Run function. and it's used for logging and debugging.
 	GetFinalScript() string
+	// Clone returns a new Runner instance with the same configuration to keep concurrency safe.
+	// It's used for creating a new runner for each linter.
+	Clone() Runner
 }
 
 // LocalRunner is a runner that runs the linter locally.
@@ -51,6 +55,10 @@ type LocalRunner struct {
 }
 
 func NewLocalRunner() Runner {
+	return &LocalRunner{}
+}
+
+func (l *LocalRunner) Clone() Runner {
 	return &LocalRunner{}
 }
 

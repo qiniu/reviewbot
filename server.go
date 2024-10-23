@@ -51,9 +51,12 @@ type Server struct {
 	// e.g. https://domain
 	serverAddr string
 
-	dockerRunner     runner.Runner
-	kubernetesRunner runner.Runner
-	storage          storage.Storage
+	// getDockerRunner returns the docker runner
+	getDockerRunner func() runner.Runner
+	// getKubernetesRunner returns the kubernetes runner
+	getKubernetesRunner func() runner.Runner
+
+	storage storage.Storage
 
 	webhookSecret []byte
 
@@ -92,10 +95,13 @@ func (s *Server) initKubernetesRunner() {
 	if err != nil {
 		log.Fatalf("failed to init kubernetes runner: %v", err)
 	}
-	s.kubernetesRunner = kubeRunner
+
+	s.getKubernetesRunner = func() runner.Runner {
+		return kubeRunner.Clone()
+	}
 
 	for _, toCheck := range toChecks {
-		if err := s.kubernetesRunner.Prepare(context.Background(), &config.Linter{
+		if err := kubeRunner.Prepare(context.Background(), &config.Linter{
 			KubernetesAsRunner: toCheck,
 		}); err != nil {
 			log.Fatalf("failed to check permission for kubeconfig: %v", err)
@@ -130,30 +136,33 @@ func (s *Server) initDockerRunner() {
 		}
 	}
 
+	var dockerRunner runner.Runner
 	if len(images) > 0 {
 		dockerRunner, err := runner.NewDockerRunner(nil)
 		if err != nil {
 			log.Fatalf("failed to init docker runner: %v", err)
 		}
 
-		s.dockerRunner = dockerRunner
+		s.getDockerRunner = func() runner.Runner {
+			return dockerRunner.Clone()
+		}
 	}
 
-	if s.dockerRunner == nil {
+	if dockerRunner == nil {
 		return
 	}
 
 	go func() {
 		ctx := context.Background()
 		for _, image := range images {
-			s.pullImageWithRetry(ctx, image)
+			s.pullImageWithRetry(ctx, image, dockerRunner)
 		}
 	}()
 
 	log.Infof("init docker runner success")
 }
 
-func (s *Server) pullImageWithRetry(ctx context.Context, image string) {
+func (s *Server) pullImageWithRetry(ctx context.Context, image string, dockerRunner runner.Runner) {
 	maxRetries := 5
 	baseDelay := time.Second * 2
 	maxDelay := time.Minute * 2
@@ -167,7 +176,7 @@ func (s *Server) pullImageWithRetry(ctx context.Context, image string) {
 			},
 		}
 
-		err := s.dockerRunner.Prepare(ctx, linterConfig)
+		err := dockerRunner.Prepare(ctx, linterConfig)
 		if err == nil {
 			log.Infof("Successfully pulled image %s", image)
 			return
@@ -457,9 +466,9 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 		var r runner.Runner
 		switch {
 		case linterConfig.DockerAsRunner.Image != "":
-			r = s.dockerRunner
+			r = s.getDockerRunner()
 		case linterConfig.KubernetesAsRunner.Image != "":
-			r = s.kubernetesRunner
+			r = s.getKubernetesRunner()
 		default:
 			r = runner.NewLocalRunner()
 		}

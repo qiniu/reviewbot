@@ -41,7 +41,9 @@ import (
 type DockerRunner struct {
 	Cli            DockerClientInterface
 	ArchiveWrapper ArchiveWrapper
-	script         string
+
+	// script is the final script to be executed
+	script string
 }
 
 func NewDockerRunner(cli DockerClientInterface) (Runner, error) {
@@ -223,6 +225,10 @@ func (d *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClos
 	}
 
 	return d.readLogFromContainer(ctx, resp.ID)
+}
+
+func (d *DockerRunner) Clone() Runner {
+	return &DockerRunner{Cli: d.Cli, ArchiveWrapper: d.ArchiveWrapper}
 }
 
 func (d *DockerRunner) readLogFromContainer(ctx context.Context, containerID string) (io.ReadCloser, error) {
