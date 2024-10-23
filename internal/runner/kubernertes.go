@@ -32,10 +32,19 @@ var (
 	ErrUnexpectedPodStatus = errors.New("unexpected pod status")
 )
 
+const (
+	ScriptKey          = "script.sh"
+	InitContainerName  = "wait-for-code"
+	VolumeCodeMount    = "code-mount"
+	VolumeCodeFlag     = "code-flag"
+	VolumeScriptConfig = "script-config"
+)
+
 // KubernetesRunner is a runner that runs the linter in a Kubernetes pod.
 type KubernetesRunner struct {
 	client *kubernetes.Clientset
-	// script is the final script to be executed
+
+	// following fields are used for context aware fields for each execution
 	script string
 }
 
@@ -73,15 +82,14 @@ func (k *KubernetesRunner) Run(ctx context.Context, cfg *config.Linter) (io.Read
 	log.Infof("Script content: \n%s", scriptContent)
 	k.script = scriptContent
 
-	// create script configmap
-	cmName := strings.ToLower(fmt.Sprintf("%s-%s-%s-%d-%s", cfg.Org, cfg.Repo, cfg.Name, cfg.Number, log.ReqId))
-	scriptConfigMap, err := k.createScriptConfigMap(ctx, cfg, cmName, scriptContent)
+	// create a unique name for the job and script configmap
+	uniqueName := strings.ToLower(fmt.Sprintf("%s-%s-%s-%d-%s", cfg.Org, cfg.Repo, cfg.Name, cfg.Number, log.ReqId))
+	scriptConfigMap, err := k.createScriptConfigMap(ctx, cfg, uniqueName, scriptContent)
 	if err != nil {
 		return nil, err
 	}
 
-	jobName := strings.ToLower(fmt.Sprintf("%s-%s-%s-%d-%s", cfg.Org, cfg.Repo, cfg.Name, cfg.Number, log.ReqId))
-	job := k.newJob(cfg, jobName, scriptConfigMap.Name)
+	job := newJob(cfg, uniqueName, scriptConfigMap.Name)
 	containerName := job.Spec.Template.Spec.Containers[0].Name
 
 	var srcPath, dstPath string
@@ -211,14 +219,15 @@ func (k *KubernetesRunner) copyCodeToPod(ctx context.Context, srcPath, namespace
 	}
 
 	log.Infof("copy code to pod: src: %s, dest: %s", srcPath, destPath)
-	cmd := exec.CommandContext(ctx, "kubectl", "cp", srcPath, fmt.Sprintf("%s/%s:%s", namespace, podName, destPath), "-c", "wait-for-code")
+	//nolint:gosec,G204
+	cmd := exec.CommandContext(ctx, "kubectl", "cp", srcPath, fmt.Sprintf("%s/%s:%s", namespace, podName, destPath), "-c", InitContainerName)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		log.Errorf("failed to copy code to pod: %v, output: %s, command: %s", err, string(out), cmd.Args)
 		return err
 	}
 
 	// create a marker file to indicate that the code has been copied
-	cmd = exec.CommandContext(ctx, "kubectl", "exec", "-n", namespace, podName, "-c", "wait-for-code", "--", "touch", "/workspace/.code-copied")
+	cmd = exec.CommandContext(ctx, "kubectl", "exec", "-n", namespace, podName, "-c", InitContainerName, "--", "touch", "/workspace/.code-copied")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		log.Errorf("failed to create code-copied marker file: %v, output: %s, command: %s", err, string(out), cmd.Args)
 		return err
@@ -271,7 +280,7 @@ func (k *KubernetesRunner) createScriptConfigMap(ctx context.Context, cfg *confi
 			Namespace: cfg.KubernetesAsRunner.Namespace,
 		},
 		Data: map[string]string{
-			"script.sh": scriptContent,
+			ScriptKey: scriptContent,
 		},
 	}
 
@@ -393,100 +402,122 @@ func (k *KubernetesRunner) createOrRecreateJobAndWaitForPod(ctx context.Context,
 	return createdJob, nil
 }
 
-func (k *KubernetesRunner) newJob(cfg *config.Linter, jobName, scriptConfigMapName string) *batchv1.Job {
-	currentTime := time.Now().UTC().Format(time.RFC3339)
-	// see https://github.com/kubefree/kubefree
-	kubefreeLabel := "sleepmode.kubefree.com/delete-after"
-	kubefreeAnnotation := "sleepmode.kubefree.com/activity-status"
-	return &batchv1.Job{
+func newJob(cfg *config.Linter, jobName, scriptConfigMapName string) *batchv1.Job {
+	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: cfg.KubernetesAsRunner.Namespace,
 			Name:      jobName,
 		},
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						kubefreeLabel: "24h",
-					},
-					Annotations: map[string]string{
-						kubefreeAnnotation: fmt.Sprintf(`{"LastActivityTime": "%s"}`, currentTime),
-					},
-				},
-				Spec: corev1.PodSpec{
-					Volumes: []corev1.Volume{
-						{
-							Name: "code-mount",
-							VolumeSource: corev1.VolumeSource{
-								EmptyDir: &corev1.EmptyDirVolumeSource{},
-							},
-						},
-						{
-							Name: "script-config",
-							VolumeSource: corev1.VolumeSource{
-								ConfigMap: &corev1.ConfigMapVolumeSource{
-									LocalObjectReference: corev1.LocalObjectReference{
-										Name: scriptConfigMapName,
-									},
-									Items: []corev1.KeyToPath{
-										{
-											Key:  "script.sh",
-											Path: "script.sh",
-										},
-									},
-									DefaultMode: int32Ptr(0755),
-								},
-							},
-						},
-						{
-							Name: "code-flag",
-							VolumeSource: corev1.VolumeSource{
-								EmptyDir: &corev1.EmptyDirVolumeSource{},
-							},
-						},
-					},
-					InitContainers: []corev1.Container{
-						{
-							Name:       "wait-for-code",
-							Image:      cfg.KubernetesAsRunner.Image,
-							Command:    []string{"sh", "-c", "while [ ! -f /workspace/.code-copied ]; do sleep 1; done"},
-							WorkingDir: cfg.WorkDir,
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "code-mount",
-									MountPath: cfg.WorkDir,
-								},
-								{
-									Name:      "code-flag",
-									MountPath: "/workspace",
-								},
-							},
-						},
-					},
-					Containers: []corev1.Container{
-						{
-							Name:       "linter",
-							Image:      cfg.KubernetesAsRunner.Image,
-							Command:    []string{"/bin/sh", "-c"},
-							Args:       []string{"/scripts/script.sh"},
-							WorkingDir: cfg.WorkDir,
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "code-mount",
-									MountPath: cfg.WorkDir,
-								},
-								{
-									Name:      "script-config",
-									MountPath: "/scripts/script.sh",
-									SubPath:   "script.sh",
-								},
-							},
-						},
-					},
-					RestartPolicy: corev1.RestartPolicyNever,
-				},
+				ObjectMeta: metav1.ObjectMeta{},
+				Spec:       corev1.PodSpec{},
 			},
 			BackoffLimit: int32Ptr(0),
 		},
 	}
+
+	addKubefreeLabelsAndAnnotations(job)
+	addVolumes(job, scriptConfigMapName)
+	addInitContainers(job, cfg)
+	addLinterContainer(job, cfg)
+	setRestartPolicy(job)
+
+	return job
+}
+
+// for resource recycling, see https://github.com/kubefree/kubefree
+func addKubefreeLabelsAndAnnotations(job *batchv1.Job) {
+	currentTime := time.Now().UTC().Format(time.RFC3339)
+	kubefreeLabel := "sleepmode.kubefree.com/delete-after"
+	kubefreeAnnotation := "sleepmode.kubefree.com/activity-status"
+
+	job.Spec.Template.ObjectMeta.Labels = map[string]string{
+		kubefreeLabel: "24h",
+	}
+	job.Spec.Template.ObjectMeta.Annotations = map[string]string{
+		kubefreeAnnotation: fmt.Sprintf(`{"LastActivityTime": "%s"}`, currentTime),
+	}
+}
+
+func addVolumes(job *batchv1.Job, scriptConfigMapName string) {
+	job.Spec.Template.Spec.Volumes = []corev1.Volume{
+		{
+			Name: VolumeCodeMount,
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+		{
+			Name: VolumeScriptConfig,
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: scriptConfigMapName,
+					},
+					Items: []corev1.KeyToPath{
+						{
+							Key:  ScriptKey,
+							Path: ScriptKey,
+						},
+					},
+					DefaultMode: int32Ptr(0755),
+				},
+			},
+		},
+		{
+			Name: VolumeCodeFlag,
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+	}
+}
+
+func addInitContainers(job *batchv1.Job, cfg *config.Linter) {
+	job.Spec.Template.Spec.InitContainers = []corev1.Container{
+		{
+			Name:       InitContainerName,
+			Image:      cfg.KubernetesAsRunner.Image,
+			Command:    []string{"sh", "-c", "while [ ! -f /workspace/.code-copied ]; do sleep 1; done"},
+			WorkingDir: cfg.WorkDir,
+			VolumeMounts: []corev1.VolumeMount{
+				{
+					Name:      VolumeCodeMount,
+					MountPath: cfg.WorkDir,
+				},
+				{
+					Name:      VolumeCodeFlag,
+					MountPath: "/workspace",
+				},
+			},
+		},
+	}
+}
+
+func addLinterContainer(job *batchv1.Job, cfg *config.Linter) {
+	job.Spec.Template.Spec.Containers = []corev1.Container{
+		{
+			Name:       "linter",
+			Image:      cfg.KubernetesAsRunner.Image,
+			Command:    []string{"/bin/sh", "-c"},
+			Args:       []string{"/scripts/script.sh"},
+			WorkingDir: cfg.WorkDir,
+			VolumeMounts: []corev1.VolumeMount{
+				{
+					Name:      VolumeCodeMount,
+					MountPath: cfg.WorkDir,
+				},
+				{
+					Name:      VolumeScriptConfig,
+					MountPath: "/scripts/script.sh",
+					SubPath:   "script.sh",
+				},
+			},
+		},
+	}
+}
+
+func setRestartPolicy(job *batchv1.Job) {
+	job.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyNever
 }
