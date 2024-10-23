@@ -32,6 +32,8 @@ import (
 
 // refer to https://golangci-lint.run/
 var lintName = "golangci-lint"
+var oldToken string
+var newToken string
 
 func init() {
 	linters.RegisterPullRequestHandler(lintName, golangciLintHandler)
@@ -68,8 +70,46 @@ func golangciLintHandler(ctx context.Context, a linters.Agent) error {
 		a.LinterConfig.WorkDir = topDir
 	}
 
+	currentToken := a.Provider.GetToken().Value
+
+	if currentToken != oldToken {
+		oldToken = newToken
+		newToken = currentToken
+	}
+
 	a.LinterConfig.Modifier = newGoModTidyBuilder(a.LinterConfig.Modifier, goModDirs)
+	a.LinterConfig.Modifier = newGitTokenModifier(a.LinterConfig.Modifier, newToken, oldToken)
 	return linters.GeneralHandler(ctx, log, a, linters.ExecRun, parser)
+}
+
+type gitTokenModifier struct {
+	next     config.Modifier
+	newToken string
+	oldToken string
+}
+
+func newGitTokenModifier(next config.Modifier, newToken, oldToken string) config.Modifier {
+	return &gitTokenModifier{
+		next:     next,
+		newToken: newToken,
+		oldToken: oldToken,
+	}
+}
+
+func (m *gitTokenModifier) Modify(cfg *config.Linter) (*config.Linter, error) {
+	base, err := m.next.Modify(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	newCfg := base
+	args := []string{}
+	if m.oldToken != "" {
+		args = []string{fmt.Sprintf("git config --global --unset url.'https://x-access-token:%s@$GOPRIVATE'.insteadOf 'https://$GOPRIVATE'    > /dev/null \n", m.oldToken)}
+	}
+	args = append(args, fmt.Sprintf("git config --global url.'https://x-access-token:%s@$GOPRIVATE'.insteadOf 'https://$GOPRIVATE'   > /dev/null \n", m.newToken))
+	newCfg.Args = append(args, base.Args...)
+	return newCfg, nil
 }
 
 type goModTidyModifier struct {

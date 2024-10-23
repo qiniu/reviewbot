@@ -178,7 +178,9 @@ func TestFilters(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			p, err := NewGithubProvider(nil, nil, tc.a, github.PullRequestEvent{})
+			p, err := NewGithubProvider(nil, tc.a, github.PullRequestEvent{}, func() Token {
+				return Token{}
+			})
 			if err != nil {
 				t.Errorf("failed to create github provider: %v", err)
 			}
@@ -271,7 +273,9 @@ func TestLinterRelated(t *testing.T) {
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 			RegisterLinterLanguages(tc.linter, tc.langs)
-			p, err := NewGithubProvider(nil, nil, tc.a, github.PullRequestEvent{})
+			p, err := NewGithubProvider(nil, tc.a, github.PullRequestEvent{}, func() Token {
+				return Token{}
+			})
 			if err != nil {
 				t.Errorf("failed to create github provider: %v", err)
 			}

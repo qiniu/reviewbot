@@ -22,6 +22,8 @@ type Provider interface {
 	// In the future, we may need more file status information.
 	GetFiles(predicate func(filepath string) bool) []string
 
+	GetToken() Token
+
 	// ListCommits lists the commits in the PR/MR.
 	ListCommits(ctx context.Context, org, repo string, number int) ([]Commit, error)
 	// ListComments lists the comments in the PR/MR.

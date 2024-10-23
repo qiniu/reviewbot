@@ -29,7 +29,6 @@ import (
 	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/reviewbot/internal/metric"
 	"github.com/qiniu/x/log"
-	gitv2 "sigs.k8s.io/prow/pkg/git/v2"
 )
 
 var (
@@ -218,8 +217,6 @@ var _ Provider = (*GithubProvider)(nil)
 type GithubProvider struct {
 	// GitHubClient is the GitHub client.
 	GithubClient *github.Client
-	// GitClient is the Git client factory.
-	GitClient gitv2.ClientFactory
 
 	// HunkChecker is the hunk checker for the file.
 	HunkChecker *FileHunkChecker
@@ -228,19 +225,27 @@ type GithubProvider struct {
 	PullRequestChangedFiles []*github.CommitFile
 	// PullRequestEvent is the event of a pull request.
 	PullRequestEvent github.PullRequestEvent
+
+	// Token is the token for the github app.
+	Token func() Token
 }
 
-func NewGithubProvider(githubClient *github.Client, gitClient gitv2.ClientFactory, pullRequestChangedFiles []*github.CommitFile, pullRequestEvent github.PullRequestEvent) (*GithubProvider, error) {
+type Token struct {
+	Value     string
+	ExpiresAt time.Time
+}
+
+func NewGithubProvider(githubClient *github.Client, pullRequestChangedFiles []*github.CommitFile, pullRequestEvent github.PullRequestEvent, token func() Token) (*GithubProvider, error) {
 	checker, err := NewFileHunkChecker(pullRequestChangedFiles)
 	if err != nil {
 		return nil, err
 	}
 	return &GithubProvider{
 		GithubClient:            githubClient,
-		GitClient:               gitClient,
 		PullRequestChangedFiles: pullRequestChangedFiles,
 		PullRequestEvent:        pullRequestEvent,
 		HunkChecker:             checker,
+		Token:                   token,
 	}, nil
 }
 
@@ -580,4 +585,8 @@ func (g *GithubProvider) GetCodeReviewInfo() CodeReview {
 		HeadSHA:   g.PullRequestEvent.GetPullRequest().GetHead().GetSHA(),
 		UpdatedAt: g.PullRequestEvent.GetPullRequest().GetUpdatedAt().Time,
 	}
+}
+
+func (g *GithubProvider) GetToken() Token {
+	return g.Token()
 }

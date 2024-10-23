@@ -18,8 +18,13 @@ package main
 
 import (
 	"context"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"math/rand"
 	"net/http"
@@ -28,10 +33,12 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/go-github/v57/github"
 	"github.com/gregjones/httpcache"
 	"github.com/qiniu/reviewbot/config"
@@ -44,8 +51,9 @@ import (
 )
 
 type Server struct {
-	gitClientFactory gitv2.ClientFactory
-	config           config.Config
+	codeCacheDir         string
+	config               config.Config
+	installationIDTokens map[int64]linters.Token
 
 	// server addr which is used to generate the log view url
 	// e.g. https://domain
@@ -367,11 +375,13 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 		}
 	}()
 
-	installationID := event.GetInstallation().GetID()
+	// installationID := event.GetInstallation().GetID()
+	installationID := int64(56248106)
 	log.Infof("processing pull request %d, (%v/%v), installationID: %d\n", num, org, repo, installationID)
 
 	pullRequestAffectedFiles, response, err := linters.ListPullRequestsFiles(ctx, s.GithubClient(installationID), org, repo, num)
 	if err != nil {
+		log.Errorf("list files failed: %v", err)
 		return err
 	}
 
@@ -381,7 +391,27 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 	}
 	log.Infof("found %d files affected by pull request %d\n", len(pullRequestAffectedFiles), num)
 
-	workspace, defaultWorkDir, err := s.prepareGitRepos(ctx, org, repo, num)
+	if s.installationIDTokens[installationID].ExpiresAt.Before(time.Now().Add(time.Minute)) {
+		log.Infof("token expired, try to get new token")
+		token, expireAt, err := GetGithubAppAccessToken(s.appID, s.appPrivateKey, installationID)
+		if err != nil {
+			log.Errorf("failed to get github app access token: %v", err)
+			return err
+		}
+		s.installationIDTokens[installationID] = linters.Token{Value: token, ExpiresAt: expireAt}
+	}
+
+	token := func() linters.Token {
+		return s.installationIDTokens[installationID]
+	}
+
+	provider, err := linters.NewGithubProvider(s.GithubClient(installationID), pullRequestAffectedFiles, *event, token)
+	if err != nil {
+		log.Errorf("failed to create provider: %v", err)
+		return err
+	}
+
+	workspace, defaultWorkDir, err := s.prepareGitRepos(ctx, org, repo, num, installationID)
 	if err != nil {
 		return err
 	}
@@ -418,11 +448,6 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 			ID:           lintersutil.GetEventGUID(ctx),
 		}
 
-		provider, err := linters.NewGithubProvider(s.GithubClient(installationID), s.gitClientFactory, pullRequestAffectedFiles, *event)
-		if err != nil {
-			log.Errorf("failed to create provider: %v", err)
-			return err
-		}
 		agent.Provider = provider
 
 		if !linters.LinterRelated(name, agent) {
@@ -515,7 +540,7 @@ func prepareRepoDir(org, repo string, num int) (string, error) {
 	return dir, nil
 }
 
-func (s *Server) prepareGitRepos(ctx context.Context, org, repo string, num int) (workspace string, workDir string, err error) {
+func (s *Server) prepareGitRepos(ctx context.Context, org, repo string, num int, installationID int64) (workspace string, workDir string, err error) {
 	log := lintersutil.FromContext(ctx)
 	workspace, err = prepareRepoDir(org, repo, num)
 	if err != nil {
@@ -526,12 +551,28 @@ func (s *Server) prepareGitRepos(ctx context.Context, org, repo string, num int)
 	refs, workDir := s.fixRefs(workspace, org, repo)
 	log.Debugf("refs: %+v", refs)
 	for _, ref := range refs {
-		opt := gitv2.ClientFactoryOpts{
-			CacheDirBase: github.String(s.repoCacheDir),
-			Persist:      github.Bool(true),
-			UseSSH:       github.Bool(true),
-			Host:         ref.Host,
+
+		var opt gitv2.ClientFactoryOpts
+		if ref.Host == "" || ref.Host == "github.com" {
+			opt = gitv2.ClientFactoryOpts{
+				CacheDirBase: github.String(s.codeCacheDir),
+				Persist:      github.Bool(true),
+				UseSSH:       github.Bool(false),
+				Username:     func() (string, error) { return "x-access-token", nil }, // x-access-token was used as github username
+				Token: func(org string) (string, error) {
+					return s.installationIDTokens[installationID].Value, nil
+				},
+			}
 		}
+		if strings.HasPrefix(ref.Host, "gitlab") {
+			opt = gitv2.ClientFactoryOpts{
+				CacheDirBase: github.String(s.repoCacheDir),
+				Persist:      github.Bool(true),
+				UseSSH:       github.Bool(true),
+				Host:         ref.Host,
+			}
+		}
+
 		gitClient, err := gitv2.NewClientFactory(opt.Apply)
 		if err != nil {
 			log.Errorf("failed to create git client factory: %v", err)
@@ -625,4 +666,120 @@ func (s *Server) fixRefs(workspace string, org, repo string) ([]config.Refs, str
 	}
 
 	return refs, workDir
+}
+
+func createJWT(appID int64, privateKeyPEM []byte, extraExpireAt time.Time) (string, error) {
+	block, _ := pem.Decode(privateKeyPEM)
+	if block == nil {
+		return "", fmt.Errorf("can not decode private key pem")
+	}
+	var privateKey *rsa.PrivateKey
+	var err error
+
+	privateKey, err = x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		return "", fmt.Errorf("parse private key failed: %w", err)
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
+		"iat": time.Now().Unix(),
+		"exp": extraExpireAt.Unix(),
+		"iss": appID,
+	})
+	signedToken, err := token.SignedString(privateKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to sign jwt: %w", err)
+	}
+	return signedToken, nil
+
+}
+
+// GitHub app token expiration time is fixed at 60 minutes and cannot be changed.
+func GetGithubAppAccessToken(appID int64, privateKey string, installationID int64) (string, time.Time, error) {
+	url := fmt.Sprintf("https://api.github.com/app/installations/%d/access_tokens", installationID)
+	req, err := http.NewRequest("POST", url, nil)
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("failed to create request: %w", err)
+	}
+	privateKeyPem, err := os.ReadFile(privateKey)
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("failed to read private key: %w", err)
+	}
+
+	jwtToken, err := createJWT(appID, privateKeyPem, time.Now().Add(time.Minute))
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("failed to create jwt: %w", err)
+	}
+	log.Debugf("jwtToken: %s", jwtToken)
+
+	req.Header.Set("Authorization", "Bearer "+jwtToken)
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("failed to get access token: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("failed to read response body: %w", err)
+	}
+	log.Debugf("response body: %s", string(body))
+
+	var tokenResponse struct {
+		AccessToken string `json:"token"`
+	}
+
+	err = json.Unmarshal(body, &tokenResponse)
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("failed to unmarshal access token response: %w", err)
+	}
+	tokenExpireAt := time.Now().Add(time.Minute * 60)
+	return tokenResponse.AccessToken, tokenExpireAt, nil
+}
+
+func GetGithubAppInstallations(appID int64, privateKey string) ([]int64, error) {
+	url := "https://api.github.com/app/installations"
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return []int64{}, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	privateKeyPem, err := os.ReadFile(privateKey)
+	if err != nil {
+		log.Fatalf("failed to read private key: %v", err)
+	}
+	jwtTokenExpireAt := time.Now().Add(time.Minute)
+	jwtToken, err := createJWT(appID, privateKeyPem, jwtTokenExpireAt)
+	if err != nil {
+		return []int64{}, fmt.Errorf("failed to create jwt: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+jwtToken)
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return []int64{}, fmt.Errorf("failed to get installations: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return []int64{}, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	var installations []struct {
+		ID int64 `json:"id"`
+	}
+	err = json.Unmarshal(body, &installations)
+	if err != nil {
+		return []int64{}, fmt.Errorf("failed to unmarshal installations: %w", err)
+	}
+
+	var installationIDs []int64
+	for _, v := range installations {
+		installationIDs = append(installationIDs, v.ID)
+	}
+	return installationIDs, nil
 }

@@ -107,7 +107,9 @@ func TestGoModCheck(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.id, func(t *testing.T) {
-			p, err := linters.NewGithubProvider(nil, nil, tc.input, github.PullRequestEvent{})
+			p, err := linters.NewGithubProvider(nil, tc.input, github.PullRequestEvent{}, func() linters.Token {
+				return linters.Token{}
+			})
 			if err != nil {
 				t.Errorf("Error creating github provider: %v", err)
 				return

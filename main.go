@@ -17,6 +17,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"expvar"
 	"flag"
@@ -27,15 +28,15 @@ import (
 	"net/http/pprof"
 	"net/url"
 	"os"
+	"regexp"
 
-	"github.com/google/go-github/v57/github"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/qiniu/reviewbot/config"
+	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/reviewbot/internal/storage"
 	"github.com/qiniu/reviewbot/internal/version"
 	"github.com/qiniu/x/log"
 	"github.com/sirupsen/logrus"
-	gitv2 "sigs.k8s.io/prow/pkg/git/v2"
 
 	// linters import
 	_ "github.com/qiniu/reviewbot/internal/linters/c/cppcheck"
@@ -205,19 +206,10 @@ func main() {
 		}
 	}
 
-	opt := gitv2.ClientFactoryOpts{
-		CacheDirBase: github.String(o.codeCacheDir),
-		Persist:      github.Bool(true),
-		UseSSH:       github.Bool(true),
-	}
-	v2, err := gitv2.NewClientFactory(opt.Apply)
-	if err != nil {
-		log.Fatalf("failed to create git client factory: %v", err)
-	}
-
 	logrus.SetLevel(logrus.DebugLevel)
 
 	var cfg config.Config
+	var err error
 	if o.config != "" {
 		cfg, err = config.NewConfig(o.config)
 		if err != nil {
@@ -225,17 +217,50 @@ func main() {
 		}
 	}
 
+	var linterReference map[string]string
+	regexpRefernce := make(map[*regexp.Regexp]string)
+	if o.linterReferencePath != "" {
+		log.Infof("linter reference path: %s", o.linterReferencePath)
+		data, err := os.ReadFile(o.linterReferencePath)
+		if err != nil {
+			log.Fatalf("failed to load linter reference file: %v", err)
+		}
+		err = json.Unmarshal(data, &linterReference)
+		if err != nil {
+			log.Fatalf("failed to unmarshal linter reference file: %v", err)
+		}
+
+		for key, value := range linterReference {
+			re := regexp.MustCompile(key)
+			regexpRefernce[re] = value
+		}
+	}
+
+	installations, err := GetGithubAppInstallations(o.appID, o.appPrivateKey)
+	if err != nil {
+		log.Fatalf("failed to get github app installations: %v", err)
+	}
+	installationIDTokens := make(map[int64]linters.Token)
+	for _, installationID := range installations {
+		token, expireAt, err := GetGithubAppAccessToken(o.appID, o.appPrivateKey, installationID)
+		if err != nil {
+			log.Fatalf("failed to get github app access token: %v", err)
+		}
+		installationIDTokens[installationID] = linters.Token{Value: token, ExpiresAt: expireAt}
+	}
+
 	s := &Server{
-		webhookSecret:    []byte(o.webhookSecret),
-		gitClientFactory: v2,
-		config:           cfg,
-		accessToken:      o.accessToken,
-		appID:            o.appID,
-		appPrivateKey:    o.appPrivateKey,
-		debug:            o.debug,
-		serverAddr:       o.serverAddr,
-		repoCacheDir:     o.codeCacheDir,
-		kubeConfig:       o.kubeConfig,
+		webhookSecret:        []byte(o.webhookSecret),
+		codeCacheDir:         o.codeCacheDir,
+		config:               cfg,
+		installationIDTokens: installationIDTokens,
+		accessToken:          o.accessToken,
+		appID:                o.appID,
+		appPrivateKey:        o.appPrivateKey,
+		debug:                o.debug,
+		serverAddr:           o.serverAddr,
+		repoCacheDir:         o.codeCacheDir,
+		kubeConfig:           o.kubeConfig,
 	}
 
 	go s.initDockerRunner()
