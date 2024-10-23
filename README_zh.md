@@ -38,6 +38,7 @@ Reviewbot 帮助你快速搭建一个自托管的代码分析和代码审查服�
   - [调整执行命令](#调整执行命令)
   - [关闭 Linter](#关闭-Linter)
   - [通过 Docker 执行 linter](#通过-Docker-执行-linter)
+  - [在 Kubernetes 集群中执行 linter](#在-Kubernetes-集群中执行-linter)
 - [Reviewbot 运行流程](#reviewbot-运行流程)
 - [观测检测结果](#观测检测结果)
 - [贡献](#贡献)
@@ -174,6 +175,21 @@ qbox/net-gslb:
 ```
 
 这个配置意味着，针对`qbox/net-gslb`仓库代码的`golangci-lint`检查，使用`golangci/golangci-lint:v1.54.2`这个 Docker 镜像来执行。
+
+### 在 Kubernetes 集群中执行 linter
+
+Reviewbot 也支持在 Kubernetes 集群中执行 linter，这个场景下，特别适合多任务并发执行，本地资源不足的情况。
+
+示例配置:
+
+```yaml
+qiniu/reviewbot:
+  linters:
+    golangci-lint:
+      kubernetesAsRunner:
+        image: "aslan-spock-register.qiniu.io/reviewbot/base:golangci-lint.1.61.0"
+        namespace: "reviewbot"
+```
 
 ## Reviewbot 运行流程
 

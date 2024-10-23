@@ -42,6 +42,7 @@ This approach helps PR authors avoid searching for issues in lengthy console log
   - [Adjusting Execution Commands](#adjusting-execution-commands)
   - [Disabling a Linter](#disabling-a-linter)
   - [Executing Linters via Docker](#executing-linters-via-docker)
+  - [Executing Linters via Kubernetes](#executing-linters-via-kubernetes)
 - [Reviewbot Operational Flow](#reviewbot-operational-flow)
 - [How to add a new Linter](#how-to-add-a-new-linter)
 - [Monitoring Detection Results](#monitoring-detection-results)
@@ -181,6 +182,22 @@ qbox/net-gslb:
 ```
 
 This configuration means that for the `golangci-lint` check of the `qbox/net-gslb` repository code, the `golangci/golangci-lint:v1.54.2` Docker image is used for execution.
+
+### Executing Linters in Kubernetes Cluster
+
+Reviewbot also supports executing linters in a Kubernetes cluster. This is particularly useful in scenarios where multiple tasks are running concurrently, and local resources are insufficient.
+
+Example configuration:
+
+```yaml
+qiniu/reviewbot:
+  linters:
+    golangci-lint:
+      enable: true
+      kubernetesAsRunner:
+        image: "aslan-spock-register.qiniu.io/reviewbot/base:golangci-lint.1.61.0"
+        namespace: "reviewbot"
+```
 
 ## Reviewbot Operational Flow
 
