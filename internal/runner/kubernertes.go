@@ -32,8 +32,10 @@ var (
 	ErrUnexpectedPodStatus = errors.New("unexpected pod status")
 )
 
+// KubernetesRunner is a runner that runs the linter in a Kubernetes pod.
 type KubernetesRunner struct {
 	client *kubernetes.Clientset
+	// script is the final script to be executed
 	script string
 }
 
@@ -174,6 +176,10 @@ func (k *KubernetesRunner) Prepare(ctx context.Context, cfg *config.Linter) erro
 	}
 
 	return nil
+}
+
+func (k *KubernetesRunner) Clone() Runner {
+	return &KubernetesRunner{client: k.client}
 }
 
 func loadClusterConfig(masterURL, kubeConfig string) (*rest.Config, error) {
