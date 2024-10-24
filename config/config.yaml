@@ -119,3 +119,15 @@ customConfig: # custom config for specific orgs or repos
         kubernetesAsRunner:
           image: "aslan-spock-register.qiniu.io/reviewbot/base:golangci-lint.1.61.0"
           namespace: "reviewbot"
+
+issueReferences:
+  golangci-lint:
+    - pattern: '^ST1003: .+ \(stylecheck\)$'
+      url: "https://github.com/qiniu/reviewbot/issues/398"
+    - pattern: '^do not define dynamic errors, use wrapped static errors instead:.*\(err113\)$'
+      url: "https://github.com/qiniu/reviewbot/issues/418"
+    - pattern: '^found a struct that contains a context.Context field \(containedctx\)$'
+      url: "https://github.com/qiniu/reviewbot/issues/420"
+  shellcheck:
+    - pattern: '^SC2086: .+ \(shellcheck\)$'
+      url: "https://github.com/qiniu/reviewbot/issues/413"

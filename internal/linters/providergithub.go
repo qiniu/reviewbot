@@ -443,7 +443,7 @@ func (g *GithubProvider) CreateGithubChecks(ctx context.Context, a Agent, lintEr
 		},
 	}
 
-	logURL := a.GenLogViewUrl()
+	logURL := a.GenLogViewURL()
 	if logURL == "" {
 		check.Output.Summary = github.String(Reference)
 	} else {

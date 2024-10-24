@@ -449,7 +449,6 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 		agent := linters.Agent{
 			LinterConfig: linterConfig,
 			RepoDir:      r.Directory(),
-			Context:      ctx,
 			ID:           lintersutil.GetEventGUID(ctx),
 		}
 
@@ -479,7 +478,7 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 		agent.GenLogKey = func() string {
 			return fmt.Sprintf("%s/%s/%s", agent.LinterConfig.Name, agent.Provider.GetCodeReviewInfo().Org+"/"+agent.Provider.GetCodeReviewInfo().Repo, agent.ID)
 		}
-		agent.GenLogViewUrl = func() string {
+		agent.GenLogViewURL = func() string {
 			// if serverAddr is not provided, return empty string
 			if s.serverAddr == "" {
 				return ""
@@ -487,7 +486,7 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 			return s.serverAddr + "/view/" + agent.GenLogKey()
 		}
 
-		agent.LinterReference = s.linterReference
+		agent.IssueReferences = s.config.GetCompiledIssueReferences(name)
 
 		if err := fn(ctx, agent); err != nil {
 			if errors.Is(err, context.Canceled) {
