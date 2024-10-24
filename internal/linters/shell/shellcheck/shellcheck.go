@@ -54,7 +54,7 @@ func shellcheck(ctx context.Context, a linters.Agent) error {
 			a.LinterConfig.Args = args
 		}
 
-		output, err := linters.ExecRun(a)
+		output, err := linters.ExecRun(ctx, a)
 		if err != nil {
 			log.Warnf("%s run with error: %v, mark and continue", cmd, err)
 		}

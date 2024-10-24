@@ -235,8 +235,8 @@ func TestExecRun(t *testing.T) {
 			tc.input.GenLogKey = func() string { return "test" }
 			tc.input.Runner = runner.NewLocalRunner()
 			tc.input.LinterConfig.Modifier = config.NewBaseModifier()
-			tc.input.Context = context.WithValue(context.Background(), lintersutil.EventGUIDKey, "test")
-			output, err := ExecRun(tc.input)
+			ctx := context.WithValue(context.Background(), lintersutil.EventGUIDKey, "test")
+			output, err := ExecRun(ctx, tc.input)
 			if !errors.Is(err, tc.err) {
 				t.Errorf("expected: %v, got: %v", tc.err, err)
 			}
