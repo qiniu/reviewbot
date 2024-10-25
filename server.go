@@ -62,7 +62,8 @@ type Server struct {
 	webhookSecret []byte
 
 	// support developer access token model
-	accessToken string
+	gitLabAccessToken string
+	gitHubAccessToken string
 	// support github app model
 	appID         int64
 	appPrivateKey string
@@ -514,13 +515,13 @@ func (s *Server) githubAppClient(installationID int64) *github.Client {
 
 func (s *Server) githubAccessTokenClient() *github.Client {
 	gc := github.NewClient(httpcache.NewMemoryCacheTransport().Client())
-	gc.WithAuthToken(s.accessToken)
+	gc.WithAuthToken(s.gitHubAccessToken)
 	return gc
 }
 
 // GithubClient returns a github client
 func (s *Server) GithubClient(installationID int64) *github.Client {
-	if s.accessToken != "" {
+	if s.gitHubAccessToken != "" {
 		return s.githubAccessTokenClient()
 	}
 	return s.githubAppClient(installationID)
