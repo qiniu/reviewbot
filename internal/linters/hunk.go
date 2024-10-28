@@ -18,6 +18,7 @@ package linters
 
 import (
 	"fmt"
+	"github.com/xanzy/go-gitlab"
 	"regexp"
 	"strconv"
 
@@ -62,6 +63,41 @@ func NewFileHunkChecker(commitFiles []*github.CommitFile) (*FileHunkChecker, err
 	return &FileHunkChecker{
 		Hunks: hunks,
 	}, nil
+}
+func NewGitLabCommitFileHunkChecker(commitFiles []*gitlab.MergeRequestDiff) (*FileHunkChecker, error) {
+	hunks := make(map[string][]Hunk)
+	for _, commitFile := range commitFiles {
+		if commitFile == nil || commitFile.NewPath == "" {
+			continue
+		}
+
+		if commitFile.DeletedFile == true {
+			continue
+		}
+
+		fileHunks, err := DiffHunksMerge(commitFile)
+		if err != nil {
+			return nil, err
+		}
+
+		v, ok := hunks[commitFile.NewPath]
+		if ok {
+			log.Warnf("duplicate commitFiles: %v, %v", commitFile, v)
+			continue
+		}
+
+		hunks[commitFile.NewPath] = fileHunks
+	}
+
+	return &FileHunkChecker{
+		Hunks: hunks,
+	}, nil
+}
+func DiffHunksMerge(commitFile *gitlab.MergeRequestDiff) ([]Hunk, error) {
+	if commitFile == nil || commitFile.NewPath == "" {
+		return nil, fmt.Errorf("invalid commitFile: %v", commitFile)
+	}
+	return ParsePatch(commitFile.Diff)
 }
 
 func (c *FileHunkChecker) InHunk(file string, line, startLine int) bool {

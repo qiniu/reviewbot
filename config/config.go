@@ -321,8 +321,10 @@ func applyCustomConfig(legacy, custom Linter) Linter {
 type GithubReportType string
 
 const (
-	GithubCheckRuns GithubReportType = "github_check_run"
-	GithubPRReview  GithubReportType = "github_pr_review"
+	GithubCheckRuns  GithubReportType = "github_check_run"
+	GithubPRReview   GithubReportType = "github_pr_review"
+	GitlabComment    GithubReportType = "gitlab_mr_comment"
+	GitlabDiscussion GithubReportType = "gitlab_mr_discussion"
 
 	// for debug and testing.
 	Quiet GithubReportType = "quiet"
