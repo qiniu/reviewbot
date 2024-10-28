@@ -231,7 +231,7 @@ func TestArgs(t *testing.T) {
 	}
 }
 
-func TestConfigApply(t *testing.T) {
+func TestGolangciConfigApply(t *testing.T) {
 	tcs := []struct {
 		id         string
 		input      linters.Agent
@@ -292,7 +292,7 @@ func TestConfigApply(t *testing.T) {
 				}
 			}
 
-			got := configApply(xlog.New("ut"), tc.input)
+			got := golangciConfigApply(xlog.New("ut"), tc.input)
 			if !strings.HasSuffix(got, tc.wantSuffix) {
 				t.Errorf("configApply() = %v, want with suffix %v", got, tc.wantSuffix)
 			}
