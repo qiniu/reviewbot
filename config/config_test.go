@@ -34,7 +34,7 @@ globalDefaultConfig: # global default settings, will be overridden by qbox org a
 
 customConfig: # custom config for specific orgs or repos
   qbox: # github organization name
-    extraRefs:
+    refs:
     - org: qbox
       repo: net-cache
     linters:
@@ -48,7 +48,7 @@ customConfig: # custom config for specific orgs or repos
         enable: true
         workDir: "nginx" # only run in the nginx directory since there are .luacheckrc files in this directory
   qiniu/test:
-    extraRefs:
+    refs:
     - org: qbox
       repo: net-cache
       cloneUrl : "git@github.com:qbox/net-schedule.git"
@@ -100,7 +100,7 @@ issueReferences:
 								Args:   []string{"run", "-D", "staticcheck"},
 							},
 						},
-						ExtraRefs: []Refs{
+						Refs: []Refs{
 							{
 								Repo: "net-cache",
 								Org:  "qbox",
@@ -122,7 +122,7 @@ issueReferences:
 								WorkDir: "nginx",
 							},
 						},
-						ExtraRefs: []Refs{
+						Refs: []Refs{
 							{
 								Repo:     "net-schedule",
 								Org:      "qbox",
@@ -180,7 +180,7 @@ globalDefaultConfig: # global default settings, will be overridden by qbox org a
   golangciLintConfig: "linters-config/.golangci.yml"
 customConfig: # custom config for specific orgs or repos
   qbox: # github organization name
-    extraRefs:
+    refs:
     - org: qbox
       repo: net-cache
     - org: qiniu
@@ -209,7 +209,7 @@ customConfig: # custom config for specific orgs or repos
 								Args:   []string{"run", "-D", "staticcheck"},
 							},
 						},
-						ExtraRefs: []Refs{
+						Refs: []Refs{
 							{
 								Repo: "net-cache",
 								Org:  "qbox",
