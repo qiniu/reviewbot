@@ -30,10 +30,11 @@ type Config struct {
 }
 
 type RepoConfig struct {
-	// ExtraRefs are auxiliary repositories that
-	// need to be cloned, determined from config
-	ExtraRefs []Refs            `json:"extraRefs,omitempty"`
-	Linters   map[string]Linter `json:"linters,omitempty"`
+	// Refs are repositories that need to be cloned.
+	// The main repository is cloned by default and does not need to be specified here if not specified.
+	// extra refs must be specified.
+	Refs    []Refs            `json:"refs,omitempty"`
+	Linters map[string]Linter `json:"linters,omitempty"`
 }
 
 type Refs struct {
@@ -179,6 +180,10 @@ func (l Linter) String() string {
 		*l.Enable, l.DockerAsRunner, l.WorkDir, l.Command, l.Args, l.ReportFormat, l.ConfigPath)
 }
 
+var (
+	ErrEmptyRepoOrOrg = errors.New("empty repo or org")
+)
+
 // NewConfig returns a new Config.
 func NewConfig(conf string) (Config, error) {
 	var c Config
@@ -194,6 +199,9 @@ func NewConfig(conf string) (Config, error) {
 	// ============ validate and update the config ============
 
 	if err := c.parseCloneURLs(); err != nil {
+		return c, err
+	}
+	if err := c.validateRefs(); err != nil {
 		return c, err
 	}
 	if err := c.parseIssueReferences(); err != nil {
@@ -405,13 +413,26 @@ func (c *Config) parseCloneURLs() error {
 	re := regexp.MustCompile(`^(?:git@|https://)?([^:/]+)[:/]{1}(.*?)/(.*?)\.git$`)
 
 	for orgRepo, refConfig := range c.CustomConfig {
-		for k, ref := range refConfig.ExtraRefs {
+		for k, ref := range refConfig.Refs {
 			if ref.CloneURL == "" {
 				continue
 			}
 
 			if err := c.parseAndUpdateCloneURL(re, orgRepo, k); err != nil {
 				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (c *Config) validateRefs() error {
+	for orgRepo, refConfig := range c.CustomConfig {
+		for _, ref := range refConfig.Refs {
+			if ref.PathAlias != "" && (ref.Repo == "" || ref.Org == "") {
+				log.Errorf("invalid ref: %v for org/repo: %s", ref, orgRepo)
+				return ErrEmptyRepoOrOrg
 			}
 		}
 	}
@@ -444,7 +465,7 @@ func (c *Config) parseIssueReferences() error {
 }
 
 func (c *Config) parseAndUpdateCloneURL(re *regexp.Regexp, orgRepo string, k int) error {
-	ref := &c.CustomConfig[orgRepo].ExtraRefs[k]
+	ref := &c.CustomConfig[orgRepo].Refs[k]
 	matches := re.FindStringSubmatch(ref.CloneURL)
 	if len(matches) != 4 {
 		log.Errorf("failed to parse CloneURL, please check the format of %s", ref.CloneURL)

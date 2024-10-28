@@ -1,5 +1,5 @@
 # go lint tool dependencies `go list` `gofmt`
-# image from qiniu registry, same as 
+# image from qiniu registry, origin: https://hub.docker.com/_/golang
 FROM aslan-spock-register.qiniu.io/qa/golang:1.23.0-alpine3.20
 
 # if you want to install other tools, please add them here.

@@ -27,7 +27,6 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"sync"
 	"time"
@@ -69,9 +68,8 @@ type Server struct {
 
 	debug bool
 
-	repoCacheDir    string
-	kubeConfig      string
-	linterReference map[*regexp.Regexp]string
+	repoCacheDir string
+	kubeConfig   string
 }
 
 var (
@@ -383,52 +381,20 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 	}
 	log.Infof("found %d files affected by pull request %d\n", len(pullRequestAffectedFiles), num)
 
-	defaultWorkDir, err := prepareRepoDir(org, repo, num)
+	workspace, defaultWorkDir, err := s.prepareGitRepos(ctx, org, repo, num)
 	if err != nil {
-		return fmt.Errorf("failed to prepare repo dir: %w", err)
+		return err
 	}
+
+	// clean up workspace
 	defer func() {
 		if s.debug {
 			return // do not remove the repository in debug mode
 		}
-		if err := os.RemoveAll(defaultWorkDir); err != nil {
-			log.Errorf("failed to remove the repository , err : %v", err)
+		if err := os.RemoveAll(workspace); err != nil {
+			log.Errorf("failed to remove the repository, err: %v", err)
 		}
 	}()
-
-	r, err := s.gitClientFactory.ClientForWithRepoOpts(org, repo, gitv2.RepoOpts{
-		CopyTo: defaultWorkDir + "/" + repo,
-	})
-	if err != nil {
-		log.Errorf("failed to create git client: %v", err)
-		return err
-	}
-
-	if err := r.CheckoutPullRequest(num); err != nil {
-		log.Errorf("failed to checkout pull request %d: %v", num, err)
-		return err
-	}
-
-	gitModulesFile := path.Join(r.Directory(), ".gitmodules")
-	_, err = os.Stat(gitModulesFile)
-	if err == nil {
-		log.Info("git pull submodule in progress")
-		cmd := exec.Command("git", "submodule", "update", "--init", "--recursive")
-		cmd.Dir = r.Directory()
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			log.Errorf("error when git pull submodule, marked and continue, details :%v ", err)
-		}
-		log.Infof("git pull submodule output: %s ", out)
-	} else {
-		log.Infof("no .gitmodules file in repo %s", repo)
-	}
-
-	_, err = s.PrepareExtraRef(org, repo, defaultWorkDir)
-	if err != nil {
-		log.Errorf("failed to prepare and clone ExtraRef : %v", err)
-		return err
-	}
 
 	for name, fn := range linters.TotalPullRequestHandlers() {
 		linterConfig := s.config.GetLinterConfig(org, repo, name)
@@ -439,16 +405,16 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 		}
 
 		if linterConfig.WorkDir != "" {
-			linterConfig.WorkDir = r.Directory() + "/" + linterConfig.WorkDir
+			linterConfig.WorkDir = defaultWorkDir + "/" + linterConfig.WorkDir
 		} else {
-			linterConfig.WorkDir = r.Directory()
+			linterConfig.WorkDir = defaultWorkDir
 		}
 
 		log.Infof("[%s] config on repo %v: %+v", name, orgRepo, linterConfig)
 
 		agent := linters.Agent{
 			LinterConfig: linterConfig,
-			RepoDir:      r.Directory(),
+			RepoDir:      defaultWorkDir,
 			ID:           lintersutil.GetEventGUID(ctx),
 		}
 
@@ -549,45 +515,114 @@ func prepareRepoDir(org, repo string, num int) (string, error) {
 	return dir, nil
 }
 
-func (s *Server) PrepareExtraRef(org, repo, defaultWorkDir string) (repoClients []gitv2.RepoClient, err error) {
-	var repoCfg config.RepoConfig
-	config := s.config
-	if v, ok := config.CustomConfig[org]; ok {
-		repoCfg = v
-	}
-	if v, ok := config.CustomConfig[org+"/"+repo]; ok {
-		repoCfg = v
+func (s *Server) prepareGitRepos(ctx context.Context, org, repo string, num int) (workspace string, workDir string, err error) {
+	log := lintersutil.FromContext(ctx)
+	workspace, err = prepareRepoDir(org, repo, num)
+	if err != nil {
+		log.Errorf("failed to prepare workspace: %v", err)
+		return "", "", err
 	}
 
-	if len(repoCfg.ExtraRefs) == 0 {
-		return []gitv2.RepoClient{}, nil
-	}
-
-	for _, refConfig := range repoCfg.ExtraRefs {
+	refs, workDir := s.fixRefs(workspace, org, repo)
+	log.Debugf("refs: %+v", refs)
+	for _, ref := range refs {
 		opt := gitv2.ClientFactoryOpts{
 			CacheDirBase: github.String(s.repoCacheDir),
 			Persist:      github.Bool(true),
 			UseSSH:       github.Bool(true),
-			Host:         refConfig.Host,
+			Host:         ref.Host,
 		}
 		gitClient, err := gitv2.NewClientFactory(opt.Apply)
 		if err != nil {
-			log.Fatalf("failed to create git client factory: %v", err)
+			log.Errorf("failed to create git client factory: %v", err)
+			return "", "", err
 		}
 
-		repoPath := defaultWorkDir + "/" + refConfig.Repo
-		if refConfig.PathAlias != "" {
-			repoPath = defaultWorkDir + refConfig.PathAlias
-		}
-		r, err := gitClient.ClientForWithRepoOpts(refConfig.Org, refConfig.Repo, gitv2.RepoOpts{
-			CopyTo: repoPath,
+		r, err := gitClient.ClientForWithRepoOpts(ref.Org, ref.Repo, gitv2.RepoOpts{
+			CopyTo: ref.PathAlias,
 		})
 		if err != nil {
-			return []gitv2.RepoClient{}, fmt.Errorf("failed to clone for %s/%s: %w", refConfig.Org, refConfig.Repo, err)
+			log.Errorf("failed to clone for %s/%s: %v", ref.Org, ref.Repo, err)
+			return "", "", err
 		}
 
-		repoClients = append(repoClients, r)
+		// main repo, need to checkout PR and update submodules if any
+		if ref.Org == org && ref.Repo == repo {
+			if err := r.CheckoutPullRequest(num); err != nil {
+				log.Errorf("failed to checkout pull request %d: %v", num, err)
+				return "", "", err
+			}
+
+			// update submodules if any
+			if err := updateSubmodules(ctx, r.Directory(), repo); err != nil {
+				log.Errorf("error updating submodules: %v", err)
+				// continue to run other linters
+			}
+		}
 	}
 
-	return repoClients, nil
+	return workspace, workDir, nil
+}
+
+func updateSubmodules(ctx context.Context, repoDir, repo string) error {
+	log := lintersutil.FromContext(ctx)
+	gitModulesFile := path.Join(repoDir, ".gitmodules")
+	if _, err := os.Stat(gitModulesFile); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			log.Infof("no .gitmodules file in repo %s", repo)
+			return nil
+		}
+		return err
+	}
+
+	log.Info("git pull submodule in progress")
+	cmd := exec.Command("git", "submodule", "update", "--init", "--recursive")
+	cmd.Dir = repoDir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Errorf("error when git pull submodule: %v, output: %s", err, out)
+		return err
+	}
+
+	log.Infof("git pull submodule output: %s", out)
+	return nil
+}
+
+func (s *Server) fixRefs(workspace string, org, repo string) ([]config.Refs, string) {
+	var repoCfg config.RepoConfig
+	if v, ok := s.config.CustomConfig[org]; ok {
+		repoCfg = v
+	}
+	if v, ok := s.config.CustomConfig[org+"/"+repo]; ok {
+		repoCfg = v
+	}
+
+	var mainRepoFound bool
+	var workDir string
+	refs := make([]config.Refs, 0, len(repoCfg.Refs))
+	for _, ref := range repoCfg.Refs {
+		if ref.PathAlias != "" {
+			ref.PathAlias = filepath.Join(workspace, ref.PathAlias)
+		} else {
+			ref.PathAlias = filepath.Join(workspace, ref.Repo)
+		}
+		refs = append(refs, ref)
+
+		if ref.Repo == repo && ref.Org == org {
+			mainRepoFound = true
+			workDir = ref.PathAlias
+		}
+	}
+
+	if !mainRepoFound {
+		// always add the main repo to the list
+		workDir = filepath.Join(workspace, repo)
+		refs = append(refs, config.Refs{
+			Org:       org,
+			Repo:      repo,
+			PathAlias: workDir,
+		})
+	}
+
+	return refs, workDir
 }
