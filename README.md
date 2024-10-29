@@ -41,6 +41,7 @@ This approach helps PR authors avoid searching for issues in lengthy console log
 - [Configuration](#configuration)
   - [Adjusting Execution Commands](#adjusting-execution-commands)
   - [Disabling a Linter](#disabling-a-linter)
+  - [Cloning multiple repositories](#cloning-multiple-repositories)
   - [Executing Linters via Docker](#executing-linters-via-docker)
   - [Executing Linters via Kubernetes](#executing-linters-via-kubernetes)
 - [Reviewbot Operational Flow](#reviewbot-operational-flow)
@@ -162,6 +163,22 @@ qbox/net-gslb:
 ```
 
 This configuration means that the `golangci-lint` check is disabled for the `qbox/net-gslb` repository.
+
+### Cloning multiple repositories
+
+By default, Reviewbot clones the repository where the event occurs. However, in some scenarios, we might want to clone multiple repositories, and customizing the cloning path.
+
+For example:
+
+```yaml
+qbox/net-gslb:
+  refs:
+    - org: "qbox"
+      repo: "net-gslb"
+      pathAlias: "src/qiniu.com/net-gslb"
+    - org: "qbox"
+      repo: "kodo"
+```
 
 ### Executing Linters via Docker
 
