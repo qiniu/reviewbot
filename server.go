@@ -399,6 +399,7 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 	for name, fn := range linters.TotalPullRequestHandlers() {
 		linterConfig := s.config.GetLinterConfig(org, repo, name)
 		linterConfig.Number = num
+		linterConfig.Workspace = workspace
 		// skip linter if it is disabled
 		if linterConfig.Enable != nil && !*linterConfig.Enable {
 			continue

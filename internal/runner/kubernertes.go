@@ -138,7 +138,7 @@ func (k *KubernetesRunner) Run(ctx context.Context, cfg *config.Linter) (io.Read
 	}
 
 	// copy repo code to pod
-	err = k.copyCodeToPod(ctx, cfg.WorkDir, namespace, podName, cfg.WorkDir)
+	err = k.copyCodeToPod(ctx, cfg.Workspace, namespace, podName, cfg.Workspace)
 	if err != nil {
 		log.Errorf("failed to copy code to pod: %v", err)
 		return nil, err

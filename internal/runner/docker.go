@@ -148,8 +148,8 @@ func (d *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadClos
 
 	// NOTE(Carl): do not know why mount volume does not work in DinD mode,
 	// copy the code to container instead.
-	log.Infof("copy code to container: src: %s, dst: %s", cfg.WorkDir, cfg.WorkDir)
-	if err := d.copyToContainer(ctx, resp.ID, cfg.WorkDir, cfg.WorkDir); err != nil {
+	log.Infof("copy code to container: src: %s, dst: %s", cfg.Workspace, cfg.Workspace)
+	if err := d.copyToContainer(ctx, resp.ID, cfg.Workspace, cfg.Workspace); err != nil {
 		return nil, fmt.Errorf("failed to copy code to container: %w", err)
 	}
 

@@ -139,6 +139,8 @@ type Linter struct {
 	Repo string `json:"-"`
 	// Number is the number of PR or MR.
 	Number int `json:"-"`
+	// Workspace is the workspace to store all git repositories related by the linter.
+	Workspace string `json:"-"`
 	// Enable is whether to enable this linter, if false, linter still run but not report.
 	Enable *bool `json:"enable,omitempty"`
 	// DockerAsRunner is the docker image to run the linter.
@@ -176,8 +178,8 @@ type Linter struct {
 
 func (l Linter) String() string {
 	return fmt.Sprintf(
-		"Linter{Enable: %v, DockerAsRunner: %v, WorkDir: %v, Command: %v, Args: %v, ReportFormat: %v, ConfigPath: %v}",
-		*l.Enable, l.DockerAsRunner, l.WorkDir, l.Command, l.Args, l.ReportFormat, l.ConfigPath)
+		"Linter{Enable: %v, DockerAsRunner: %v, Workspace: %v, WorkDir: %v, Command: %v, Args: %v, ReportFormat: %v, ConfigPath: %v}",
+		*l.Enable, l.DockerAsRunner, l.Workspace, l.WorkDir, l.Command, l.Args, l.ReportFormat, l.ConfigPath)
 }
 
 var (
