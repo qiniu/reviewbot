@@ -52,6 +52,7 @@ type GlobalConfig struct {
 	// GithubReportType is the format of the report, will be used if linterConfig.ReportFormat is empty.
 	// e.g. "github_checks", "github_pr_review"
 	GithubReportType GithubReportType `json:"githubReportType,omitempty"`
+	GitlabReportType GitlabReportType `json:"gitlabReportType,omitempty"`
 
 	// GolangciLintConfig is the path of golangci-lint config file to run golangci-lint globally.
 	// if not empty, use the config to run golangci-lint.
@@ -143,7 +144,8 @@ type Linter struct {
 	// github_pr_review: https://developer.github.com/v3/pulls/reviews/#create-a-pull-request-review
 	// Note:
 	// * github_check_run only support on Github Apps, not support on Github OAuth Apps or authenticated users.
-	ReportFormat GithubReportType `json:"githubReportType,omitempty"`
+	GithubReportFormat GithubReportType `json:"githubReportType,omitempty"`
+	GitlabReportFormat GitlabReportType `json:"githubReportType,omitempty"`
 
 	// ConfigPath is the path of the linter config file.
 	// If not empty, use the config to run the linter.
@@ -156,7 +158,7 @@ type Linter struct {
 func (l Linter) String() string {
 	return fmt.Sprintf(
 		"Linter{Enable: %v, DockerAsRunner: %v, WorkDir: %v, Command: %v, Args: %v, ReportFormat: %v, ConfigPath: %v}",
-		*l.Enable, l.DockerAsRunner, l.WorkDir, l.Command, l.Args, l.ReportFormat, l.ConfigPath)
+		*l.Enable, l.DockerAsRunner, l.WorkDir, l.Command, l.Args, l.GithubReportFormat, l.ConfigPath)
 }
 
 // NewConfig returns a new Config.
@@ -215,12 +217,13 @@ func NewConfig(conf string) (Config, error) {
 
 func (c Config) GetLinterConfig(org, repo, ln string) Linter {
 	linter := Linter{
-		Enable:       boolPtr(true),
-		ReportFormat: c.GlobalDefaultConfig.GithubReportType,
-		Modifier:     NewBaseModifier(),
-		Name:         ln,
-		Org:          org,
-		Repo:         repo,
+		Enable:             boolPtr(true),
+		GithubReportFormat: c.GlobalDefaultConfig.GithubReportType,
+		GitlabReportFormat: c.GlobalDefaultConfig.GitlabReportType,
+		Modifier:           NewBaseModifier(),
+		Name:               ln,
+		Org:                org,
+		Repo:               repo,
 	}
 
 	// set golangci-lint config path if exists
@@ -277,8 +280,11 @@ func applyCustomConfig(legacy, custom Linter) Linter {
 		legacy.Args = custom.Args
 	}
 
-	if custom.ReportFormat != "" {
-		legacy.ReportFormat = custom.ReportFormat
+	if custom.GithubReportFormat != "" {
+		legacy.GithubReportFormat = custom.GithubReportFormat
+	}
+	if custom.GitlabReportFormat != "" {
+		legacy.GitlabReportFormat = custom.GitlabReportFormat
 	}
 
 	if custom.ConfigPath != "" {
@@ -319,15 +325,18 @@ func applyCustomConfig(legacy, custom Linter) Linter {
 
 // GithubReportType is the type of the report.
 type GithubReportType string
+type GitlabReportType string
 
 const (
-	GithubCheckRuns  GithubReportType = "github_check_run"
-	GithubPRReview   GithubReportType = "github_pr_review"
-	GitlabComment    GithubReportType = "gitlab_mr_comment"
-	GitlabDiscussion GithubReportType = "gitlab_mr_discussion"
+	GithubCheckRuns            GithubReportType = "github_check_run"
+	GithubPRReview             GithubReportType = "github_pr_review"
+	GitlabComment              GitlabReportType = "gitlab_mr_comment"
+	GitlabDiscussion           GitlabReportType = "gitlab_mr_discussion"
+	GitlabCommentAndDiscussion GitlabReportType = "gitlab_mr_comment_discussion"
 
 	// for debug and testing.
-	Quiet GithubReportType = "quiet"
+	Quiet       GithubReportType = "quiet"
+	QuietGitlab GitlabReportType = "quiet"
 )
 
 func boolPtr(b bool) *bool {

@@ -214,6 +214,7 @@ func main() {
 		CacheDirBase: github.String(o.codeCacheDir),
 		Persist:      github.Bool(true),
 		UseSSH:       github.Bool(true),
+		Host:         "gitlab.com",
 	}
 	v2, err := gitv2.NewClientFactory(opt.Apply)
 	if err != nil {
@@ -255,13 +256,14 @@ func main() {
 		config:            cfg,
 		gitHubAccessToken: o.gitHubAccessToken,
 		gitLabAccessToken: o.gitLabAccessToken,
-		appID:             o.appID,
-		appPrivateKey:     o.appPrivateKey,
-		debug:             o.debug,
-		serverAddr:        o.serverAddr,
-		repoCacheDir:      o.codeCacheDir,
-		kubeConfig:        o.kubeConfig,
-		linterReference:   regexpRefernce,
+
+		appID:           o.appID,
+		appPrivateKey:   o.appPrivateKey,
+		debug:           o.debug,
+		serverAddr:      o.serverAddr,
+		repoCacheDir:    o.codeCacheDir,
+		kubeConfig:      o.kubeConfig,
+		linterReference: regexpRefernce,
 	}
 
 	go s.initDockerRunner()

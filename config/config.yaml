@@ -6,8 +6,10 @@
 
 globalDefaultConfig: # global default settings, will be overridden by qbox org and repo specific settings if they exist
   githubReportType: "github_check_run" # github_pr_review, github_check_run
+  gitlabReportType: "gitlab_mr_comment" # gitlab_mr_comment, gitlab_mr_discussion,gitlab_mr_comment_discussion
   golangcilintConfig: "config/linters-config/.golangci.yml" # golangci-lint config file to use
   copySSHKeyToContainer: "/root/.ssh/id_rsa"
+
 
 customConfig: # custom config for specific orgs or repos
   goplus:

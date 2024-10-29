@@ -432,9 +432,10 @@ func (s *Server) gitlabHandle(ctx context.Context, event *gitlab.MergeEvent) err
 
 	log.Infof("processing pull request %d, (%v/%v)\n", num, org, repo)
 
-	mergeRequestAffectedFiles, response, err := linters.ListMergeRequestsFiles(ctx, s.GitLabClient(), org, repo, pid, num)
-	if err != nil {
-		return err
+	mergeRequestAffectedFiles, response, errx := linters.ListMergeRequestsFiles(ctx, s.GitLabClient(), org, repo, pid, num)
+	if errx != nil {
+		log.Errorf("List MergeRequestFiles Error: %v\n", errx)
+		return errx
 	}
 	//var changeFiles []linters.GitlabProvider.MergeRequestChangedFiles
 	//
@@ -515,22 +516,27 @@ func (s *Server) gitlabHandle(ctx context.Context, event *gitlab.MergeEvent) err
 		}
 
 		log.Infof("[%s] config on repo %v: %+v", name, orgRepo, linterConfig)
-		linterConfig.ReportFormat = config.GitlabComment
+		opt := gitv2.ClientFactoryOpts{
+			CacheDirBase: github.String(s.repoCacheDir),
+			Persist:      github.Bool(true),
+			UseSSH:       github.Bool(true),
+		}
+		v2new, err := gitv2.NewClientFactory(opt.Apply)
+		if err != nil {
+			log.Fatalf("failed to create git client factory: %v", err)
+		}
+		gitlabProvider, err := linters.NewGitlabProvider(s.GitLabClient(), v2new, mergeRequestAffectedFiles, *event)
 
-		gitlabProvider, err := linters.NewGitlabProvider(s.gitLabAccessToken, s.gitClientFactory, mergeRequestAffectedFiles, *event)
 		if err != nil {
 			log.Errorf("failed to create provider: %v", err)
 			return err
 		}
 		agent := linters.Agent{
 			LinterConfig: linterConfig,
-			//GitClient:                s.gitClientFactory,
-			//GitLabClient:             s.GitLabClient(),
-			//MergeRequestEvent:        *event,
-			RepoDir:  r.Directory(),
-			Context:  ctx,
-			ID:       lintersutil.GetEventGUID(ctx),
-			Provider: gitlabProvider,
+			RepoDir:      r.Directory(),
+			Context:      ctx,
+			ID:           lintersutil.GetEventGUID(ctx),
+			Provider:     gitlabProvider,
 		}
 
 		if !linters.LinterRelated(name, agent) {
@@ -566,8 +572,8 @@ func (s *Server) gitlabHandle(ctx context.Context, event *gitlab.MergeEvent) err
 
 }
 func (s *Server) GitLabClient() *gitlab.Client {
-	git, err := gitlab.NewClient(s.gitLabAccessToken, gitlab.WithBaseURL("https://gitlab.qiniu.io/"))
-	// git, err := gitlab.NewClient("gitlabtokeen", gitlab.WithBaseURL("https://gitlab.com/"))
+	//git, err := gitlab.NewClient(s.gitLabAccessToken, gitlab.WithBaseURL("https://gitlab.qiniu.io/"))
+	git, err := gitlab.NewClient(s.gitLabAccessToken, gitlab.WithBaseURL("https://gitlab.com/"))
 	if err != nil {
 		log.Fatalf("Failed to create client: %v", err)
 	}
@@ -807,6 +813,7 @@ func (s *Server) PrepareExtraRef(org, repo, defaultWorkDir string) (repoClients 
 			UseSSH:       github.Bool(true),
 			Host:         refConfig.Host,
 		}
+
 		gitClient, err := gitv2.NewClientFactory(opt.Apply)
 		if err != nil {
 			log.Fatalf("failed to create git client factory: %v", err)
