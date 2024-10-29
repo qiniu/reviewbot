@@ -1,12 +1,13 @@
 # go lint tool dependencies `go list` `gofmt`
-FROM golang:1.22.3-alpine3.20
+FROM golang:1.23.2-alpine3.20
 
 # if you want to install other tools, please add them here.
 # Do not install unnecessary tools to reduce image size.
 RUN set -eux  \
     apk update && \
-    apk --no-cache add ca-certificates git openssh yarn libpcap-dev curl openjdk11 bash build-base  && \
-    curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b  /usr/local/bin v1.59.1
+    apk --no-cache add ca-certificates git openssh yarn libpcap-dev curl openjdk11 bash build-base  
+
+RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b  /usr/local/bin v1.61.0
 
 WORKDIR /
 
