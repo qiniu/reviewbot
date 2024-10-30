@@ -19,17 +19,18 @@ package linters
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/hashicorp/go-version"
 	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/reviewbot/internal/metric"
 	"github.com/qiniu/x/log"
 	gitlab "github.com/xanzy/go-gitlab"
-	"net/http"
 	gitv2 "sigs.k8s.io/prow/pkg/git/v2"
-	"strconv"
-	"strings"
-	"time"
 )
 
 func ListMergeRequestsFiles(ctx context.Context, gc *gitlab.Client, owner string, repo string, pid int, number int) ([]*gitlab.MergeRequestDiff, *gitlab.Response, error) {
@@ -300,8 +301,8 @@ func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[st
 }
 
 func CreateGitLabCommentsReport(ctx context.Context, gc *gitlab.Client, outputs map[string][]LinterOutput, lintername string, pid int, number int, logurl string) error {
-	const ComentDetalHeader = "<details>"
-	const CommentDetal = `
+	const comentDetailHeader = "<details>"
+	const commentDetail = `
 <br>If you have any questions about this comment, feel free to raise an issue here:
 
 - **https://github.com/qiniu/reviewbot**
@@ -319,9 +320,9 @@ func CreateGitLabCommentsReport(ctx context.Context, gc *gitlab.Client, outputs 
 				errormessage = errormessage + "<br>" + outputmessage.File + ", line:" + strconv.Itoa(outputmessage.Line) + ", " + outputmessage.Message
 			}
 		}
-		message = fmt.Sprintf("[**%s**]  check failed❌ , %v files exist errors,%v errors found.     This is [the detailed log](%s).\n%s", lintername, len(outputs), totalerrorscount, logurl, ComentDetalHeader+errormessage+"<br>"+CommentDetal)
+		message = fmt.Sprintf("[**%s**]  check failed❌ , %v files exist errors,%v errors found.     This is [the detailed log](%s).\n%s", lintername, len(outputs), totalerrorscount, logurl, comentDetailHeader+errormessage+"<br>"+commentDetail)
 	} else {
-		message = fmt.Sprintf("[**%s**]  check passed✅ . \n%s", lintername, ComentDetalHeader+CommentDetal)
+		message = fmt.Sprintf("[**%s**]  check passed✅ . \n%s", lintername, comentDetailHeader+commentDetail)
 	}
 	var optd gitlab.CreateMergeRequestNoteOptions
 	var addedComments []*gitlab.Note
@@ -383,7 +384,6 @@ func ListMergeRequestDiscussions(ctx context.Context, gc *gitlab.Client, number 
 }
 
 func DeleteMergeRequestDiscussions(ctx context.Context, gc *gitlab.Client, number int, pid int, dlist []*gitlab.Discussion, linterFlag string) error {
-
 	for _, d := range dlist {
 		if (d.Notes[0].Type == "DiffNote") && strings.HasPrefix(d.Notes[0].Body, linterFlag) {
 			re, err := gc.Discussions.DeleteMergeRequestDiscussionNote(pid, number, "", d.Notes[0].ID, nil)
@@ -488,8 +488,7 @@ func DeleteMergeReviewCommentsForGitLab(ctx context.Context, gc *gitlab.Client, 
 
 func constructMergeRequestDiscussion(linterOutputs map[string][]LinterOutput, linterName, commitID string, headSha string, baseSha string, startSha string) []*gitlab.CreateMergeRequestDiscussionOptions {
 	var comments []*gitlab.CreateMergeRequestDiscussionOptions
-	var ptype string
-	ptype = "text"
+	var ptype = "text"
 	for file, outputs := range linterOutputs {
 		for _, output := range outputs {
 			message := fmt.Sprintf("%s %s\n%s",

@@ -551,10 +551,9 @@ func (s *Server) gitlabHandle(ctx context.Context, event *gitlab.MergeEvent) err
 	}
 
 	return nil
-
 }
+
 func (s *Server) GitLabClient() *gitlab.Client {
-	//git, err := gitlab.NewClient(s.gitLabAccessToken, gitlab.WithBaseURL("https://gitlab.qiniu.io/"))
 	git, err := gitlab.NewClient(s.gitLabAccessToken, gitlab.WithBaseURL("https://"+s.gitLabHost+"/"))
 	if err != nil {
 		log.Fatalf("Failed to create client: %v", err)
