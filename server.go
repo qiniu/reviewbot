@@ -63,6 +63,8 @@ type Server struct {
 	storage storage.Storage
 
 	webhookSecret []byte
+	// support gitlab
+	gitLabHost string
 
 	// support developer access token model
 	gitLabAccessToken string
@@ -520,6 +522,7 @@ func (s *Server) gitlabHandle(ctx context.Context, event *gitlab.MergeEvent) err
 			CacheDirBase: github.String(s.repoCacheDir),
 			Persist:      github.Bool(true),
 			UseSSH:       github.Bool(true),
+			Host:         s.gitLabHost,
 		}
 		v2new, err := gitv2.NewClientFactory(opt.Apply)
 		if err != nil {
@@ -573,7 +576,7 @@ func (s *Server) gitlabHandle(ctx context.Context, event *gitlab.MergeEvent) err
 }
 func (s *Server) GitLabClient() *gitlab.Client {
 	//git, err := gitlab.NewClient(s.gitLabAccessToken, gitlab.WithBaseURL("https://gitlab.qiniu.io/"))
-	git, err := gitlab.NewClient(s.gitLabAccessToken, gitlab.WithBaseURL("https://gitlab.com/"))
+	git, err := gitlab.NewClient(s.gitLabAccessToken, gitlab.WithBaseURL("https://"+s.gitLabHost+"/"))
 	if err != nil {
 		log.Fatalf("Failed to create client: %v", err)
 	}

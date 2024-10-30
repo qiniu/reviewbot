@@ -18,31 +18,18 @@ package linters
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"golang.org/x/mod/semver"
-	"net/http"
-	"strconv"
-	"strings"
-	"time"
-
-	"github.com/google/go-github/v57/github"
+	"github.com/hashicorp/go-version"
 	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/x/log"
 	gitlab "github.com/xanzy/go-gitlab"
+	"net/http"
 	gitv2 "sigs.k8s.io/prow/pkg/git/v2"
+	"strconv"
+	"strings"
+	"time"
 )
-
-//var (
-//	// ErrAfterTry is the error that the operation failed after 5 retries.
-//	ErrAfterTry       = errors.New("failed after 5 retries")
-//	ErrDeleteComment  = errors.New("delete comment failed")
-//	ErrCreateComment  = errors.New("create comment failed")
-//	ErrCreateCheckRun = errors.New("create check run failed")
-//	ErrListComments   = errors.New("list comments failed")
-//	ErrListCommits    = errors.New("list commits failed")
-//)
 
 // ListFiles lists all files for the specified pull request.
 func getFloatGitLabVersion(ctx context.Context, gc *gitlab.Client) string {
@@ -55,83 +42,11 @@ func getFloatGitLabVersion(ctx context.Context, gc *gitlab.Client) string {
 	return v.Version
 }
 func ListMergeRequestsFiles(ctx context.Context, gc *gitlab.Client, owner string, repo string, pid int, number int) ([]*gitlab.MergeRequestDiff, *gitlab.Response, error) {
-	//fversion := getFloatGitLabVersion(ctx, gc)
-	//if semver.Compare(fversion, "15.7") >= 0 {
-	//	files, response, err := gc.MergeRequests.ListMergeRequestDiffs(pid, number, nil)
-	//	if err != nil {
-	//		return nil, nil, err
-	//	}
-	//	return files, response, err
-	//}
 	files, response, err := gc.MergeRequests.GetMergeRequestChanges(pid, number, nil)
 	if err != nil {
 		return nil, nil, err
 	}
-	//files
 	return files.Changes, response, err
-}
-
-// FilterPullRequests filter full request by commit.
-func FilterMergeRequestsWithCommit(ctx context.Context, gc *github.Client, owner, repo, headSha string) ([]*github.PullRequest, error) {
-	var allPRs []*github.PullRequest
-	opt := &github.PullRequestListOptions{
-		State: "open",
-		ListOptions: github.ListOptions{
-			PerPage: 100,
-		},
-	}
-
-	for {
-		prs, resp, err := gc.PullRequests.List(ctx, owner, repo, opt)
-		if err != nil {
-			return nil, fmt.Errorf("failed to list pull requests: %w", err)
-		}
-		if resp.StatusCode != http.StatusOK {
-			return nil, fmt.Errorf("failed to list pull requests: %v", github.Stringify(resp.Body))
-		}
-
-		for _, pr := range prs {
-			if pr.GetHead().GetSHA() == headSha {
-				allPRs = append(allPRs, pr)
-			}
-		}
-
-		if resp.NextPage == 0 {
-			break
-		}
-		opt.Page = resp.NextPage
-	}
-
-	return allPRs, nil
-}
-
-// RetryWithBackoff retries the function with backoff.
-func RetryWithBackoffMerge(ctx context.Context, f func() error) error {
-	log := lintersutil.FromContext(ctx)
-	backoff := time.Second
-	for i := 0; i < 5; i++ {
-		err := f()
-		if err == nil {
-			return nil
-		}
-
-		if errors.Is(err, context.Canceled) {
-			return err
-		}
-
-		log.Errorf("retrying after error: %v", err)
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(backoff):
-			backoff *= 2
-		}
-	}
-
-	return ErrAfterTry
-}
-func getPid() {
-
 }
 
 func (g *GitlabProvider) ListCommits(ctx context.Context, org, repo string, number int) ([]Commit, error) {
@@ -165,61 +80,6 @@ func (g *GitlabProvider) ListCommits(ctx context.Context, org, repo string, numb
 	}
 
 	return allCommits, nil
-}
-
-//func linterNamePrefix(linterName string) string {
-//	return fmt.Sprintf("[%s]", linterName)
-//}
-
-// filterPullRequestComments filters out the comments that are already posted by the bot.
-func filterLinterOutputsForGitLab(outputs map[string][]LinterOutput, comments []*gitlab.Note) (toAdds map[string][]LinterOutput, toDeletes []*gitlab.Note) {
-	toAdds = make(map[string][]LinterOutput)
-
-	validComments := make(map[int64]struct{})
-	for file, lintFileErrs := range outputs {
-		for _, lintErr := range lintFileErrs {
-			var found bool
-			for _, comment := range comments {
-				if comment.FileName == file && comment.Position.NewLine == lintErr.Line && strings.Contains(comment.Body, lintErr.Message) {
-					found = true
-					validComments[int64(comment.ID)] = struct{}{}
-					break
-				}
-			}
-
-			// if the linter err is not found, add it to the toAdds
-			if !found {
-				toAdds[file] = append(toAdds[file], lintErr)
-			}
-		}
-	}
-
-	// filter out the comments that are not in the linter outputs
-	for _, comment := range comments {
-		if _, ok := validComments[int64(comment.ID)]; !ok {
-			toDeletes = append(toDeletes, comment)
-		}
-	}
-	return toAdds, toDeletes
-}
-
-//const Reference = "If you have any questions about this comment, feel free to [raise an issue here](https://github.com/qiniu/reviewbot)."
-
-func toGitlabCheckRunAnnotations(linterOutputs map[string][]LinterOutput) []*github.CheckRunAnnotation {
-	var annotations []*github.CheckRunAnnotation
-	for file, outputs := range linterOutputs {
-		for _, output := range outputs {
-			annotation := &github.CheckRunAnnotation{
-				Path:            github.String(file),
-				StartLine:       github.Int(output.Line),
-				EndLine:         github.Int(output.Line),
-				AnnotationLevel: github.String("warning"),
-				Message:         github.String(output.Message),
-			}
-			annotations = append(annotations, annotation)
-		}
-	}
-	return annotations
 }
 
 // make sure the GitLabProvider implements the Provider interface.
@@ -280,7 +140,6 @@ func (g *GitlabProvider) DeleteComment(ctx context.Context, org, repo string, co
 
 func (g *GitlabProvider) CreateComment(ctx context.Context, org, repo string, number int, comment *Comment) (*Comment, error) {
 
-	//gc.MergeRequests.GetMergeRequestDiffVersions()
 	cmt := comment
 	var opt gitlab.CreateMergeRequestNoteOptions
 	opt.Body = &cmt.Body
@@ -305,7 +164,6 @@ func (g *GitlabProvider) CreateComment(ctx context.Context, org, repo string, nu
 }
 
 func (g *GitlabProvider) GetCodeReviewInfo() CodeReview {
-	//TODO implement me
 
 	updatetime, _ := time.Parse("2006-01-02 15:04:05", g.MergeRequestEvent.ObjectAttributes.UpdatedAt)
 
@@ -342,9 +200,12 @@ func ReportFormMartCheck(gc *gitlab.Client, reportFomart config.GitlabReportType
 		log.Fatalf("Failed to get version: %v,response is %v", e, r)
 		return config.QuietGitlab
 	}
-	if semver.Compare(v.Version, "10.8") < 0 {
+	v1, _ := version.NewVersion(v.Version)
+	v2, _ := version.NewVersion("10.8")
+	if v1.LessThan(v2) {
 		return config.GitlabComment
 	}
+
 	return reportFomart
 
 }
@@ -352,7 +213,9 @@ func ReportFormMartCheck(gc *gitlab.Client, reportFomart config.GitlabReportType
 func (g *GitlabProvider) HandleComments(ctx context.Context, outputs map[string][]LinterOutput) error {
 	return nil
 }
-
+func linterNamePrefixGitLab(linterName string) string {
+	return fmt.Sprintf("[**%s**]", linterName)
+}
 func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[string][]LinterOutput) error {
 	linterName := a.LinterConfig.Name
 	org := a.Provider.GetCodeReviewInfo().Org
@@ -371,15 +234,14 @@ func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[st
 
 		// filter out the comments that are not related to the linter
 		var existedCommentsToKeep []*gitlab.Note
-		linterFlag := linterNamePrefix(linterName)
+		linterFlag := linterNamePrefixGitLab(linterName)
 		for _, comment := range existedComments {
 			if strings.HasPrefix(comment.Body, linterFlag) {
 				existedCommentsToKeep = append(existedCommentsToKeep, comment)
 			}
 		}
 		log.Infof("%s found %d existed comments for this PR %d (%s) \n", linterFlag, len(existedCommentsToKeep), num, orgRepo)
-
-		toAdds, toDeletes := filterLinterOutputsForGitLab(lintResults, existedCommentsToKeep)
+		toDeletes := existedCommentsToKeep
 		if err := DeleteMergeReviewCommentsForGitLab(context.Background(), g.GitLabClient, org, repo, toDeletes, pid, num); err != nil {
 			log.Errorf("failed to delete comments: %v", err)
 			return err
@@ -392,12 +254,25 @@ func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[st
 		}
 
 		logURL := a.GenLogViewUrl()
-		commerr := CreateGitLabCommnetsReport(context.Background(), g.GitLabClient, toAdds, linterName, pid, num, logURL)
+		commerr := CreateGitLabCommentsReport(context.Background(), g.GitLabClient, lintResults, linterName, pid, num, logURL)
 		if commerr != nil {
 			log.Errorf("failed to delete comments: %v", commerr)
 		}
 
-		discussion := constructMergeRequestDiscussion(toAdds, linterFlag, g.MergeRequestEvent.ObjectAttributes.LastCommit.ID, h, b, s)
+		// create discussion note
+		dlist, err := ListMergeRequestDiscussions(context.Background(), g.GitLabClient, num, pid)
+		if err != nil {
+			log.Errorf("failed to list comments: %v", err)
+			return err
+		}
+		log.Info(len(dlist))
+		errd := DeleteMergeRequestDiscussions(context.Background(), g.GitLabClient, num, pid, dlist, linterFlag)
+		if errd != nil {
+			log.Errorf("failed to delete discussion: %v", err)
+			return errd
+		}
+
+		discussion := constructMergeRequestDiscussion(lintResults, linterFlag, g.MergeRequestEvent.ObjectAttributes.LastCommit.ID, h, b, s)
 		if len(discussion) == 0 {
 			return nil
 		}
@@ -421,7 +296,7 @@ func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[st
 
 		// filter out the comments that are not related to the linter
 		var existedCommentsToKeep []*gitlab.Note
-		linterFlag := linterNamePrefix(linterName)
+		linterFlag := linterNamePrefixGitLab(linterName)
 		for _, comment := range existedComments {
 			if strings.HasPrefix(comment.Body, linterFlag) {
 				existedCommentsToKeep = append(existedCommentsToKeep, comment)
@@ -429,15 +304,14 @@ func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[st
 		}
 		log.Infof("%s found %d existed comments for this PR %d (%s) \n", linterFlag, len(existedCommentsToKeep), num, orgRepo)
 
-		toAdds, toDeletes := filterLinterOutputsForGitLab(lintResults, existedCommentsToKeep)
-		if err := DeleteMergeReviewCommentsForGitLab(context.Background(), g.GitLabClient, org, repo, toDeletes, pid, num); err != nil {
+		if err := DeleteMergeReviewCommentsForGitLab(context.Background(), g.GitLabClient, org, repo, existedCommentsToKeep, pid, num); err != nil {
 			log.Errorf("failed to delete comments: %v", err)
 			return err
 		}
-		log.Infof("%s delete %d comments for this PR %d (%s) \n", linterFlag, len(toDeletes), num, orgRepo)
+		log.Infof("%s delete %d comments for this PR %d (%s) \n", linterFlag, len(existedCommentsToKeep), num, orgRepo)
 
 		logURL := a.GenLogViewUrl()
-		commerr := CreateGitLabCommnetsReport(context.Background(), g.GitLabClient, toAdds, linterName, pid, num, logURL)
+		commerr := CreateGitLabCommentsReport(context.Background(), g.GitLabClient, lintResults, linterName, pid, num, logURL)
 		if commerr != nil {
 			log.Errorf("failed to delete comments: %v", commerr)
 		}
@@ -450,10 +324,8 @@ func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[st
 
 	return nil
 }
-func CreateGitLabDisscussionReport(ctx context.Context, gc gitlab.Client, outputs map[string][]LinterOutput, pid int, number int, lintername string) {
 
-}
-func CreateGitLabCommnetsReport(ctx context.Context, gc *gitlab.Client, outputs map[string][]LinterOutput, lintername string, pid int, number int, logurl string) error {
+func CreateGitLabCommentsReport(ctx context.Context, gc *gitlab.Client, outputs map[string][]LinterOutput, lintername string, pid int, number int, logurl string) error {
 
 	const ComentDetalHeader = "<details>"
 	const CommentDetal = `
@@ -481,14 +353,14 @@ func CreateGitLabCommnetsReport(ctx context.Context, gc *gitlab.Client, outputs 
 		message = fmt.Sprintf("[**%s**]  check passed✅ . \n%s", lintername, ComentDetalHeader+CommentDetal)
 	}
 
-	var optd gitlab.CreateMergeRequestDiscussionOptions
-	var addedComments []*gitlab.Discussion
+	var optd gitlab.CreateMergeRequestNoteOptions
+	var addedComments []*gitlab.Note
 
 	optd.Body = &message
 	err := RetryWithBackoff(ctx, func() error {
 		log.Infof("CREATE NOTE %v,%v", pid, number)
 
-		cm, resp, err := gc.Discussions.CreateMergeRequestDiscussion(pid, number, &optd)
+		cm, resp, err := gc.Notes.CreateMergeRequestNote(pid, number, &optd)
 		if err != nil {
 			return err
 		}
@@ -528,45 +400,36 @@ func MergeRequestSHA(gc *gitlab.Client, pid int, num int) (HeadSha string, BaseS
 		return "", "", "", fmt.Errorf("get mr head sha failed: %v", err)
 
 	}
-
 	return mr.DiffRefs.HeadSha, mr.DiffRefs.BaseSha, mr.DiffRefs.StartSha, nil
 }
-func constructMergeRequestComments(linterOutputs map[string][]LinterOutput, linterName, commitID string, headSha string, baseSha string, startSha string) []*gitlab.Note {
-	var comments []*gitlab.Note
-	for file, outputs := range linterOutputs {
-		for _, output := range outputs {
-			message := fmt.Sprintf("%s %s\n%s", linterName, output.Message, CommentFooter)
-			if output.StartLine != 0 {
-				comments = append(comments, &gitlab.Note{
-					Body:     message,
-					CommitID: commitID,
-					Position: &gitlab.NotePosition{
-						NewPath:  file,
-						NewLine:  output.StartLine,
-						BaseSHA:  baseSha,
-						HeadSHA:  headSha,
-						StartSHA: startSha,
-					},
-				})
-			} else {
-				comments = append(comments, &gitlab.Note{
-					Body: message,
 
-					Position: &gitlab.NotePosition{
-						NewPath:  file,
-						BaseSHA:  baseSha,
-						HeadSHA:  headSha,
-						StartSHA: startSha,
-						NewLine:  output.StartLine,
-					},
-					CommitID: commitID,
-				})
-			}
-		}
+func ListMergeRequestDiscussions(ctx context.Context, gc *gitlab.Client, number int, pid int) ([]*gitlab.Discussion, error) {
+	opts := gitlab.ListMergeRequestDiscussionsOptions{
+		PerPage: 200,
 	}
-	return comments
+	rd, re, er := gc.Discussions.ListMergeRequestDiscussions(pid, number, &opts, nil)
+	if er != nil {
+		log.Errorf("get mergerequest discussions failed:%v,reponse is:", er, re)
+		return nil, er
+	}
+	return rd, nil
 }
 
+func DeleteMergeRequestDiscussions(ctx context.Context, gc *gitlab.Client, number int, pid int, dlist []*gitlab.Discussion, linterFlag string) error {
+
+	for _, d := range dlist {
+		if (d.Notes[0].Type == "DiffNote") && strings.HasPrefix(d.Notes[0].Body, linterFlag) {
+			re, err := gc.Discussions.DeleteMergeRequestDiscussionNote(pid, number, "", d.Notes[0].ID, nil)
+			if err != nil {
+				log.Errorf("delete mergerequest discussions failed:%v,reponse is:", err, re)
+				return err
+			}
+		}
+
+	}
+
+	return nil
+}
 func (g *GitlabProvider) ListMergeRequestsComments(ctx context.Context, gc *gitlab.Client, owner string, repo string, number int, pid int) ([]*gitlab.Note, error) {
 	var allComments []*gitlab.Note
 	opts := gitlab.ListMergeRequestNotesOptions{
@@ -649,7 +512,7 @@ func DeleteMergeReviewCommentsForGitLab(ctx context.Context, gc *gitlab.Client, 
 	for _, comment := range comments {
 		cmt := comment
 		err := RetryWithBackoff(ctx, func() error {
-			resp, err := gc.Notes.DeleteMergeRequestNote(pid, number, cmt.ID)
+			resp, err := gc.Notes.DeleteMergeRequestNote(int(pid), int(number), int(cmt.ID), nil)
 			if err != nil {
 				return err
 			}
@@ -668,52 +531,6 @@ func DeleteMergeReviewCommentsForGitLab(ctx context.Context, gc *gitlab.Client, 
 	return nil
 }
 
-func (g *GitlabProvider) MergeRequestSHA(ctx context.Context, gc *gitlab.Client, pid int, num int) (HeadSha string, BaseSha string, StartSha string, err error) {
-	var mr *gitlab.MergeRequest
-	mr, _, err = gc.MergeRequests.GetMergeRequest(pid, num, nil)
-	if err != nil {
-		return "", "", "", fmt.Errorf("get mr head sha failed: %v", err)
-
-	}
-
-	return mr.DiffRefs.HeadSha, mr.DiffRefs.BaseSha, mr.DiffRefs.StartSha, nil
-}
-
-func CreateMergeReviewCommentsTotal(ctx context.Context, gc *gitlab.Client, owner string, repo string, number int, comments []*gitlab.Note, pid int) {
-
-}
-func CreateMergeReviewComments(ctx context.Context, gc *gitlab.Client, owner string, repo string, number int, comments []*gitlab.Note, pid int) ([]*gitlab.Note, error) {
-	var addedComments []*gitlab.Note
-	//gc.MergeRequests.GetMergeRequestDiffVersions()
-
-	for _, comment := range comments {
-		cmt := comment
-		var opt gitlab.CreateMergeRequestNoteOptions
-		var optd gitlab.CreateMergeRequestDiscussionOptions
-		opt.Body = &cmt.Body
-		optd.Body = &cmt.Body
-		err := RetryWithBackoff(ctx, func() error {
-			log.Infof("CREATE NOTE %v,%v", pid, number)
-			cm, resp, err := gc.Notes.CreateMergeRequestNote(pid, number, &opt)
-
-			if err != nil {
-				return err
-			}
-			if resp.StatusCode != http.StatusCreated {
-				return fmt.Errorf("create comment failed: %v", resp)
-			}
-			addedComments = append(addedComments, cm)
-			return nil
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		log.Infof("create comment success: %v", comment)
-	}
-
-	return addedComments, nil
-}
 func constructMergeRequestDiscussion(linterOutputs map[string][]LinterOutput, linterName, commitID string, headSha string, baseSha string, startSha string) []*gitlab.CreateMergeRequestDiscussionOptions {
 	var comments []*gitlab.CreateMergeRequestDiscussionOptions
 	var ptype string
@@ -762,36 +579,3 @@ func constructMergeRequestDiscussion(linterOutputs map[string][]LinterOutput, li
 	}
 	return comments
 }
-func (g *GitlabProvider) CreateMergeReviewDiscussion(ctx context.Context, gc *gitlab.Client, owner string, repo string, number int, comments []*gitlab.CreateMergeRequestDiscussionOptions, pid int) ([]*gitlab.Discussion, error) {
-	var addedComments []*gitlab.Discussion
-	for _, comment := range comments {
-		cmt := comment
-		log.Infof("CreateMergeReviewDiscussion%v", comment)
-
-		var optd gitlab.CreateMergeRequestDiscussionOptions
-
-		optd.Body = cmt.Body
-		err := RetryWithBackoff(ctx, func() error {
-			log.Infof("CREATE NOTE %v,%v", pid, number)
-
-			cm, resp, err := gc.Discussions.CreateMergeRequestDiscussion(pid, number, comment)
-			if err != nil {
-				return err
-			}
-			if resp.StatusCode != 201 {
-				return fmt.Errorf("create comment failed: %v", resp)
-			}
-			addedComments = append(addedComments, cm)
-			return nil
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		log.Infof("create comment success: %v", comment)
-	}
-
-	return addedComments, nil
-}
-
-// CreateGithubChecks creates github checks for the specified pull request.

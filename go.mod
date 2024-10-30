@@ -11,6 +11,7 @@ require (
 	github.com/docker/docker v27.2.0+incompatible
 	github.com/google/go-github/v57 v57.0.0
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79
+	github.com/hashicorp/go-version v1.7.0
 	github.com/opencontainers/image-spec v1.1.0
 	github.com/prometheus/client_golang v1.19.0
 	github.com/qiniu/x v1.13.10
