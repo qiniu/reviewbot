@@ -131,6 +131,10 @@ customConfig: # custom config for specific orgs or repos
       golangci-lint:
         dockerAsRunner:
           image: "aslan-spock-register.qiniu.io/reviewbot/base:go1.20.14-gocilint.1.61.0"
+  qbox/net-pcdn:
+    refs:
+      - org: qbox
+        repo: kodo
 
 issueReferences:
   golangci-lint:
