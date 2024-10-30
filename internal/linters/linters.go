@@ -27,11 +27,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/reviewbot/internal/metric"
-	"github.com/qiniu/reviewbot/internal/runner"
-	"github.com/qiniu/reviewbot/internal/storage"
 	"github.com/qiniu/x/log"
 	"github.com/qiniu/x/xlog"
 )
@@ -98,30 +95,6 @@ type LinterOutput struct {
 	StartLine int
 }
 
-// Agent knows necessary information in order to run linters.
-type Agent struct {
-	// ID each linter execution has a unique id.
-	ID string
-	// Context is the context of the agent.
-	Context context.Context
-	// Storage knows how to store and retrieve the linter logs.
-	Storage storage.Storage
-	// Runner is the way to run the linter.	like docker, local, etc.
-	Runner runner.Runner
-	// Provider knows how to interact with the git provider. such as github, gitlab, etc.
-	Provider Provider
-	// LinterConfig is the linter configuration.
-	LinterConfig config.Linter
-	// RepoDir is the repo directory.
-	RepoDir string
-	// GenLogKey generates the log key.
-	GenLogKey func() string
-	// GenLogViewUrl generates the log view url.
-	GenLogViewUrl func() string
-	// linter result reference
-	LinterReference map[*regexp.Regexp]string
-}
-
 const CommentFooter = `
 <details>
 
@@ -138,9 +111,9 @@ If you have any questions about this comment, feel free to raise an issue here:
 // The unexpected lines are the lines that cannot be parsed.
 type LinterParser func(*xlog.Logger, []byte) (map[string][]LinterOutput, []string)
 
-func GeneralHandler(ctx context.Context, log *xlog.Logger, a Agent, execRun func(a Agent) ([]byte, error), linterParser func(*xlog.Logger, []byte) (map[string][]LinterOutput, []string)) error {
+func GeneralHandler(ctx context.Context, log *xlog.Logger, a Agent, execRun func(ctx context.Context, a Agent) ([]byte, error), linterParser func(*xlog.Logger, []byte) (map[string][]LinterOutput, []string)) error {
 	linterName := a.LinterConfig.Name
-	output, err := execRun(a)
+	output, err := execRun(ctx, a)
 	if err != nil {
 		// NOTE(CarlJi): the error is *ExitError, it seems to have little information and needs to be handled in a better way.
 		log.Warnf("%s run with exit code: %v, mark and continue", linterName, err)
@@ -163,10 +136,10 @@ func GeneralHandler(ctx context.Context, log *xlog.Logger, a Agent, execRun func
 }
 
 // ExecRun executes a command.
-func ExecRun(a Agent) ([]byte, error) {
-	eventGuid := lintersutil.FromContext(a.Context).ReqId
+func ExecRun(ctx context.Context, a Agent) ([]byte, error) {
+	eventGuid := lintersutil.FromContext(ctx).ReqId
 	start := time.Now()
-	reader, err := a.Runner.Run(a.Context, &a.LinterConfig)
+	reader, err := a.Runner.Run(ctx, &a.LinterConfig)
 	if err != nil {
 		log.Warnf("failed to run linter: %v, mark and continue", err)
 	}
@@ -185,7 +158,7 @@ func ExecRun(a Agent) ([]byte, error) {
 		start.Format(time.RFC3339), eventGuid, a.Runner.GetFinalScript()))
 	toLog = append(toLog, []byte(fmt.Sprintf("[%s][%s] output:\n%s\n",
 		end.Format(time.RFC3339), eventGuid, string(output)))...)
-	err = a.Storage.Write(a.Context, a.GenLogKey(), toLog)
+	err = a.Storage.Write(ctx, a.GenLogKey(), toLog)
 	if err != nil {
 		if !errors.Is(err, context.Canceled) {
 			log.Errorf("write to storage was failed %v", err)
@@ -219,17 +192,7 @@ func Report(ctx context.Context, a Agent, lintResults map[string][]LinterOutput)
 
 	log.Infof("[%s] found %d files with valid %d linter errors related to this PR %d (%s) \n", linterName, len(lintResults), countLinterErrors(lintResults), num, orgRepo)
 
-	// If the result has a reference to the linterReference , then the link will be added to the result.
-	if a.LinterReference != nil {
-		for fileName, outputs := range lintResults {
-			for i, output := range outputs {
-				ref, exist := referenceFilter(output.Message, a)
-				if exist {
-					lintResults[fileName][i].Message = fmt.Sprintf("[%s](%s)", output.Message, ref)
-				}
-			}
-		}
-	}
+	a.ApplyIssueReferences(lintResults)
 
 	if len(lintResults) > 0 {
 		metric.IncIssueCounter(orgRepo, linterName, a.Provider.GetCodeReviewInfo().URL, a.Provider.GetCodeReviewInfo().HeadSHA, float64(countLinterErrors(lintResults)))

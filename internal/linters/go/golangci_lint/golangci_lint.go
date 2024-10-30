@@ -17,11 +17,9 @@
 package golangcilint
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -51,7 +49,7 @@ func golangciLintHandler(ctx context.Context, a linters.Agent) error {
 		a = argsApply(log, a)
 	} else if a.LinterConfig.ConfigPath != "" {
 		// Custom mode, only apply golangci-lint configuration if necessary.
-		path := configApply(log, a)
+		path := golangciConfigApply(log, a)
 		log.Infof("golangci-lint config prepared: %v", path)
 	}
 
@@ -61,6 +59,13 @@ func golangciLintHandler(ctx context.Context, a linters.Agent) error {
 	if len(goModDirs) == 0 {
 		a.LinterConfig.Env = append(a.LinterConfig.Env, "GO111MODULE=off")
 		return linters.GeneralHandler(ctx, log, a, linters.ExecRun, parser)
+	}
+
+	// if the workDir is not specified, align it with the directory of the root-level go.mod file.
+	if a.LinterConfig.WorkDir == a.RepoDir && len(goModDirs) > 0 {
+		topDir := topLevelGoModDir(goModDirs)
+		log.Infof("align workDir with the directory of the root-level go.mod file: %v", topDir)
+		a.LinterConfig.WorkDir = topDir
 	}
 
 	a.LinterConfig.Modifier = newGoModTidyBuilder(a.LinterConfig.Modifier, goModDirs)
@@ -200,7 +205,7 @@ func argsApply(log *xlog.Logger, a linters.Agent) linters.Agent {
 		newArgs = append(newArgs, "--concurrency=8")
 	}
 	if !configFlag && config.ConfigPath != "" {
-		config.ConfigPath = configApply(log, a)
+		config.ConfigPath = golangciConfigApply(log, a)
 		newArgs = append(newArgs, "--config", config.ConfigPath)
 	}
 
@@ -210,11 +215,11 @@ func argsApply(log *xlog.Logger, a linters.Agent) linters.Agent {
 	return a
 }
 
-// configApply is used to get the config file path based on rules as below:
+// golangciConfigApply is used to get the config file path based on rules as below:
 // 1. if the config file exists in current directory, return its absolute path.
 // 2. if the config file exists in the workDir directory, return its absolute path.
 // 3. if the config file exists in the repo linter ConfigPath.
-func configApply(log *xlog.Logger, a linters.Agent) string {
+func golangciConfigApply(log *xlog.Logger, a linters.Agent) string {
 	// refer to https://golangci-lint.run/usage/configuration/
 	// the default config file name is .golangci.yml, .golangci.yaml, .golangci.json, .golangci.toml
 	golangciConfigFiles := []string{".golangci.yml", ".golangci.yaml", ".golangci.json", ".golangci.toml"}
@@ -319,20 +324,16 @@ func extractDirs(files []string) []string {
 	return directories
 }
 
-// Execute go mod tidy when go.mod exists.
-func execGoModTidy(log *xlog.Logger, workdir string) {
-	log.Infof("go mod tidy workdir: %v", workdir)
-	cmd := exec.Command("go", "mod", "tidy")
-	cmd.Dir = workdir
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-	if err != nil {
-		log.Warnf("Error running go mod tidy:%v", err)
-	} else {
-		log.Info("running go mod tidy successfully")
+// topLevelGoModDir is used to find the root-level go.mod directory.
+func topLevelGoModDir(gomodDirs []string) string {
+	rootLevelGoModDir := gomodDirs[0]
+	minDepth := strings.Count(rootLevelGoModDir, string(filepath.Separator))
+	for i := 1; i < len(gomodDirs); i++ {
+		depth := strings.Count(gomodDirs[i], string(filepath.Separator))
+		if depth < minDepth {
+			minDepth = depth
+			rootLevelGoModDir = gomodDirs[i]
+		}
 	}
-	if stderr.Len() > 0 {
-		log.Warnf("running go mod tidy something wrong :%s", stderr.String())
-	}
+	return rootLevelGoModDir
 }

@@ -443,7 +443,7 @@ func (g *GithubProvider) CreateGithubChecks(ctx context.Context, a Agent, lintEr
 		},
 	}
 
-	logURL := a.GenLogViewUrl()
+	logURL := a.GenLogViewURL()
 	if logURL == "" {
 		check.Output.Summary = github.String(Reference)
 	} else {
@@ -462,7 +462,7 @@ func (g *GithubProvider) CreateGithubChecks(ctx context.Context, a Agent, lintEr
 		checkRun, resp, err := g.GithubClient.Checks.CreateCheckRun(ctx, owner, repo, check)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
-				log.Errorf("create check run failed: %v", err)
+				log.Errorf("create check run failed: %v, check: %v", err, check)
 			}
 			return err
 		}

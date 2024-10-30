@@ -10,7 +10,6 @@ globalDefaultConfig: # global default settings, will be overridden by qbox org a
   golangcilintConfig: "config/linters-config/.golangci.yml" # golangci-lint config file to use
   copySSHKeyToContainer: "/root/.ssh/id_rsa"
 
-
 customConfig: # custom config for specific orgs or repos
   goplus:
     linters:
@@ -24,22 +23,22 @@ customConfig: # custom config for specific orgs or repos
         enable: false
 
   qbox/zrs:
-    extraRefs:
+    refs:
       - org: qbox
         repo: kodo
     linters:
       gomodcheck:
         enable: false
   qbox/kodoe-manager:
-    extraRefs:
+    refs:
       - org: qbox
         repo: kodo
   qbox/configcenter:
-    extraRefs:
+    refs:
       - org: qbox
         repo: kodo
   qbox/logverse:
-    extraRefs:
+    refs:
       - org: qbox
         repo: kodo
 
@@ -49,7 +48,7 @@ customConfig: # custom config for specific orgs or repos
         enable: true
         dockerAsRunner:
           # kodo only use go1.22.+, see kodo/logservice/logupload/version/check_test.go
-          image: "aslan-spock-register.qiniu.io/reviewbot/base:golangci-lint.1.59.1"
+          image: "aslan-spock-register.qiniu.io/reviewbot/base:go1.22.3-gocilint.1.59.1"
         command:
           - "/bin/sh"
           - "-c"
@@ -64,7 +63,7 @@ customConfig: # custom config for specific orgs or repos
             golangci-lint run --timeout=10m0s --allow-parallel-runners=true --print-issued-lines=false --out-format=line-number >> $ARTIFACT/lint.log 2>&1
 
   qbox/kodo-ops:
-    extraRefs:
+    refs:
       - org: qbox
         repo: kodo
     linters:
@@ -112,12 +111,40 @@ customConfig: # custom config for specific orgs or repos
             go mod tidy
             CGO_ENABLED=1 golangci-lint run --timeout=10m0s --allow-parallel-runners=true --print-issued-lines=false --out-format=line-number >> $ARTIFACT/lint.log 2>&1
         dockerAsRunner:
-          image: "aslan-spock-register.qiniu.io/reviewbot/base:golangci-lint.1.59.1"
+          image: "aslan-spock-register.qiniu.io/reviewbot/base:go1.22.3-gocilint.1.59.1"
 
-#  qiniu/reviewbot:
-#    linters:
-#      golangci-lint:
-#        enable: true
-#        kubernetesAsRunner:
-#          image: "aslan-spock-register.qiniu.io/reviewbot/base:golangci-lint.1.61.0"
-#          namespace: "reviewbot"
+  qiniu/reviewbot:
+    linters:
+      golangci-lint:
+        enable: true
+        kubernetesAsRunner:
+          image: "aslan-spock-register.qiniu.io/reviewbot/base:go1.23.2-gocilint.1.61.0"
+          namespace: "reviewbot"
+
+  qbox/ffmpeg:
+    refs:
+      - org: qbox
+        repo: ffmpeg
+        pathAlias: "src/qbox.com/ffmpeg"
+
+  qbox/net-schedule:
+    linters:
+      golangci-lint:
+        dockerAsRunner:
+          image: "aslan-spock-register.qiniu.io/reviewbot/base:go1.20.14-gocilint.1.61.0"
+  qbox/net-pcdn:
+    refs:
+      - org: qbox
+        repo: kodo
+
+issueReferences:
+  golangci-lint:
+    - pattern: '^ST1003: .+ \(stylecheck\)$'
+      url: "https://github.com/qiniu/reviewbot/issues/398"
+    - pattern: '^do not define dynamic errors, use wrapped static errors instead:.*\(err113\)$'
+      url: "https://github.com/qiniu/reviewbot/issues/418"
+    - pattern: '^found a struct that contains a context.Context field \(containedctx\)$'
+      url: "https://github.com/qiniu/reviewbot/issues/420"
+  shellcheck:
+    - pattern: '^SC2086: .+ \(shellcheck\)$'
+      url: "https://github.com/qiniu/reviewbot/issues/413"

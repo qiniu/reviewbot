@@ -17,7 +17,6 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"expvar"
 	"flag"
@@ -28,7 +27,6 @@ import (
 	"net/http/pprof"
 	"net/url"
 	"os"
-	"regexp"
 
 	"github.com/google/go-github/v57/github"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -118,7 +116,6 @@ func gatherOptions() options {
 	fs.StringVar(&o.serverAddr, "server-addr", "", "server addr which is used to generate the log view url")
 	fs.StringVar(&o.S3CredentialsFile, "s3-credentials-file", "", "File where s3 credentials are stored. For the exact format see http://xxxx/doc")
 	fs.StringVar(&o.kubeConfig, "kube-config", "", "kube config file")
-	fs.StringVar(&o.linterReferencePath, "linter-reference", "", "linter result reference path")
 
 	err := fs.Parse(os.Args[1:])
 	if err != nil {
@@ -232,39 +229,19 @@ func main() {
 		}
 	}
 
-	var linterReference map[string]string
-	regexpRefernce := make(map[*regexp.Regexp]string)
-	if o.linterReferencePath != "" {
-		log.Infof("linter reference path: %s", o.linterReferencePath)
-		data, err := os.ReadFile(o.linterReferencePath)
-		if err != nil {
-			log.Fatalf("failed to load linter reference file: %v", err)
-		}
-		err = json.Unmarshal(data, &linterReference)
-		if err != nil {
-			log.Fatalf("failed to unmarshal linter reference file: %v", err)
-		}
-
-		for key, value := range linterReference {
-			re := regexp.MustCompile(key)
-			regexpRefernce[re] = value
-		}
-	}
-
 	s := &Server{
 		webhookSecret:     []byte(o.webhookSecret),
 		gitClientFactory:  v2,
 		config:            cfg,
 		gitHubAccessToken: o.gitHubAccessToken,
 		gitLabAccessToken: o.gitLabAccessToken,
-		gitLabHost:        o.gitLabHost,
 		appID:             o.appID,
 		appPrivateKey:     o.appPrivateKey,
 		debug:             o.debug,
 		serverAddr:        o.serverAddr,
 		repoCacheDir:      o.codeCacheDir,
 		kubeConfig:        o.kubeConfig,
-		linterReference:   regexpRefernce,
+		gitLabHost:        o.gitLabHost,
 	}
 
 	go s.initDockerRunner()

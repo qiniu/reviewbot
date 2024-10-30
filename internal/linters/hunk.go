@@ -18,12 +18,12 @@ package linters
 
 import (
 	"fmt"
-	"github.com/xanzy/go-gitlab"
 	"regexp"
 	"strconv"
 
 	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/x/log"
+	"github.com/xanzy/go-gitlab"
 )
 
 type HunkChecker interface {
@@ -70,22 +70,18 @@ func NewGitLabCommitFileHunkChecker(commitFiles []*gitlab.MergeRequestDiff) (*Fi
 		if commitFile == nil || commitFile.NewPath == "" {
 			continue
 		}
-
-		if commitFile.DeletedFile == true {
+		if commitFile.DeletedFile {
 			continue
 		}
-
 		fileHunks, err := DiffHunksMerge(commitFile)
 		if err != nil {
 			return nil, err
 		}
-
 		v, ok := hunks[commitFile.NewPath]
 		if ok {
 			log.Warnf("duplicate commitFiles: %v, %v", commitFile, v)
 			continue
 		}
-
 		hunks[commitFile.NewPath] = fileHunks
 	}
 

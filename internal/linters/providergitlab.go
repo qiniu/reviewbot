@@ -22,6 +22,7 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/lintersutil"
+	"github.com/qiniu/reviewbot/internal/metric"
 	"github.com/qiniu/x/log"
 	gitlab "github.com/xanzy/go-gitlab"
 	"net/http"
@@ -31,16 +32,6 @@ import (
 	"time"
 )
 
-// ListFiles lists all files for the specified pull request.
-func getFloatGitLabVersion(ctx context.Context, gc *gitlab.Client) string {
-
-	v, r, e := gc.Version.GetVersion()
-	if e != nil {
-		fmt.Errorf("failed to get gitlab verion: %v, response is:%v", e, r)
-		return ""
-	}
-	return v.Version
-}
 func ListMergeRequestsFiles(ctx context.Context, gc *gitlab.Client, owner string, repo string, pid int, number int) ([]*gitlab.MergeRequestDiff, *gitlab.Response, error) {
 	files, response, err := gc.MergeRequests.GetMergeRequestChanges(pid, number, nil)
 	if err != nil {
@@ -101,9 +92,7 @@ type GitlabProvider struct {
 }
 
 func (g *GitlabProvider) ListComments(ctx context.Context, org, repo string, number int) ([]Comment, error) {
-	//TODO implement me
 	var pid = g.MergeRequestEvent.ObjectAttributes.TargetProjectID
-
 	opts := gitlab.ListMergeRequestNotesOptions{
 		ListOptions: gitlab.ListOptions{PerPage: 100},
 	}
@@ -115,7 +104,6 @@ func (g *GitlabProvider) ListComments(ctx context.Context, org, repo string, num
 		log.Errorf("list comments failed: %v", resp)
 		return nil, ErrListComments
 	}
-
 	var allComments = make([]Comment, 0, len(comments))
 	for _, comment := range comments {
 		allComments = append(allComments, Comment{
@@ -132,18 +120,14 @@ func (g *GitlabProvider) ListComments(ctx context.Context, org, repo string, num
 }
 
 func (g *GitlabProvider) DeleteComment(ctx context.Context, org, repo string, commentID int64) error {
-
 	_, err := g.GitLabClient.Notes.DeleteMergeRequestNote(g.MergeRequestEvent.ObjectAttributes.TargetProjectID, g.MergeRequestEvent.ObjectAttributes.IID, int(commentID), nil)
 	return err
-
 }
 
 func (g *GitlabProvider) CreateComment(ctx context.Context, org, repo string, number int, comment *Comment) (*Comment, error) {
-
 	cmt := comment
 	var opt gitlab.CreateMergeRequestNoteOptions
 	opt.Body = &cmt.Body
-
 	cm, resp, err := g.GitLabClient.Notes.CreateMergeRequestNote(g.MergeRequestEvent.ObjectAttributes.TargetProjectID, number, &opt)
 	if err != nil {
 		return nil, err
@@ -160,13 +144,10 @@ func (g *GitlabProvider) CreateComment(ctx context.Context, org, repo string, nu
 		HTMLURL:   "",
 		IssueURL:  "",
 	}, nil
-
 }
 
 func (g *GitlabProvider) GetCodeReviewInfo() CodeReview {
-
 	updatetime, _ := time.Parse("2006-01-02 15:04:05", g.MergeRequestEvent.ObjectAttributes.UpdatedAt)
-
 	return CodeReview{
 		Org:       g.MergeRequestEvent.Project.Namespace,
 		Repo:      g.MergeRequestEvent.Repository.Name,
@@ -194,7 +175,8 @@ func NewGitlabProvider(gitlabClient *gitlab.Client, gitClient gitv2.ClientFactor
 		HunkChecker:              checker,
 	}, nil
 }
-func ReportFormMartCheck(gc *gitlab.Client, reportFomart config.GitlabReportType) (string config.GitlabReportType) {
+
+func ReportFormMartCheck(gc *gitlab.Client, reportFomart config.GitlabReportType) (reportType config.GitlabReportType) {
 	v, r, e := gc.Version.GetVersion()
 	if e != nil {
 		log.Fatalf("Failed to get version: %v,response is %v", e, r)
@@ -205,17 +187,17 @@ func ReportFormMartCheck(gc *gitlab.Client, reportFomart config.GitlabReportType
 	if v1.LessThan(v2) {
 		return config.GitlabComment
 	}
-
 	return reportFomart
-
 }
 
 func (g *GitlabProvider) HandleComments(ctx context.Context, outputs map[string][]LinterOutput) error {
 	return nil
 }
+
 func linterNamePrefixGitLab(linterName string) string {
 	return fmt.Sprintf("[**%s**]", linterName)
 }
+
 func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[string][]LinterOutput) error {
 	linterName := a.LinterConfig.Name
 	org := a.Provider.GetCodeReviewInfo().Org
@@ -231,7 +213,6 @@ func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[st
 			log.Errorf("failed to list comments: %v", err)
 			return err
 		}
-
 		// filter out the comments that are not related to the linter
 		var existedCommentsToKeep []*gitlab.Note
 		linterFlag := linterNamePrefixGitLab(linterName)
@@ -252,13 +233,11 @@ func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[st
 			log.Errorf("failed to delete comments: %v", e)
 			return e
 		}
-
-		logURL := a.GenLogViewUrl()
+		logURL := a.GenLogViewURL()
 		commerr := CreateGitLabCommentsReport(context.Background(), g.GitLabClient, lintResults, linterName, pid, num, logURL)
 		if commerr != nil {
 			log.Errorf("failed to delete comments: %v", commerr)
 		}
-
 		// create discussion note
 		dlist, err := ListMergeRequestDiscussions(context.Background(), g.GitLabClient, num, pid)
 		if err != nil {
@@ -271,21 +250,19 @@ func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[st
 			log.Errorf("failed to delete discussion: %v", err)
 			return errd
 		}
-
 		discussion := constructMergeRequestDiscussion(lintResults, linterFlag, g.MergeRequestEvent.ObjectAttributes.LastCommit.ID, h, b, s)
 		if len(discussion) == 0 {
 			return nil
 		}
 		log.Infof("discussion%v", discussion)
-
 		// Add the comments
 		addedDis, err := CreateMergeReviewDiscussion(context.Background(), g.GitLabClient, org, repo, num, discussion, pid)
 		if err != nil {
-			log.Errorf("failed to post comments: %v", err)
+			log.Errorf("failed to post discussions: %v", err)
 			return err
 		}
 		log.Infof("[%s] add %d comments for this PR %d (%s) \n", linterName, len(addedDis), num, orgRepo)
-		//metric.NotifyWebhookByText(ConstructGotchaMsg(linterName, g.MergeRequestEvent.Project.WebURL, toAdds[][0].Message, lintResults))
+		metric.NotifyWebhookByText(ConstructGotchaMsg(linterName, g.MergeRequestEvent.Project.WebURL, "", lintResults))
 	case config.GitlabComment:
 		var pid = g.MergeRequestEvent.ObjectAttributes.TargetProjectID
 		existedComments, err := g.ListMergeRequestsComments(context.Background(), g.GitLabClient, org, repo, num, pid)
@@ -293,7 +270,6 @@ func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[st
 			log.Errorf("failed to list comments: %v", err)
 			return err
 		}
-
 		// filter out the comments that are not related to the linter
 		var existedCommentsToKeep []*gitlab.Note
 		linterFlag := linterNamePrefixGitLab(linterName)
@@ -309,24 +285,21 @@ func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[st
 			return err
 		}
 		log.Infof("%s delete %d comments for this PR %d (%s) \n", linterFlag, len(existedCommentsToKeep), num, orgRepo)
-
-		logURL := a.GenLogViewUrl()
+		logURL := a.GenLogViewURL()
 		commerr := CreateGitLabCommentsReport(context.Background(), g.GitLabClient, lintResults, linterName, pid, num, logURL)
 		if commerr != nil {
-			log.Errorf("failed to delete comments: %v", commerr)
+			log.Errorf("failed to post comments: %v", commerr)
 		}
-
+		metric.NotifyWebhookByText(ConstructGotchaMsg(linterName, g.MergeRequestEvent.Project.WebURL, "", lintResults))
 	case config.QuietGitlab:
 		return nil
 	default:
 		log.Errorf("unsupported report format: %v", a.LinterConfig.GitlabReportFormat)
 	}
-
 	return nil
 }
 
 func CreateGitLabCommentsReport(ctx context.Context, gc *gitlab.Client, outputs map[string][]LinterOutput, lintername string, pid int, number int, logurl string) error {
-
 	const ComentDetalHeader = "<details>"
 	const CommentDetal = `
 <br>If you have any questions about this comment, feel free to raise an issue here:
@@ -339,32 +312,27 @@ func CreateGitLabCommentsReport(ctx context.Context, gc *gitlab.Client, outputs 
 	var errormessage string
 	var totalerrorscount int
 	totalerrorscount = 0
-
 	if len(outputs) > 0 {
 		for _, output := range outputs {
-			totalerrorscount = totalerrorscount + len(output)
-			for _, outputmesage := range output {
-				errormessage = errormessage + "<br>" + outputmesage.File + ", line:" + strconv.Itoa(outputmesage.Line) + ", " + outputmesage.Message
+			totalerrorscount += len(output)
+			for _, outputmessage := range output {
+				errormessage = errormessage + "<br>" + outputmessage.File + ", line:" + strconv.Itoa(outputmessage.Line) + ", " + outputmessage.Message
 			}
 		}
-
 		message = fmt.Sprintf("[**%s**]  check failed❌ , %v files exist errors,%v errors found.     This is [the detailed log](%s).\n%s", lintername, len(outputs), totalerrorscount, logurl, ComentDetalHeader+errormessage+"<br>"+CommentDetal)
 	} else {
 		message = fmt.Sprintf("[**%s**]  check passed✅ . \n%s", lintername, ComentDetalHeader+CommentDetal)
 	}
-
 	var optd gitlab.CreateMergeRequestNoteOptions
 	var addedComments []*gitlab.Note
-
 	optd.Body = &message
 	err := RetryWithBackoff(ctx, func() error {
 		log.Infof("CREATE NOTE %v,%v", pid, number)
-
 		cm, resp, err := gc.Notes.CreateMergeRequestNote(pid, number, &optd)
 		if err != nil {
 			return err
 		}
-		if resp.StatusCode != 201 {
+		if resp.StatusCode != http.StatusCreated {
 			return fmt.Errorf("create comment failed: %v", resp)
 		}
 		addedComments = append(addedComments, cm)
@@ -374,7 +342,6 @@ func CreateGitLabCommentsReport(ctx context.Context, gc *gitlab.Client, outputs 
 		return err
 	}
 	return nil
-
 }
 
 func (g *GitlabProvider) IsRelated(file string, line int, startLine int) bool {
@@ -393,12 +360,12 @@ func (g *GitlabProvider) GetFiles(predicate func(filepath string) bool) []string
 	}
 	return files
 }
-func MergeRequestSHA(gc *gitlab.Client, pid int, num int) (HeadSha string, BaseSha string, StartSha string, err error) {
+
+func MergeRequestSHA(gc *gitlab.Client, pid int, num int) (headsha string, basesha string, startsha string, err error) {
 	var mr *gitlab.MergeRequest
 	mr, _, err = gc.MergeRequests.GetMergeRequest(pid, num, nil)
 	if err != nil {
 		return "", "", "", fmt.Errorf("get mr head sha failed: %v", err)
-
 	}
 	return mr.DiffRefs.HeadSha, mr.DiffRefs.BaseSha, mr.DiffRefs.StartSha, nil
 }
@@ -409,7 +376,7 @@ func ListMergeRequestDiscussions(ctx context.Context, gc *gitlab.Client, number 
 	}
 	rd, re, er := gc.Discussions.ListMergeRequestDiscussions(pid, number, &opts, nil)
 	if er != nil {
-		log.Errorf("get mergerequest discussions failed:%v,reponse is:", er, re)
+		log.Errorf("get mergerequest discussions failed:%v,response is:%v", er, re)
 		return nil, er
 	}
 	return rd, nil
@@ -421,24 +388,19 @@ func DeleteMergeRequestDiscussions(ctx context.Context, gc *gitlab.Client, numbe
 		if (d.Notes[0].Type == "DiffNote") && strings.HasPrefix(d.Notes[0].Body, linterFlag) {
 			re, err := gc.Discussions.DeleteMergeRequestDiscussionNote(pid, number, "", d.Notes[0].ID, nil)
 			if err != nil {
-				log.Errorf("delete mergerequest discussions failed:%v,reponse is:", err, re)
+				log.Errorf("delete mergerequest discussions failed:%v,response is:%v", err, re)
 				return err
 			}
 		}
-
 	}
-
 	return nil
 }
+
 func (g *GitlabProvider) ListMergeRequestsComments(ctx context.Context, gc *gitlab.Client, owner string, repo string, number int, pid int) ([]*gitlab.Note, error) {
 	var allComments []*gitlab.Note
 	opts := gitlab.ListMergeRequestNotesOptions{
 		ListOptions: gitlab.ListOptions{PerPage: 100},
 	}
-	comments1, resp1, err1 := gc.Notes.ListMergeRequestNotes(pid, number, nil)
-	fmt.Println(comments1)
-	fmt.Println(resp1)
-	fmt.Println(err1)
 	err := RetryWithBackoff(ctx, func() error {
 		comments, resp, err := gc.Notes.ListMergeRequestNotes(pid, number, &opts)
 		if err != nil {
@@ -447,11 +409,9 @@ func (g *GitlabProvider) ListMergeRequestsComments(ctx context.Context, gc *gitl
 		if resp.StatusCode != http.StatusOK {
 			return fmt.Errorf("list comments failed: %v", resp)
 		}
-
 		allComments = comments
 		return nil
 	})
-
 	return allComments, err
 }
 
@@ -460,18 +420,15 @@ func CreateMergeReviewDiscussion(ctx context.Context, gc *gitlab.Client, owner s
 	for _, comment := range comments {
 		cmt := comment
 		log.Infof("CreateMergeReviewDiscussion%v", comment)
-
 		var optd gitlab.CreateMergeRequestDiscussionOptions
-
 		optd.Body = cmt.Body
 		err := RetryWithBackoff(ctx, func() error {
 			log.Infof("CREATE NOTE %v,%v", pid, number)
-
 			cm, resp, err := gc.Discussions.CreateMergeRequestDiscussion(pid, number, comment)
 			if err != nil {
 				return err
 			}
-			if resp.StatusCode != 201 {
+			if resp.StatusCode != http.StatusCreated {
 				return fmt.Errorf("create comment failed: %v", resp)
 			}
 			addedComments = append(addedComments, cm)
@@ -483,9 +440,9 @@ func CreateMergeReviewDiscussion(ctx context.Context, gc *gitlab.Client, owner s
 
 		log.Infof("create comment success: %v", comment)
 	}
-
 	return addedComments, nil
 }
+
 func (g *GitlabProvider) DeleteMergeReviewComments(ctx context.Context, gc *gitlab.Client, owner, repo string, comments []*gitlab.Note, pid int, number int) error {
 	for _, comment := range comments {
 		cmt := comment
@@ -494,7 +451,7 @@ func (g *GitlabProvider) DeleteMergeReviewComments(ctx context.Context, gc *gitl
 			if err != nil {
 				return err
 			}
-			if resp.StatusCode != 204 {
+			if resp.StatusCode != http.StatusNoContent {
 				return fmt.Errorf("delete comment failed: %v", resp)
 			}
 			return nil
@@ -502,21 +459,20 @@ func (g *GitlabProvider) DeleteMergeReviewComments(ctx context.Context, gc *gitl
 		if err != nil {
 			return err
 		}
-
 		log.Infof("delete comment success: %v", comment)
 	}
-
 	return nil
 }
+
 func DeleteMergeReviewCommentsForGitLab(ctx context.Context, gc *gitlab.Client, owner, repo string, comments []*gitlab.Note, pid int, number int) error {
 	for _, comment := range comments {
 		cmt := comment
 		err := RetryWithBackoff(ctx, func() error {
-			resp, err := gc.Notes.DeleteMergeRequestNote(int(pid), int(number), int(cmt.ID), nil)
+			resp, err := gc.Notes.DeleteMergeRequestNote(pid, number, cmt.ID, nil)
 			if err != nil {
 				return err
 			}
-			if resp.StatusCode != 204 {
+			if resp.StatusCode != http.StatusNoContent {
 				return fmt.Errorf("delete comment failed: %v", resp)
 			}
 			return nil
@@ -527,29 +483,24 @@ func DeleteMergeReviewCommentsForGitLab(ctx context.Context, gc *gitlab.Client, 
 
 		log.Infof("delete comment success: %v", comment)
 	}
-
 	return nil
 }
 
 func constructMergeRequestDiscussion(linterOutputs map[string][]LinterOutput, linterName, commitID string, headSha string, baseSha string, startSha string) []*gitlab.CreateMergeRequestDiscussionOptions {
 	var comments []*gitlab.CreateMergeRequestDiscussionOptions
 	var ptype string
-
 	ptype = "text"
 	for file, outputs := range linterOutputs {
 		for _, output := range outputs {
-
 			message := fmt.Sprintf("%s %s\n%s",
 				linterName, output.Message, CommentFooter)
-
 			if output.StartLine != 0 {
 				comments = append(comments, &gitlab.CreateMergeRequestDiscussionOptions{
 					Body:     &message,
 					CommitID: &commitID,
-
 					Position: &gitlab.PositionOptions{
 						NewPath:      &file,
-						NewLine:      &output.Line, //&output.StartLine,
+						NewLine:      &output.Line,
 						BaseSHA:      &baseSha,
 						HeadSHA:      &headSha,
 						StartSHA:     &startSha,
@@ -567,7 +518,7 @@ func constructMergeRequestDiscussion(linterOutputs map[string][]LinterOutput, li
 						BaseSHA:      &baseSha,
 						HeadSHA:      &headSha,
 						StartSHA:     &startSha,
-						NewLine:      &output.Line, //&output.StartLine,
+						NewLine:      &output.Line,
 						PositionType: &ptype,
 						OldPath:      &file,
 						OldLine:      &output.Line,

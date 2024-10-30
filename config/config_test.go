@@ -34,7 +34,7 @@ globalDefaultConfig: # global default settings, will be overridden by qbox org a
 
 customConfig: # custom config for specific orgs or repos
   qbox: # github organization name
-    extraRefs:
+    refs:
     - org: qbox
       repo: net-cache
     linters:
@@ -48,7 +48,7 @@ customConfig: # custom config for specific orgs or repos
         enable: true
         workDir: "nginx" # only run in the nginx directory since there are .luacheckrc files in this directory
   qiniu/test:
-    extraRefs:
+    refs:
     - org: qbox
       repo: net-cache
       cloneUrl : "git@github.com:qbox/net-schedule.git"
@@ -56,6 +56,37 @@ customConfig: # custom config for specific orgs or repos
       luacheck:
         enable: true
         workDir: "nginx" # only run in the nginx directory since there are .luacheckrc files in this directory
+  qbox/kodo:
+    linters:
+      golangci-lint:
+        enable: true
+        dockerAsRunner:
+          # kodo only use go1.22.+, see kodo/logservice/logupload/version/check_test.go
+          image: "aslan-spock-register.qiniu.io/reviewbot/base:golangci-lint.1.59.1"
+        command:
+          - "/bin/sh"
+          - "-c"
+          - "--"
+        args:
+          - |
+            source env.sh
+            cp .golangci.yml src/qiniu.com/kodo/.golangci.yml
+            cd src/qiniu.com/kodo
+            export GO111MODULE=auto
+            go mod tidy
+            golangci-lint run --timeout=10m0s --allow-parallel-runners=true --print-issued-lines=false --out-format=line-number >> $ARTIFACT/lint.log 2>&1
+  qiniu/reviewbot:
+    linters:
+      golangci-lint:
+        enable: true
+        kubernetesAsRunner:
+          image: "aslan-spock-register.qiniu.io/reviewbot/base:golangci-lint.1.61.0"
+          namespace: "reviewbot"			
+
+issueReferences:
+  golangci-lint:
+    - pattern: '^found a struct that contains a context.Context field \(containedctx\)$'
+      url: "https://github.com/qiniu/reviewbot/issues/420"
 `,
 			expected: Config{
 				GlobalDefaultConfig: GlobalConfig{
@@ -69,7 +100,7 @@ customConfig: # custom config for specific orgs or repos
 								Args:   []string{"run", "-D", "staticcheck"},
 							},
 						},
-						ExtraRefs: []Refs{
+						Refs: []Refs{
 							{
 								Repo: "net-cache",
 								Org:  "qbox",
@@ -91,13 +122,50 @@ customConfig: # custom config for specific orgs or repos
 								WorkDir: "nginx",
 							},
 						},
-						ExtraRefs: []Refs{
+						Refs: []Refs{
 							{
 								Repo:     "net-schedule",
 								Org:      "qbox",
 								Host:     "github.com",
 								CloneURL: "git@github.com:qbox/net-schedule.git",
 							},
+						},
+					},
+					"qiniu/reviewbot": {
+						Linters: map[string]Linter{
+							"golangci-lint": {
+								Enable: boolPtr(true),
+								KubernetesAsRunner: KubernetesAsRunner{
+									Image:     "aslan-spock-register.qiniu.io/reviewbot/base:golangci-lint.1.61.0",
+									Namespace: "reviewbot",
+								},
+							},
+						},
+					},
+					"qbox/kodo": {
+						Linters: map[string]Linter{
+							"golangci-lint": {
+								Enable: boolPtr(true),
+								DockerAsRunner: DockerAsRunner{
+									Image: "aslan-spock-register.qiniu.io/reviewbot/base:golangci-lint.1.59.1",
+								},
+								Command: []string{"/bin/sh", "-c", "--"},
+								Args: []string{`source env.sh
+cp .golangci.yml src/qiniu.com/kodo/.golangci.yml
+cd src/qiniu.com/kodo
+export GO111MODULE=auto
+go mod tidy
+golangci-lint run --timeout=10m0s --allow-parallel-runners=true --print-issued-lines=false --out-format=line-number >> $ARTIFACT/lint.log 2>&1
+`},
+							},
+						},
+					},
+				},
+				IssueReferences: map[string][]IssueReference{
+					"golangci-lint": {
+						{
+							Pattern: "^found a struct that contains a context.Context field \\(containedctx\\)$",
+							URL:     "https://github.com/qiniu/reviewbot/issues/420",
 						},
 					},
 				},
@@ -112,7 +180,7 @@ globalDefaultConfig: # global default settings, will be overridden by qbox org a
   golangciLintConfig: "linters-config/.golangci.yml"
 customConfig: # custom config for specific orgs or repos
   qbox: # github organization name
-    extraRefs:
+    refs:
     - org: qbox
       repo: net-cache
     - org: qiniu
@@ -141,7 +209,7 @@ customConfig: # custom config for specific orgs or repos
 								Args:   []string{"run", "-D", "staticcheck"},
 							},
 						},
-						ExtraRefs: []Refs{
+						Refs: []Refs{
 							{
 								Repo: "net-cache",
 								Org:  "qbox",
@@ -189,11 +257,15 @@ customConfig: # custom config for specific orgs or repos
 				}
 
 				if !strings.HasSuffix(c.GlobalDefaultConfig.GolangCiLintConfig, tc.expected.GlobalDefaultConfig.GolangCiLintConfig) {
-					t.Errorf("expected %v, got %v", tc.expected.GlobalDefaultConfig.GolangCiLintConfig, c.GlobalDefaultConfig.GolangCiLintConfig)
+					t.Errorf("expected: %v\ngot: %v", tc.expected.GlobalDefaultConfig.GolangCiLintConfig, c.GlobalDefaultConfig.GolangCiLintConfig)
 				}
 
 				if !reflect.DeepEqual(c.CustomConfig, tc.expected.CustomConfig) {
-					t.Errorf("expected %v, got %v", tc.expected.CustomConfig, c.CustomConfig)
+					t.Errorf("expected:\n%v\ngot:\n%v", tc.expected.CustomConfig, c.CustomConfig)
+				}
+
+				if !reflect.DeepEqual(c.IssueReferences, tc.expected.IssueReferences) {
+					t.Errorf("expected: %v\ngot: %v", tc.expected.IssueReferences, c.IssueReferences)
 				}
 			}
 		})

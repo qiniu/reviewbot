@@ -20,13 +20,21 @@ type Config struct {
 	// * "org/repo": {"extraRefs":{org:xxx, repo:xxx, path_alias:github.com/repo }, "golangci-lint": {"enable": true, "workDir": "", "command": "golangci-lint", "args": ["run", "--config", ".golangci.yml"], "reportFormat": "github_checks"}}
 	// * "org": {"extraRefs":{org:xxx, repo:xxx, path_alias:github.com/repo }, "golangci-lint": {"enable": true, "workDir": "", "command": "golangci-lint", "args": ["run", "--config", ".golangci.yml"], "reportFormat": "github_checks"}}
 	CustomConfig map[string]RepoConfig `json:"customConfig,omitempty"`
+
+	// IssueReferences is the issue references config.
+	// key is the linter name.
+	// value is the issue references config.
+	IssueReferences map[string][]IssueReference `json:"issueReferences,omitempty"`
+	// compiledIssueReferences is the compiled issue references config.
+	compiledIssueReferences map[string][]CompiledIssueReference
 }
 
 type RepoConfig struct {
-	// ExtraRefs are auxiliary repositories that
-	// need to be cloned, determined from config
-	ExtraRefs []Refs            `json:"extraRefs,omitempty"`
-	Linters   map[string]Linter `json:"linters,omitempty"`
+	// Refs are repositories that need to be cloned.
+	// The main repository is cloned by default and does not need to be specified here if not specified.
+	// extra refs must be specified.
+	Refs    []Refs            `json:"refs,omitempty"`
+	Linters map[string]Linter `json:"linters,omitempty"`
 }
 
 type Refs struct {
@@ -110,6 +118,19 @@ type KubernetesAsRunner struct {
 	// The destination directory will be created via mounting a emptyDir volume in the pod.
 	CopySSHKeyToPod string `json:"copySSHKeyToPod,omitempty"`
 }
+
+type IssueReference struct {
+	// Pattern is the regex pattern to match the issue message.
+	Pattern string `json:"pattern"`
+	// URL is the url of the issue reference.
+	URL string `json:"url"`
+}
+
+type CompiledIssueReference struct {
+	Pattern *regexp.Regexp
+	URL     string
+}
+
 type Linter struct {
 	// Name is the linter name.
 	Name string
@@ -147,7 +168,7 @@ type Linter struct {
 	// Note:
 	// * github_check_run only support on Github Apps, not support on Github OAuth Apps or authenticated users.
 	GithubReportFormat GithubReportType `json:"githubReportType,omitempty"`
-	GitlabReportFormat GitlabReportType `json:"githubReportType,omitempty"`
+	GitlabReportFormat GitlabReportType `json:"gitlabReportType,omitempty"`
 
 	// ConfigPath is the path of the linter config file.
 	// If not empty, use the config to run the linter.
@@ -159,10 +180,13 @@ type Linter struct {
 
 func (l Linter) String() string {
 	return fmt.Sprintf(
-
 		"Linter{Enable: %v, DockerAsRunner: %v, Workspace: %v, WorkDir: %v, Command: %v, Args: %v, ReportFormat: %v, ConfigPath: %v}",
 		*l.Enable, l.DockerAsRunner, l.Workspace, l.WorkDir, l.Command, l.Args, l.GithubReportFormat, l.ConfigPath)
 }
+
+var (
+	ErrEmptyRepoOrOrg = errors.New("empty repo or org")
+)
 
 // NewConfig returns a new Config.
 func NewConfig(conf string) (Config, error) {
@@ -179,6 +203,12 @@ func NewConfig(conf string) (Config, error) {
 	// ============ validate and update the config ============
 
 	if err := c.parseCloneURLs(); err != nil {
+		return c, err
+	}
+	if err := c.validateRefs(); err != nil {
+		return c, err
+	}
+	if err := c.parseIssueReferences(); err != nil {
 		return c, err
 	}
 
@@ -266,6 +296,17 @@ func (c Config) GetLinterConfig(org, repo, ln string) Linter {
 	return linter
 }
 
+// GetCompiledIssueReferences returns the compiled issue references config for the given linter name.
+func (c Config) GetCompiledIssueReferences(linterName string) []CompiledIssueReference {
+	if c.compiledIssueReferences == nil {
+		return nil
+	}
+	if refs, ok := c.compiledIssueReferences[linterName]; ok {
+		return refs
+	}
+	return nil
+}
+
 func applyCustomConfig(legacy, custom Linter) Linter {
 	if custom.Enable != nil {
 		legacy.Enable = custom.Enable
@@ -334,7 +375,6 @@ const (
 	GithubCheckRuns            GithubReportType = "github_check_run"
 	GithubPRReview             GithubReportType = "github_pr_review"
 	GitlabComment              GitlabReportType = "gitlab_mr_comment"
-	GitlabDiscussion           GitlabReportType = "gitlab_mr_discussion"
 	GitlabCommentAndDiscussion GitlabReportType = "gitlab_mr_comment_discussion"
 
 	// for debug and testing.
@@ -385,7 +425,7 @@ func (c *Config) parseCloneURLs() error {
 	re := regexp.MustCompile(`^(?:git@|https://)?([^:/]+)[:/]{1}(.*?)/(.*?)\.git$`)
 
 	for orgRepo, refConfig := range c.CustomConfig {
-		for k, ref := range refConfig.ExtraRefs {
+		for k, ref := range refConfig.Refs {
 			if ref.CloneURL == "" {
 				continue
 			}
@@ -399,8 +439,45 @@ func (c *Config) parseCloneURLs() error {
 	return nil
 }
 
+func (c *Config) validateRefs() error {
+	for orgRepo, refConfig := range c.CustomConfig {
+		for _, ref := range refConfig.Refs {
+			if ref.PathAlias != "" && (ref.Repo == "" || ref.Org == "") {
+				log.Errorf("invalid ref: %v for org/repo: %s", ref, orgRepo)
+				return ErrEmptyRepoOrOrg
+			}
+		}
+	}
+
+	return nil
+}
+
+func (c *Config) parseIssueReferences() error {
+	if c.IssueReferences == nil {
+		return nil
+	}
+
+	c.compiledIssueReferences = make(map[string][]CompiledIssueReference)
+
+	for linterName, issueReferences := range c.IssueReferences {
+		for _, ref := range issueReferences {
+			re, err := regexp.Compile(ref.Pattern)
+			if err != nil {
+				return err
+			}
+
+			c.compiledIssueReferences[linterName] = append(c.compiledIssueReferences[linterName], CompiledIssueReference{
+				Pattern: re,
+				URL:     ref.URL,
+			})
+		}
+	}
+
+	return nil
+}
+
 func (c *Config) parseAndUpdateCloneURL(re *regexp.Regexp, orgRepo string, k int) error {
-	ref := &c.CustomConfig[orgRepo].ExtraRefs[k]
+	ref := &c.CustomConfig[orgRepo].Refs[k]
 	matches := re.FindStringSubmatch(ref.CloneURL)
 	if len(matches) != 4 {
 		log.Errorf("failed to parse CloneURL, please check the format of %s", ref.CloneURL)

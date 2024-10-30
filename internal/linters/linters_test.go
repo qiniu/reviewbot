@@ -189,10 +189,10 @@ func TestExecRun(t *testing.T) {
 			id: "case1 - without ARTIFACT",
 			input: Agent{
 				LinterConfig: config.Linter{
-					Enable:       &tp,
-					Command:      []string{"/bin/bash", "-c", "--"},
-					Args:         []string{"echo file:line:column:message"},
-					ReportFormat: config.Quiet,
+					Enable:             &tp,
+					Command:            []string{"/bin/bash", "-c", "--"},
+					Args:               []string{"echo file:line:column:message"},
+					GithubReportFormat: config.Quiet,
 				},
 			},
 			output: []byte("file:line:column:message\n"),
@@ -202,10 +202,10 @@ func TestExecRun(t *testing.T) {
 			id: "case2 - with ARTIFACT",
 			input: Agent{
 				LinterConfig: config.Linter{
-					Enable:       &tp,
-					Command:      []string{"/bin/bash", "-c", "--"},
-					Args:         []string{"echo file2:6:7:message >> $ARTIFACT/golangci-lint.log 2>&1"},
-					ReportFormat: config.Quiet,
+					Enable:             &tp,
+					Command:            []string{"/bin/bash", "-c", "--"},
+					Args:               []string{"echo file2:6:7:message >> $ARTIFACT/golangci-lint.log 2>&1"},
+					GithubReportFormat: config.Quiet,
 				},
 			},
 			output: []byte("file2:6:7:message\n"),
@@ -215,10 +215,10 @@ func TestExecRun(t *testing.T) {
 			id: "case2 - with multi files under ARTIFACT",
 			input: Agent{
 				LinterConfig: config.Linter{
-					Enable:       &tp,
-					Command:      []string{"/bin/bash", "-c", "--"},
-					Args:         []string{"echo file2:6:7:message >> $ARTIFACT/golangci-lint.log 2>&1 ;echo file3:6:7:message >> $ARTIFACT/golangci-lint.log 2>&1"},
-					ReportFormat: config.Quiet,
+					Enable:             &tp,
+					Command:            []string{"/bin/bash", "-c", "--"},
+					Args:               []string{"echo file2:6:7:message >> $ARTIFACT/golangci-lint.log 2>&1 ;echo file3:6:7:message >> $ARTIFACT/golangci-lint.log 2>&1"},
+					GithubReportFormat: config.Quiet,
 				},
 			},
 			output: []byte("file2:6:7:message\nfile3:6:7:message\n"),
@@ -235,8 +235,8 @@ func TestExecRun(t *testing.T) {
 			tc.input.GenLogKey = func() string { return "test" }
 			tc.input.Runner = runner.NewLocalRunner()
 			tc.input.LinterConfig.Modifier = config.NewBaseModifier()
-			tc.input.Context = context.WithValue(context.Background(), lintersutil.EventGUIDKey, "test")
-			output, err := ExecRun(tc.input)
+			ctx := context.WithValue(context.Background(), lintersutil.EventGUIDKey, "test")
+			output, err := ExecRun(ctx, tc.input)
 			if !errors.Is(err, tc.err) {
 				t.Errorf("expected: %v, got: %v", tc.err, err)
 			}
