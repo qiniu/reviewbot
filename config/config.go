@@ -17,8 +17,8 @@ type Config struct {
 
 	// CustomConfig is the custom org or repo config.
 	// e.g.
-	// * "org/repo": {"extraRefs":{org:xxx, repo:xxx, path_alias:github.com/repo }, "golangci-lint": {"enable": true, "workDir": "", "command": "golangci-lint", "args": ["run", "--config", ".golangci.yml"], "reportFormat": "github_checks"}}
-	// * "org": {"extraRefs":{org:xxx, repo:xxx, path_alias:github.com/repo }, "golangci-lint": {"enable": true, "workDir": "", "command": "golangci-lint", "args": ["run", "--config", ".golangci.yml"], "reportFormat": "github_checks"}}
+	// * "org/repo": {"extraRefs":{org:xxx, repo:xxx, path_alias:github.com/repo }, "golangci-lint": {"enable": true, "workDir": "", "command": "golangci-lint", "args": ["run", "--config", ".golangci.yml"], "githubReportFormat": "github_checks"}}
+	// * "org": {"extraRefs":{org:xxx, repo:xxx, path_alias:github.com/repo }, "golangci-lint": {"enable": true, "workDir": "", "command": "golangci-lint", "args": ["run", "--config", ".golangci.yml"], "githubReportFormat": "github_checks"}}
 	CustomConfig map[string]RepoConfig `json:"customConfig,omitempty"`
 
 	// IssueReferences is the issue references config.
@@ -57,7 +57,7 @@ type Refs struct {
 }
 
 type GlobalConfig struct {
-	// GithubReportType is the format of the report, will be used if linterConfig.ReportFormat is empty.
+	// GithubReportType is the format of the report, will be used if linterConfig.GithubReportFormat is empty.
 	// e.g. "github_checks", "github_pr_review"
 	GithubReportType GithubReportType `json:"githubReportType,omitempty"`
 	GitlabReportType GitlabReportType `json:"gitlabReportType,omitempty"`
@@ -161,7 +161,7 @@ type Linter struct {
 	// Env is the environment variables required for the linter execution.
 	Env []string `json:"env,omitempty"`
 
-	// ReportFormat is the format of the report, if empty, use globalDefaultConfig.
+	// GithubReportFormat is the format of the report, if empty, use globalDefaultConfig.
 	// For more details, see:
 	// github_check_run: https://developer.github.com/v3/checks/runs/#create-a-check-run
 	// github_pr_review: https://developer.github.com/v3/pulls/reviews/#create-a-pull-request-review

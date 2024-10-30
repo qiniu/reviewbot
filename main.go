@@ -80,19 +80,22 @@ type options struct {
 	linterReferencePath string
 }
 
+var (
+	errGitlabAccessTokenNotSet = errors.New("either access-token or github app information should be provided")
+	errAppNotSet               = errors.New("app-private-key is required when using github app")
+	errWebHookNotSet           = errors.New("webhook-secret is required")
+)
+
 func (o options) Validate() error {
 	if o.gitHubAccessToken == "" && o.appID == 0 {
-		return errors.New("either access-token or github app information should be provided")
+		return errGitlabAccessTokenNotSet
 	}
-
 	if o.appID != 0 && o.appPrivateKey == "" {
-		return errors.New("app-private-key is required when using github app")
+		return errAppNotSet
 	}
-
 	if o.webhookSecret == "" {
-		return errors.New("webhook-secret is required")
+		return errWebHookNotSet
 	}
-
 	return nil
 }
 

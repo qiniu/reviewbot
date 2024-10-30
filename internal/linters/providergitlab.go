@@ -19,6 +19,7 @@ package linters
 import (
 	"context"
 	"fmt"
+	"github.com/qiniu/x/errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -33,7 +34,15 @@ import (
 	gitv2 "sigs.k8s.io/prow/pkg/git/v2"
 )
 
+var (
+	errCreateComment = errors.New("failed to create comment")
+	errMrHeadSha     = errors.New("get mr head sha failed")
+	errListComment   = errors.New("failed to list MR comment")
+	errDeleteComment = errors.New("failed to delete MR comment")
+)
+
 func ListMergeRequestsFiles(ctx context.Context, gc *gitlab.Client, owner string, repo string, pid int, number int) ([]*gitlab.MergeRequestDiff, *gitlab.Response, error) {
+	// For version compatibility,because verion below 10.8 not support ListMergeRequestDiffs
 	files, response, err := gc.MergeRequests.GetMergeRequestChanges(pid, number, nil)
 	if err != nil {
 		return nil, nil, err
@@ -134,7 +143,8 @@ func (g *GitlabProvider) CreateComment(ctx context.Context, org, repo string, nu
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusCreated {
-		return nil, fmt.Errorf("create comment failed: %v", resp)
+		log.Errorf("create comment failed: %v", resp)
+		return nil, errCreateComment
 	}
 	return &Comment{
 		ID:        int64(cm.ID),
@@ -209,7 +219,7 @@ func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[st
 	switch reportformat {
 	case config.GitlabCommentAndDiscussion:
 		var pid = g.MergeRequestEvent.ObjectAttributes.TargetProjectID
-		existedComments, err := g.ListMergeRequestsComments(context.Background(), g.GitLabClient, org, repo, num, pid)
+		existedComments, err := g.ListMergeRequestsComments(ctx, g.GitLabClient, org, repo, num, pid)
 		if err != nil {
 			log.Errorf("failed to list comments: %v", err)
 			return err
@@ -224,7 +234,7 @@ func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[st
 		}
 		log.Infof("%s found %d existed comments for this PR %d (%s) \n", linterFlag, len(existedCommentsToKeep), num, orgRepo)
 		toDeletes := existedCommentsToKeep
-		if err := DeleteMergeReviewCommentsForGitLab(context.Background(), g.GitLabClient, org, repo, toDeletes, pid, num); err != nil {
+		if err := DeleteMergeReviewCommentsForGitLab(ctx, g.GitLabClient, org, repo, toDeletes, pid, num); err != nil {
 			log.Errorf("failed to delete comments: %v", err)
 			return err
 		}
@@ -235,18 +245,18 @@ func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[st
 			return e
 		}
 		logURL := a.GenLogViewURL()
-		commerr := CreateGitLabCommentsReport(context.Background(), g.GitLabClient, lintResults, linterName, pid, num, logURL)
+		commerr := CreateGitLabCommentsReport(ctx, g.GitLabClient, lintResults, linterName, pid, num, logURL)
 		if commerr != nil {
 			log.Errorf("failed to delete comments: %v", commerr)
 		}
 		// create discussion note
-		dlist, err := ListMergeRequestDiscussions(context.Background(), g.GitLabClient, num, pid)
+		dlist, err := ListMergeRequestDiscussions(ctx, g.GitLabClient, num, pid)
 		if err != nil {
 			log.Errorf("failed to list comments: %v", err)
 			return err
 		}
 		log.Info(len(dlist))
-		errd := DeleteMergeRequestDiscussions(context.Background(), g.GitLabClient, num, pid, dlist, linterFlag)
+		errd := DeleteMergeRequestDiscussions(ctx, g.GitLabClient, num, pid, dlist, linterFlag)
 		if errd != nil {
 			log.Errorf("failed to delete discussion: %v", err)
 			return errd
@@ -257,7 +267,7 @@ func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[st
 		}
 		log.Infof("discussion%v", discussion)
 		// Add the comments
-		addedDis, err := CreateMergeReviewDiscussion(context.Background(), g.GitLabClient, org, repo, num, discussion, pid)
+		addedDis, err := CreateMergeReviewDiscussion(ctx, g.GitLabClient, org, repo, num, discussion, pid)
 		if err != nil {
 			log.Errorf("failed to post discussions: %v", err)
 			return err
@@ -266,7 +276,7 @@ func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[st
 		metric.NotifyWebhookByText(ConstructGotchaMsg(linterName, g.MergeRequestEvent.Project.WebURL, "", lintResults))
 	case config.GitlabComment:
 		var pid = g.MergeRequestEvent.ObjectAttributes.TargetProjectID
-		existedComments, err := g.ListMergeRequestsComments(context.Background(), g.GitLabClient, org, repo, num, pid)
+		existedComments, err := g.ListMergeRequestsComments(ctx, g.GitLabClient, org, repo, num, pid)
 		if err != nil {
 			log.Errorf("failed to list comments: %v", err)
 			return err
@@ -281,13 +291,13 @@ func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[st
 		}
 		log.Infof("%s found %d existed comments for this PR %d (%s) \n", linterFlag, len(existedCommentsToKeep), num, orgRepo)
 
-		if err := DeleteMergeReviewCommentsForGitLab(context.Background(), g.GitLabClient, org, repo, existedCommentsToKeep, pid, num); err != nil {
+		if err := DeleteMergeReviewCommentsForGitLab(ctx, g.GitLabClient, org, repo, existedCommentsToKeep, pid, num); err != nil {
 			log.Errorf("failed to delete comments: %v", err)
 			return err
 		}
 		log.Infof("%s delete %d comments for this PR %d (%s) \n", linterFlag, len(existedCommentsToKeep), num, orgRepo)
 		logURL := a.GenLogViewURL()
-		commerr := CreateGitLabCommentsReport(context.Background(), g.GitLabClient, lintResults, linterName, pid, num, logURL)
+		commerr := CreateGitLabCommentsReport(ctx, g.GitLabClient, lintResults, linterName, pid, num, logURL)
 		if commerr != nil {
 			log.Errorf("failed to post comments: %v", commerr)
 		}
@@ -317,7 +327,7 @@ func CreateGitLabCommentsReport(ctx context.Context, gc *gitlab.Client, outputs 
 		for _, output := range outputs {
 			totalerrorscount += len(output)
 			for _, outputmessage := range output {
-				errormessage = errormessage + "<br>" + outputmessage.File + ", line:" + strconv.Itoa(outputmessage.Line) + ", " + outputmessage.Message
+				errormessage = errormessage + "<br>`" + outputmessage.File + ", line:" + strconv.Itoa(outputmessage.Line) + "` <br>" + outputmessage.Message
 			}
 		}
 		message = fmt.Sprintf("[**%s**]  check failed❌ , %v files exist errors,%v errors found.     This is [the detailed log](%s).\n%s", lintername, len(outputs), totalerrorscount, logurl, comentDetailHeader+errormessage+"<br>"+commentDetail)
@@ -334,7 +344,8 @@ func CreateGitLabCommentsReport(ctx context.Context, gc *gitlab.Client, outputs 
 			return err
 		}
 		if resp.StatusCode != http.StatusCreated {
-			return fmt.Errorf("create comment failed: %v", resp)
+			log.Errorf("create comment failed: %v", resp)
+			return errCreateComment
 		}
 		addedComments = append(addedComments, cm)
 		return nil
@@ -366,7 +377,8 @@ func MergeRequestSHA(gc *gitlab.Client, pid int, num int) (headsha string, bases
 	var mr *gitlab.MergeRequest
 	mr, _, err = gc.MergeRequests.GetMergeRequest(pid, num, nil)
 	if err != nil {
-		return "", "", "", fmt.Errorf("get mr head sha failed: %v", err)
+		log.Errorf("get mr head sha failed:%v", err)
+		return "", "", "", errMrHeadSha
 	}
 	return mr.DiffRefs.HeadSha, mr.DiffRefs.BaseSha, mr.DiffRefs.StartSha, nil
 }
@@ -407,7 +419,8 @@ func (g *GitlabProvider) ListMergeRequestsComments(ctx context.Context, gc *gitl
 			return err
 		}
 		if resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("list comments failed: %v", resp)
+			log.Errorf("list mergerequest comments failed: %v", resp)
+			return errListComment
 		}
 		allComments = comments
 		return nil
@@ -429,7 +442,8 @@ func CreateMergeReviewDiscussion(ctx context.Context, gc *gitlab.Client, owner s
 				return err
 			}
 			if resp.StatusCode != http.StatusCreated {
-				return fmt.Errorf("create comment failed: %v", resp)
+				log.Errorf("create mergerequest discussions failed: %v", resp)
+				return errCreateComment
 			}
 			addedComments = append(addedComments, cm)
 			return nil
@@ -452,7 +466,9 @@ func (g *GitlabProvider) DeleteMergeReviewComments(ctx context.Context, gc *gitl
 				return err
 			}
 			if resp.StatusCode != http.StatusNoContent {
-				return fmt.Errorf("delete comment failed: %v", resp)
+				log.Errorf("delete mergerequest comments failed: %v", resp)
+
+				return errDeleteComment
 			}
 			return nil
 		})
@@ -473,7 +489,8 @@ func DeleteMergeReviewCommentsForGitLab(ctx context.Context, gc *gitlab.Client, 
 				return err
 			}
 			if resp.StatusCode != http.StatusNoContent {
-				return fmt.Errorf("delete comment failed: %v", resp)
+				log.Errorf("delete mergerequest comments failed: %v", resp)
+				return errDeleteComment
 			}
 			return nil
 		})

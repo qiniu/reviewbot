@@ -22,6 +22,7 @@ import (
 	"strconv"
 
 	"github.com/google/go-github/v57/github"
+	"github.com/qiniu/x/errors"
 	"github.com/qiniu/x/log"
 	"github.com/xanzy/go-gitlab"
 )
@@ -34,6 +35,10 @@ type FileHunkChecker struct {
 	// map[file][]hunks
 	Hunks map[string][]Hunk
 }
+
+var (
+	errCommitFile = errors.New("commit file error")
+)
 
 func NewFileHunkChecker(commitFiles []*github.CommitFile) (*FileHunkChecker, error) {
 	hunks := make(map[string][]Hunk)
@@ -91,7 +96,8 @@ func NewGitLabCommitFileHunkChecker(commitFiles []*gitlab.MergeRequestDiff) (*Fi
 }
 func DiffHunksMerge(commitFile *gitlab.MergeRequestDiff) ([]Hunk, error) {
 	if commitFile == nil || commitFile.NewPath == "" {
-		return nil, fmt.Errorf("invalid commitFile: %v", commitFile)
+		log.Errorf("invalid commitFile: %v", commitFile)
+		return nil, errCommitFile
 	}
 	return ParsePatch(commitFile.Diff)
 }

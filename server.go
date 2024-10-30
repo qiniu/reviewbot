@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/xanzy/go-gitlab"
 	"io/ioutil"
 	"math"
 	"math/rand"
@@ -43,6 +42,7 @@ import (
 	"github.com/qiniu/reviewbot/internal/runner"
 	"github.com/qiniu/reviewbot/internal/storage"
 	"github.com/qiniu/x/log"
+	"github.com/xanzy/go-gitlab"
 	gitv2 "sigs.k8s.io/prow/pkg/git/v2"
 )
 
@@ -81,6 +81,11 @@ type Server struct {
 var (
 	mu    sync.Mutex
 	prMap = make(map[string]context.CancelFunc)
+)
+
+var (
+	errListFile   = errors.New("list files failed")
+	errPrepareDir = errors.New("failed to prepare repo dir")
 )
 
 func (s *Server) initKubernetesRunner() {
@@ -352,8 +357,7 @@ func (s *Server) gitlabRequestHandle(w http.ResponseWriter, r *http.Request) {
 		// limit the length of eventGUID to 12
 		eventGUID = eventGUID[len(eventGUID)-12:]
 	}
-
-	ctx := context.WithValue(context.Background(), lintersutil.EventGUIDKey, eventGUID)
+	ctx := context.WithValue(r.Context(), lintersutil.EventGUIDKey, eventGUID)
 	log := lintersutil.FromContext(ctx)
 
 	payload, err := ioutil.ReadAll(r.Body)
@@ -371,7 +375,10 @@ func (s *Server) gitlabRequestHandle(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	fmt.Fprint(w, "Event received. Have a nice day.")
+	_, errf := fmt.Fprint(w, "Event received. Have a nice day.")
+	if errf != nil {
+		fmt.Println("Event received Failed.")
+	}
 
 	switch event := event.(type) {
 	case *gitlab.MergeEvent:
@@ -440,13 +447,14 @@ func (s *Server) gitlabHandle(ctx context.Context, event *gitlab.MergeEvent) err
 
 	if response.StatusCode != http.StatusOK {
 		log.Errorf("list files failed: %v", response)
-		return fmt.Errorf("list files failed: %v", response)
+		return errListFile
 	}
 	log.Infof("found %d files affected by pull request %d\n", len(mergeRequestAffectedFiles), num)
 
 	defaultWorkDir, err := prepareRepoDir(org, repo, num)
 	if err != nil {
-		return fmt.Errorf("failed to prepare repo dir: %w", err)
+		log.Errorf("prepare repo dir failed: %v", err)
+		return errPrepareDir
 	}
 	defer func() {
 		if s.debug {
