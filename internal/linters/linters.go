@@ -192,7 +192,7 @@ func Report(ctx context.Context, a Agent, lintResults map[string][]LinterOutput)
 
 	log.Infof("[%s] found %d files with valid %d linter errors related to this PR %d (%s) \n", linterName, len(lintResults), countLinterErrors(lintResults), num, orgRepo)
 
-	a.ApplyIssueReferences(lintResults)
+	a.ApplyIssueReferences(ctx, lintResults)
 
 	if len(lintResults) > 0 {
 		metric.IncIssueCounter(orgRepo, linterName, a.Provider.GetCodeReviewInfo().URL, a.Provider.GetCodeReviewInfo().HeadSHA, float64(countLinterErrors(lintResults)))
