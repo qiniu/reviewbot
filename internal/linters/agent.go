@@ -17,12 +17,16 @@
 package linters
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/runner"
 	"github.com/qiniu/reviewbot/internal/storage"
 )
+
+var DefaultIssueReferencesCache = NewIssueReferencesCache(time.Minute * 10)
 
 // Agent knows necessary information in order to run linters.
 type Agent struct {
@@ -47,15 +51,38 @@ type Agent struct {
 }
 
 // ApplyIssueReferences applies the issue references to the lint results.
-func (a *Agent) ApplyIssueReferences(lintResults map[string][]LinterOutput) {
-	msgFormat := "%s\nmore info: %s"
+func (a *Agent) ApplyIssueReferences(ctx context.Context, lintResults map[string][]LinterOutput) {
+	var msgFormat string
+	format := a.LinterConfig.ReportFormat
+	switch format {
+	case config.GithubCheckRuns:
+		msgFormat = "%s\nmore info: %s"
+	case config.GithubPRReview:
+		msgFormat = "[%s](%s)"
+	case config.Quiet:
+		return
+	default:
+		msgFormat = "%s\nmore info: %s"
+	}
 	for _, ref := range a.IssueReferences {
 		for file, outputs := range lintResults {
 			for i, o := range outputs {
 				if ref.Pattern.MatchString(o.Message) {
 					lintResults[file][i].Message = fmt.Sprintf(msgFormat, o.Message, ref.URL)
+					if format == config.GithubPRReview {
+						issueContent, err := a.Provider.FetchIssueContent(ctx, ref.URL, DefaultIssueReferencesCache)
+						if err == nil {
+							lintResults[file][i].Message += fmt.Sprintf(ReferenceFooter, issueContent)
+						}
+					}
 				}
 			}
 		}
 	}
 }
+
+const ReferenceFooter = `
+<details>
+<summary>详细解释</summary>
+%s
+</details>`

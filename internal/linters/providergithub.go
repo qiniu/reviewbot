@@ -21,6 +21,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -127,7 +129,7 @@ func RetryWithBackoff(ctx context.Context, f func() error) error {
 }
 
 func linterNamePrefix(linterName string) string {
-	return fmt.Sprintf("[%s]", linterName)
+	return fmt.Sprintf("**[%s]** reported by [reviewbot](https://github.com/qiniu/reviewbot):cow:\n", linterName)
 }
 
 func constructPullRequestComments(linterOutputs map[string][]LinterOutput, linterName, commitID string) []*github.PullRequestComment {
@@ -580,4 +582,48 @@ func (g *GithubProvider) GetCodeReviewInfo() CodeReview {
 		HeadSHA:   g.PullRequestEvent.GetPullRequest().GetHead().GetSHA(),
 		UpdatedAt: g.PullRequestEvent.GetPullRequest().GetUpdatedAt().Time,
 	}
+}
+
+var ErrInvalidGithubIssueURL = errors.New("invalid GitHub issue URL format")
+
+func (g *GithubProvider) parseIssueURL(url string) (owner string, repo string, issueNumber int, err error) {
+	re := regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/issues/(\d+)$`)
+	matches := re.FindStringSubmatch(url)
+	if len(matches) != 4 {
+		log.Errorf("invalid GitHub issue URL format: %s", url)
+		return "", "", 0, ErrInvalidGithubIssueURL
+	}
+
+	owner = matches[1]
+	repo = matches[2]
+	issueNumber, err = strconv.Atoi(matches[3])
+	if err != nil {
+		log.Errorf("failed to parse issue number: %v", err)
+		return "", "", 0, err
+	}
+	return owner, repo, issueNumber, err
+}
+
+func (g *GithubProvider) FetchIssueContent(ctx context.Context, url string, cache *IssueCache) (string, error) {
+	owner, repo, issueNumber, err := g.parseIssueURL(url)
+	if err != nil {
+		log.Errorf("failed to parse issue URL: %v", err)
+		return "", err
+	}
+
+	if cachedIssue, isFound := cache.Get(url); isFound && !cache.IsExpired() {
+		log.Debugf("hit cache for issue: %s", url)
+		return cachedIssue, nil
+	}
+
+	issue, _, err := g.GithubClient.Issues.Get(ctx, owner, repo, issueNumber)
+	if err != nil {
+		log.Errorf("failed to fetch github issue: %v", err)
+		return "", err
+	}
+
+	issueContent := issue.GetBody()
+	log.Debugf("cache miss or expired, set cache for issue: %s", url)
+	cache.Set(url, issueContent)
+	return issueContent, nil
 }
