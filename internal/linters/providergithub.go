@@ -603,27 +603,3 @@ func (g *GithubProvider) parseIssueURL(url string) (owner string, repo string, i
 	}
 	return owner, repo, issueNumber, err
 }
-
-func (g *GithubProvider) FetchIssueContent(ctx context.Context, url string, cache *IssueCache) (string, error) {
-	owner, repo, issueNumber, err := g.parseIssueURL(url)
-	if err != nil {
-		log.Errorf("failed to parse issue URL: %v", err)
-		return "", err
-	}
-
-	if cachedIssue, isFound := cache.Get(url); isFound && !cache.IsExpired() {
-		log.Debugf("hit cache for issue: %s", url)
-		return cachedIssue, nil
-	}
-
-	issue, _, err := g.GithubClient.Issues.Get(ctx, owner, repo, issueNumber)
-	if err != nil {
-		log.Errorf("failed to fetch github issue: %v", err)
-		return "", err
-	}
-
-	issueContent := issue.GetBody()
-	log.Debugf("cache miss or expired, set cache for issue: %s", url)
-	cache.Set(url, issueContent)
-	return issueContent, nil
-}

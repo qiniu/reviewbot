@@ -19,14 +19,19 @@ package linters
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
+	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/reviewbot/config"
+	"github.com/qiniu/reviewbot/internal/cache"
+	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/reviewbot/internal/runner"
 	"github.com/qiniu/reviewbot/internal/storage"
 )
 
-var DefaultIssueReferencesCache = NewIssueReferencesCache(time.Minute * 10)
+// issueCache is the issue references cache.
+var issueCache = cache.NewIssueReferencesCache(time.Minute * 10)
 
 // Agent knows necessary information in order to run linters.
 type Agent struct {
@@ -52,6 +57,7 @@ type Agent struct {
 
 // ApplyIssueReferences applies the issue references to the lint results.
 func (a *Agent) ApplyIssueReferences(ctx context.Context, lintResults map[string][]LinterOutput) {
+	log := lintersutil.FromContext(ctx)
 	var msgFormat string
 	format := a.LinterConfig.ReportFormat
 	switch format {
@@ -67,15 +73,37 @@ func (a *Agent) ApplyIssueReferences(ctx context.Context, lintResults map[string
 	for _, ref := range a.IssueReferences {
 		for file, outputs := range lintResults {
 			for i, o := range outputs {
-				if ref.Pattern.MatchString(o.Message) {
-					lintResults[file][i].Message = fmt.Sprintf(msgFormat, o.Message, ref.URL)
-					if format == config.GithubPRReview {
-						issueContent, err := a.Provider.FetchIssueContent(ctx, ref.URL, DefaultIssueReferencesCache)
-						if err == nil {
-							lintResults[file][i].Message += fmt.Sprintf(ReferenceFooter, issueContent)
-						}
-					}
+				if !ref.Pattern.MatchString(o.Message) {
+					continue
 				}
+				lintResults[file][i].Message = fmt.Sprintf(msgFormat, o.Message, ref.URL)
+
+				if format != config.GithubPRReview {
+					continue
+				}
+
+				// specific for github pr review format
+				if issueContent, ok := issueCache.Get(ref.URL); ok && !issueCache.IsExpired() {
+					lintResults[file][i].Message += fmt.Sprintf(ReferenceFooter, issueContent)
+					continue
+				}
+
+				issue, resp, err := github.NewClient(http.DefaultClient).Issues.Get(ctx, "qiniu", "reviewbot", ref.IssueNumber)
+				if err != nil {
+					log.Errorf("failed to fetch issue content: %s", err)
+					// just log and continue.
+					continue
+				}
+
+				if resp.StatusCode != http.StatusOK {
+					log.Errorf("failed to fetch issue content, resp: %v", resp)
+					// just log and continue.
+					continue
+				}
+
+				issueContent := issue.GetBody()
+				issueCache.Set(ref.URL, issueContent)
+				lintResults[file][i].Message += fmt.Sprintf(ReferenceFooter, issueContent)
 			}
 		}
 	}
