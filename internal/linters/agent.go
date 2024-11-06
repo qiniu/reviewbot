@@ -65,6 +65,8 @@ func (a *Agent) ApplyIssueReferences(ctx context.Context, lintResults map[string
 		msgFormat = "%s\nmore info: %s"
 	case config.GithubPRReview:
 		msgFormat = "[%s](%s)"
+	case config.GithubMixType:
+		msgFormat = "[%s](%s)"
 	case config.Quiet:
 		return
 	default:
@@ -78,12 +80,12 @@ func (a *Agent) ApplyIssueReferences(ctx context.Context, lintResults map[string
 				}
 				lintResults[file][i].Message = fmt.Sprintf(msgFormat, o.Message, ref.URL)
 
-				if format != config.GithubPRReview {
+				if format != config.GithubPRReview && format != config.GithubMixType {
 					continue
 				}
 
 				// specific for github pr review format
-				if issueContent, ok := issueCache.Get(ref.URL); ok && !issueCache.IsExpired() {
+				if issueContent, ok := issueCache.Get(ref.URL); ok && !issueCache.IsExpired(ref.URL) {
 					lintResults[file][i].Message += fmt.Sprintf(ReferenceFooter, issueContent)
 					continue
 				}
