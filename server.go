@@ -763,8 +763,12 @@ func (s *Server) prepareGitRepos(ctx context.Context, org, repo string, num int)
 		opt := gitv2.ClientFactoryOpts{
 			CacheDirBase: github.String(s.repoCacheDir),
 			Persist:      github.Bool(true),
-			UseSSH:       github.Bool(true),
-			Host:         ref.Host,
+			//UseSSH:       github.Bool(f),
+			Host:     ref.Host,
+			Username: func() (string, error) { return "x-access-token", nil },
+			Token: func(v string) (string, error) {
+				return s.gitLabAccessToken, nil
+			},
 		}
 
 		gitClient, err := gitv2.NewClientFactory(opt.Apply)
