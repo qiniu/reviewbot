@@ -6,16 +6,17 @@ import (
 )
 
 type IssueCache struct {
-	mu      sync.RWMutex
-	data    map[string]string
-	ttl     time.Duration
-	lastGet time.Time
+	mu          sync.RWMutex
+	data        map[string]string
+	ttl         time.Duration
+	lastSetTime map[string]time.Time
 }
 
 func NewIssueReferencesCache(ttl time.Duration) *IssueCache {
 	return &IssueCache{
-		data: make(map[string]string),
-		ttl:  ttl,
+		data:        make(map[string]string),
+		ttl:         ttl,
+		lastSetTime: make(map[string]time.Time),
 	}
 }
 
@@ -30,9 +31,9 @@ func (c *IssueCache) Set(key string, issueContent string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.data[key] = issueContent
-	c.lastGet = time.Now()
+	c.lastSetTime[key] = time.Now()
 }
 
-func (c *IssueCache) IsExpired() bool {
-	return time.Since(c.lastGet) > c.ttl
+func (c *IssueCache) IsExpired(key string) bool {
+	return time.Since(c.lastSetTime[key]) > c.ttl
 }

@@ -375,7 +375,8 @@ type GithubReportType string
 const (
 	GithubCheckRuns GithubReportType = "github_check_run"
 	GithubPRReview  GithubReportType = "github_pr_review"
-
+	// GithubMixType is the type of the report that mix the github_check_run and github_pr_review.
+	GithubMixType GithubReportType = "github_mix"
 	// for debug and testing.
 	Quiet GithubReportType = "quiet"
 )
