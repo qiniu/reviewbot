@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
+	"strings"
 
 	"github.com/qiniu/x/log"
 	"sigs.k8s.io/yaml"
@@ -24,6 +26,9 @@ type Config struct {
 	// IssueReferences is the issue references config.
 	// key is the linter name.
 	// value is the issue references config.
+	// Considering this is the information of kinds of issue which should be maintained carefully,
+	// so we *HardCode* it to store in github.com/qiniu/reviewbot/issues.
+	// feel free to submit a issue if you want to discuss it.
 	IssueReferences map[string][]IssueReference `json:"issueReferences,omitempty"`
 	// compiledIssueReferences is the compiled issue references config.
 	compiledIssueReferences map[string][]CompiledIssueReference
@@ -127,8 +132,9 @@ type IssueReference struct {
 }
 
 type CompiledIssueReference struct {
-	Pattern *regexp.Regexp
-	URL     string
+	Pattern     *regexp.Regexp
+	URL         string
+	IssueNumber int
 }
 
 type Linter struct {
@@ -185,7 +191,9 @@ func (l Linter) String() string {
 }
 
 var (
-	ErrEmptyRepoOrOrg = errors.New("empty repo or org")
+	ErrEmptyRepoOrOrg                    = errors.New("empty repo or org")
+	ErrIssueReferenceMustInReviewbotRepo = errors.New("issue reference must in reviewbot repo")
+	ErrInvalidIssueNumber                = errors.New("invalid issue number")
 )
 
 // NewConfig returns a new Config.
@@ -461,14 +469,28 @@ func (c *Config) parseIssueReferences() error {
 
 	for linterName, issueReferences := range c.IssueReferences {
 		for _, ref := range issueReferences {
+			u := strings.TrimSpace(ref.URL)
+			fixedPrefix := "https://github.com/qiniu/reviewbot/issues/"
+			if !strings.HasPrefix(u, fixedPrefix) {
+				log.Errorf("invalid issue reference url: %s", u)
+				return ErrIssueReferenceMustInReviewbotRepo
+			}
+
+			num := u[len(fixedPrefix):]
+			issueNumber, err := strconv.Atoi(num)
+			if err != nil {
+				return ErrInvalidIssueNumber
+			}
+
 			re, err := regexp.Compile(ref.Pattern)
 			if err != nil {
 				return err
 			}
 
 			c.compiledIssueReferences[linterName] = append(c.compiledIssueReferences[linterName], CompiledIssueReference{
-				Pattern: re,
-				URL:     ref.URL,
+				Pattern:     re,
+				URL:         ref.URL,
+				IssueNumber: issueNumber,
 			})
 		}
 	}

@@ -85,4 +85,5 @@ linters:
     - gofumpt # see too many false positives
     - tagliatelle # see too many false positives
     - intrange # see too many false positives
+    - gosmopolitan # see too many false positives
 

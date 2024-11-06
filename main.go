@@ -76,8 +76,6 @@ type options struct {
 	serverAddr string
 	// kube config file
 	kubeConfig string
-	// linter result reference path
-	linterReferencePath string
 }
 
 var (

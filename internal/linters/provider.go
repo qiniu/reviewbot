@@ -21,6 +21,8 @@ type Provider interface {
 	// NOTE(CarlJi): this is a simplified definition since only the file path is returned.
 	// In the future, we may need more file status information.
 	GetFiles(predicate func(filepath string) bool) []string
+	// GetCodeReviewInfo gets the code review information for the PR/MR.
+	GetCodeReviewInfo() CodeReview
 
 	// ListCommits lists the commits in the PR/MR.
 	ListCommits(ctx context.Context, org, repo string, number int) ([]Commit, error)
@@ -30,9 +32,6 @@ type Provider interface {
 	DeleteComment(ctx context.Context, org, repo string, commentID int64) error
 	// CreateComment creates a comment in the PR/MR.
 	CreateComment(ctx context.Context, org, repo string, number int, comment *Comment) (*Comment, error)
-
-	// GetCodeReviewInfo gets the code review information for the PR/MR.
-	GetCodeReviewInfo() CodeReview
 }
 
 // Commit represents a Git commit.
