@@ -19,7 +19,6 @@ package linters
 import (
 	"context"
 	"fmt"
-	"github.com/qiniu/x/errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -29,6 +28,7 @@ import (
 	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/reviewbot/internal/metric"
+	"github.com/qiniu/x/errors"
 	"github.com/qiniu/x/log"
 	gitlab "github.com/xanzy/go-gitlab"
 	gitv2 "sigs.k8s.io/prow/pkg/git/v2"
@@ -40,6 +40,12 @@ var (
 	errListComment   = errors.New("failed to list MR comment")
 	errDeleteComment = errors.New("failed to delete MR comment")
 )
+
+type DiffSha struct {
+	HeadSha  string
+	BaseSha  string
+	StartSha string
+}
 
 func ListMergeRequestsFiles(ctx context.Context, gc *gitlab.Client, owner string, repo string, pid int, number int) ([]*gitlab.MergeRequestDiff, *gitlab.Response, error) {
 	// For version compatibility,because verion below 10.8 not support ListMergeRequestDiffs
@@ -187,7 +193,8 @@ func NewGitlabProvider(gitlabClient *gitlab.Client, gitClient gitv2.ClientFactor
 	}, nil
 }
 
-func ReportFormMartCheck(gc *gitlab.Client, reportFomart config.GitlabReportType) (reportType config.GitlabReportType) {
+func ReportFormMatCheck(gc *gitlab.Client, reportFormat config.GitlabReportType) (reportType config.GitlabReportType) {
+	//  gitlab  verion below 10.8 not support discussion resource api
 	v, r, e := gc.Version.GetVersion()
 	if e != nil {
 		log.Fatalf("Failed to get version: %v,response is %v", e, r)
@@ -198,7 +205,7 @@ func ReportFormMartCheck(gc *gitlab.Client, reportFomart config.GitlabReportType
 	if v1.LessThan(v2) {
 		return config.GitlabComment
 	}
-	return reportFomart
+	return reportFormat
 }
 
 func (g *GitlabProvider) HandleComments(ctx context.Context, outputs map[string][]LinterOutput) error {
@@ -215,9 +222,10 @@ func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[st
 	repo := a.Provider.GetCodeReviewInfo().Repo
 	num := a.Provider.GetCodeReviewInfo().Number
 	orgRepo := fmt.Sprintf("%s/%s", org, repo)
-	reportformat := ReportFormMartCheck(g.GitLabClient, a.LinterConfig.GitlabReportFormat)
+	reportformat := ReportFormMatCheck(g.GitLabClient, a.LinterConfig.GitlabReportFormat)
 	switch reportformat {
 	case config.GitlabCommentAndDiscussion:
+		// list   MR  comments
 		var pid = g.MergeRequestEvent.ObjectAttributes.TargetProjectID
 		existedComments, err := g.ListMergeRequestsComments(ctx, g.GitLabClient, org, repo, num, pid)
 		if err != nil {
@@ -234,39 +242,43 @@ func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[st
 		}
 		log.Infof("%s found %d existed comments for this PR %d (%s) \n", linterFlag, len(existedCommentsToKeep), num, orgRepo)
 		toDeletes := existedCommentsToKeep
+		// delete comments that are  related to the linter
 		if err := DeleteMergeReviewCommentsForGitLab(ctx, g.GitLabClient, org, repo, toDeletes, pid, num); err != nil {
 			log.Errorf("failed to delete comments: %v", err)
 			return err
 		}
 		log.Infof("%s delete %d comments for this PR %d (%s) \n", linterFlag, len(toDeletes), num, orgRepo)
-		h, b, s, e := MergeRequestSHA(g.GitLabClient, pid, num)
+		h, e := MergeRequestSHA(g.GitLabClient, pid, num)
+
 		if e != nil {
 			log.Errorf("failed to delete comments: %v", e)
 			return e
 		}
+		// create  MR  comments form linter result
 		logURL := a.GenLogViewURL()
 		commerr := CreateGitLabCommentsReport(ctx, g.GitLabClient, lintResults, linterName, pid, num, logURL)
 		if commerr != nil {
 			log.Errorf("failed to delete comments: %v", commerr)
 		}
-		// create discussion note
+		// list discussions
 		dlist, err := ListMergeRequestDiscussions(ctx, g.GitLabClient, num, pid)
 		if err != nil {
 			log.Errorf("failed to list comments: %v", err)
 			return err
 		}
-		log.Info(len(dlist))
+		// delete discussion  that are related the linter
 		errd := DeleteMergeRequestDiscussions(ctx, g.GitLabClient, num, pid, dlist, linterFlag)
 		if errd != nil {
 			log.Errorf("failed to delete discussion: %v", err)
 			return errd
 		}
-		discussion := constructMergeRequestDiscussion(lintResults, linterFlag, g.MergeRequestEvent.ObjectAttributes.LastCommit.ID, h, b, s)
+		// construct  discussion  from lint result
+		discussion := constructMergeRequestDiscussion(lintResults, linterFlag, g.MergeRequestEvent.ObjectAttributes.LastCommit.ID, h.HeadSha, h.BaseSha, h.StartSha)
 		if len(discussion) == 0 {
 			return nil
 		}
 		log.Infof("discussion%v", discussion)
-		// Add the comments
+		// add discussion
 		addedDis, err := CreateMergeReviewDiscussion(ctx, g.GitLabClient, org, repo, num, discussion, pid)
 		if err != nil {
 			log.Errorf("failed to post discussions: %v", err)
@@ -323,6 +335,7 @@ func CreateGitLabCommentsReport(ctx context.Context, gc *gitlab.Client, outputs 
 	var errormessage string
 	var totalerrorscount int
 	totalerrorscount = 0
+	// for combine the linter result
 	if len(outputs) > 0 {
 		for _, output := range outputs {
 			totalerrorscount += len(output)
@@ -334,6 +347,7 @@ func CreateGitLabCommentsReport(ctx context.Context, gc *gitlab.Client, outputs 
 	} else {
 		message = fmt.Sprintf("[**%s**]  check passed✅ . \n%s", lintername, comentDetailHeader+commentDetail)
 	}
+	// create MR comments
 	var optd gitlab.CreateMergeRequestNoteOptions
 	var addedComments []*gitlab.Note
 	optd.Body = &message
@@ -373,14 +387,18 @@ func (g *GitlabProvider) GetFiles(predicate func(filepath string) bool) []string
 	return files
 }
 
-func MergeRequestSHA(gc *gitlab.Client, pid int, num int) (headsha string, basesha string, startsha string, err error) {
+func MergeRequestSHA(gc *gitlab.Client, pid int, num int) (sf *DiffSha, err error) {
 	var mr *gitlab.MergeRequest
 	mr, _, err = gc.MergeRequests.GetMergeRequest(pid, num, nil)
 	if err != nil {
 		log.Errorf("get mr head sha failed:%v", err)
-		return "", "", "", errMrHeadSha
+		return nil, errMrHeadSha
 	}
-	return mr.DiffRefs.HeadSha, mr.DiffRefs.BaseSha, mr.DiffRefs.StartSha, nil
+	var diffsha = DiffSha{}
+	diffsha.BaseSha = mr.DiffRefs.BaseSha
+	diffsha.StartSha = mr.DiffRefs.StartSha
+	diffsha.HeadSha = mr.DiffRefs.HeadSha
+	return &diffsha, nil
 }
 
 func ListMergeRequestDiscussions(ctx context.Context, gc *gitlab.Client, number int, pid int) ([]*gitlab.Discussion, error) {
@@ -505,24 +523,24 @@ func DeleteMergeReviewCommentsForGitLab(ctx context.Context, gc *gitlab.Client, 
 
 func constructMergeRequestDiscussion(linterOutputs map[string][]LinterOutput, linterName, commitID string, headSha string, baseSha string, startSha string) []*gitlab.CreateMergeRequestDiscussionOptions {
 	var comments []*gitlab.CreateMergeRequestDiscussionOptions
-	var ptype = "text"
-	for file, outputs := range linterOutputs {
-		for _, output := range outputs {
+	for z := range linterOutputs {
+		for i := range linterOutputs[z] {
+			var ptype = "text"
 			message := fmt.Sprintf("%s %s\n%s",
-				linterName, output.Message, CommentFooter)
-			if output.StartLine != 0 {
+				linterName, linterOutputs[z][i].Message, CommentFooter)
+			if linterOutputs[z][i].StartLine != 0 {
 				comments = append(comments, &gitlab.CreateMergeRequestDiscussionOptions{
 					Body:     &message,
 					CommitID: &commitID,
 					Position: &gitlab.PositionOptions{
-						NewPath:      &file,
-						NewLine:      &output.Line,
+						NewPath:      &linterOutputs[z][i].File,
+						NewLine:      &linterOutputs[z][i].Line,
 						BaseSHA:      &baseSha,
 						HeadSHA:      &headSha,
 						StartSHA:     &startSha,
 						PositionType: &ptype,
-						OldPath:      &file,
-						OldLine:      &output.Line,
+						OldPath:      &linterOutputs[z][i].File,
+						OldLine:      &linterOutputs[z][i].Line,
 					},
 				})
 			} else {
@@ -530,14 +548,14 @@ func constructMergeRequestDiscussion(linterOutputs map[string][]LinterOutput, li
 					Body: &message,
 
 					Position: &gitlab.PositionOptions{
-						NewPath:      &file,
+						NewPath:      &linterOutputs[z][i].File,
 						BaseSHA:      &baseSha,
 						HeadSHA:      &headSha,
 						StartSHA:     &startSha,
-						NewLine:      &output.Line,
+						NewLine:      &linterOutputs[z][i].Line,
 						PositionType: &ptype,
-						OldPath:      &file,
-						OldLine:      &output.Line,
+						OldPath:      &linterOutputs[z][i].File,
+						OldLine:      &linterOutputs[z][i].Line,
 					},
 					CommitID: &commitID,
 				})
