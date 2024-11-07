@@ -537,7 +537,9 @@ func printAllLintResultswithMarkdown(lintErrs map[string][]LinterOutput) string 
 	info := markdownTableHeader
 	for file, outputs := range lintErrs {
 		for _, output := range outputs {
-			info += fmt.Sprintf("| %s:%d | %s |\n", file, output.Line, output.Message)
+			// It's not necessary to show the details, just show the error line is enough.
+			outMsg := strings.Split(output.Message, "\n")[0]
+			info += fmt.Sprintf("| %s:%d | %s |\n", file, output.Line, outMsg)
 		}
 	}
 	return info
