@@ -64,7 +64,7 @@ type Refs struct {
 type GlobalConfig struct {
 	// GithubReportType is the format of the report, will be used if linterConfig.ReportFormat is empty.
 	// e.g. "github_checks", "github_pr_review"
-	GithubReportType GithubReportType `json:"githubReportType,omitempty"`
+	GithubReportType ReportType `json:"githubReportType,omitempty"`
 
 	// GolangciLintConfig is the path of golangci-lint config file to run golangci-lint globally.
 	// if not empty, use the config to run golangci-lint.
@@ -172,7 +172,7 @@ type Linter struct {
 	// github_pr_review: https://developer.github.com/v3/pulls/reviews/#create-a-pull-request-review
 	// Note:
 	// * github_check_run only support on Github Apps, not support on Github OAuth Apps or authenticated users.
-	ReportFormat GithubReportType `json:"githubReportType,omitempty"`
+	ReportFormat ReportType `json:"githubReportType,omitempty"`
 
 	// ConfigPath is the path of the linter config file.
 	// If not empty, use the config to run the linter.
@@ -369,16 +369,19 @@ func applyCustomConfig(legacy, custom Linter) Linter {
 	return legacy
 }
 
-// GithubReportType is the type of the report.
-type GithubReportType string
+// ReportType is the type of the report.
+// Different report types will show different UI and style for the lint results.
+// Reviewbot has default report type for each linter and git provider, which are been thought as best practice by the maintainers.
+// but, you can still change the report type by setting the reportFormat in the linter config if you have other ideas.
+type ReportType string
 
 const (
-	GithubCheckRuns GithubReportType = "github_check_run"
-	GithubPRReview  GithubReportType = "github_pr_review"
+	GithubCheckRuns ReportType = "github_check_run"
+	GithubPRReview  ReportType = "github_pr_review"
 	// GithubMixType is the type of the report that mix the github_check_run and github_pr_review.
-	GithubMixType GithubReportType = "github_mix"
+	GithubMixType ReportType = "github_mix"
 	// for debug and testing.
-	Quiet GithubReportType = "quiet"
+	Quiet ReportType = "quiet"
 )
 
 func boolPtr(b bool) *bool {
