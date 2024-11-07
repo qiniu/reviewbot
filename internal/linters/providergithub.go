@@ -21,8 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -270,37 +268,15 @@ func (g *GithubProvider) Report(ctx context.Context, a Agent, lintResults map[st
 
 		metric.NotifyWebhookByText(ConstructGotchaMsg(linterName, a.Provider.GetCodeReviewInfo().URL, ch.GetHTMLURL(), lintResults))
 	case config.GithubPRReview:
-		// List existing comments
-		existedComments, err := g.ListPullRequestsComments(ctx, org, repo, num)
+		comments, err := g.ProcessNeedToAddComments(ctx, a, lintResults)
 		if err != nil {
-			if !errors.Is(err, context.Canceled) {
-				log.Errorf("failed to list comments: %v", err)
-			}
+			log.Errorf("failed to process need to add comments: %v", err)
 			return err
 		}
-
-		// filter out the comments that are not related to the linter
-		var existedCommentsToKeep []*github.PullRequestComment
-		linterFlag := linterNamePrefix(linterName)
-		for _, comment := range existedComments {
-			if strings.HasPrefix(comment.GetBody(), linterFlag) {
-				existedCommentsToKeep = append(existedCommentsToKeep, comment)
-			}
-		}
-		log.Infof("%s found %d existed comments for this PR %d (%s) \n", linterFlag, len(existedCommentsToKeep), num, orgRepo)
-
-		toAdds, toDeletes := filterLinterOutputs(lintResults, existedCommentsToKeep)
-		if err := g.DeletePullReviewComments(ctx, org, repo, toDeletes); err != nil {
-			log.Errorf("failed to delete comments: %v", err)
-			return err
-		}
-		log.Infof("%s delete %d comments for this PR %d (%s) \n", linterFlag, len(toDeletes), num, orgRepo)
-
-		comments := constructPullRequestComments(toAdds, linterFlag, a.Provider.GetCodeReviewInfo().HeadSHA)
 		if len(comments) == 0 {
+			log.Infof("[%s] no comments need to add", linterName)
 			return nil
 		}
-
 		// Add the comments
 		addedCmts, err := g.CreatePullReviewComments(ctx, org, repo, num, comments)
 		if err != nil {
@@ -309,6 +285,37 @@ func (g *GithubProvider) Report(ctx context.Context, a Agent, lintResults map[st
 		}
 		log.Infof("[%s] add %d comments for this PR %d (%s) \n", linterName, len(addedCmts), num, orgRepo)
 		metric.NotifyWebhookByText(ConstructGotchaMsg(linterName, a.Provider.GetCodeReviewInfo().URL, addedCmts[0].GetHTMLURL(), lintResults))
+	case config.GithubMixType:
+		// report all lint results as a check run summary, but not annotations
+		ch, err := g.CreateGithubChecks(ctx, a, lintResults)
+		if err != nil {
+			if !errors.Is(err, context.Canceled) {
+				log.Errorf("failed to create github checks: %v", err)
+			}
+			return err
+		}
+		log.Infof("[%s] create check run success, HTML_URL: %v", linterName, ch.GetHTMLURL())
+
+		// report top 10 lint results to pull request review comments at most
+		top10LintResults := listTop10LintResults(lintResults)
+		comments, err := g.ProcessNeedToAddComments(ctx, a, top10LintResults)
+		if err != nil {
+			log.Errorf("failed to process need to add comments: %v", err)
+			return err
+		}
+		if len(comments) == 0 {
+			log.Infof("[%s] no comments need to add", linterName)
+			return nil
+		}
+
+		addedCmts, err := g.CreatePullReviewComments(ctx, org, repo, num, comments)
+		if err != nil {
+			log.Errorf("failed to post comments: %v", err)
+			return err
+		}
+		log.Infof("[%s] add %d comments for this PR %d (%s) \n", linterName, len(addedCmts), num, orgRepo)
+
+		metric.NotifyWebhookByText(ConstructGotchaMsg(linterName, a.Provider.GetCodeReviewInfo().URL, ch.GetHTMLURL(), lintResults))
 	case config.Quiet:
 		return nil
 	default:
@@ -316,6 +323,45 @@ func (g *GithubProvider) Report(ctx context.Context, a Agent, lintResults map[st
 	}
 
 	return nil
+}
+
+// lists the top 10 lint results.
+func listTop10LintResults(lintResults map[string][]LinterOutput) map[string][]LinterOutput {
+	seenMsgs := make(map[string]struct{})
+	seenLinterOutput := make(map[string]struct{})
+	result := make(map[string][]LinterOutput)
+	count := 0
+
+	// Filter out different outputs according to output.Message, when the results are greater than or equal to 10, return it directly.
+	for file, outputs := range lintResults {
+		for _, output := range outputs {
+			if count >= 10 {
+				return result
+			}
+			if _, exists := seenMsgs[output.Message]; !exists {
+				seenMsgs[output.Message] = struct{}{}
+				seenLinterOutput[fmt.Sprintf("%s:%d", output.File, output.Line)] = struct{}{}
+				result[file] = append(result[file], output)
+				count++
+			}
+		}
+	}
+
+	// After the above processing, if the results are less than 10, then add the output according to the file and line.
+	for file, outputs := range lintResults {
+		for _, output := range outputs {
+			if count >= 10 {
+				return result
+			}
+			key := fmt.Sprintf("%s:%d", output.File, output.Line)
+			if _, exists := seenLinterOutput[key]; !exists {
+				result[file] = append(result[file], output)
+				count++
+			}
+		}
+	}
+
+	return result
 }
 
 func (g *GithubProvider) IsRelated(file string, line int, startLine int) bool {
@@ -459,6 +505,12 @@ func (g *GithubProvider) CreateGithubChecks(ctx context.Context, a Agent, lintEr
 		check.Conclusion = github.String("success")
 	}
 
+	if a.LinterConfig.ReportFormat == config.GithubMixType {
+		check.Output.Title = github.String(fmt.Sprintf("[%s] found %d issues related to your changes", linterName, len(annotations)))
+		check.Output.Annotations = nil
+		check.Output.Summary = github.String("All issues are be shown in the following table \n" + printAllLintResultswithMarkdown(lintErrs))
+	}
+
 	var ch *github.CheckRun
 	err := RetryWithBackoff(ctx, func() error {
 		checkRun, resp, err := g.GithubClient.Checks.CreateCheckRun(ctx, owner, repo, check)
@@ -480,6 +532,21 @@ func (g *GithubProvider) CreateGithubChecks(ctx context.Context, a Agent, lintEr
 
 	return ch, err
 }
+
+func printAllLintResultswithMarkdown(lintErrs map[string][]LinterOutput) string {
+	info := markdownTableHeader
+	for file, outputs := range lintErrs {
+		for _, output := range outputs {
+			info += fmt.Sprintf("| %s:%d | %s |\n", file, output.Line, output.Message)
+		}
+	}
+	return info
+}
+
+var markdownTableHeader = `
+| filepath          | linter error                  |
+|-------------------|-------------------------------|
+`
 
 func (g *GithubProvider) ListCommits(ctx context.Context, org, repo string, number int) ([]Commit, error) {
 	log := lintersutil.FromContext(ctx)
@@ -584,22 +651,39 @@ func (g *GithubProvider) GetCodeReviewInfo() CodeReview {
 	}
 }
 
-var ErrInvalidGithubIssueURL = errors.New("invalid GitHub issue URL format")
+func (g *GithubProvider) ProcessNeedToAddComments(ctx context.Context, a Agent, lintResults map[string][]LinterOutput) ([]*github.PullRequestComment, error) {
+	org := a.Provider.GetCodeReviewInfo().Org
+	repo := a.Provider.GetCodeReviewInfo().Repo
+	num := a.Provider.GetCodeReviewInfo().Number
+	linterName := a.LinterConfig.Name
+	log := lintersutil.FromContext(ctx)
+	orgRepo := org + "/" + repo
 
-func (g *GithubProvider) parseIssueURL(url string) (owner string, repo string, issueNumber int, err error) {
-	re := regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/issues/(\d+)$`)
-	matches := re.FindStringSubmatch(url)
-	if len(matches) != 4 {
-		log.Errorf("invalid GitHub issue URL format: %s", url)
-		return "", "", 0, ErrInvalidGithubIssueURL
-	}
-
-	owner = matches[1]
-	repo = matches[2]
-	issueNumber, err = strconv.Atoi(matches[3])
+	// List existing comments
+	existedComments, err := g.ListPullRequestsComments(ctx, org, repo, num)
 	if err != nil {
-		log.Errorf("failed to parse issue number: %v", err)
-		return "", "", 0, err
+		if !errors.Is(err, context.Canceled) {
+			log.Errorf("failed to list comments: %v", err)
+		}
+		return nil, err
 	}
-	return owner, repo, issueNumber, err
+
+	// filter out the comments that are not related to the linter
+	var existedCommentsToKeep []*github.PullRequestComment
+	linterFlag := linterNamePrefix(linterName)
+	for _, comment := range existedComments {
+		if strings.HasPrefix(comment.GetBody(), linterFlag) {
+			existedCommentsToKeep = append(existedCommentsToKeep, comment)
+		}
+	}
+	log.Infof("[%s] found %d existed comments for this PR %d (%s) \n", linterName, len(existedCommentsToKeep), num, orgRepo)
+
+	toAdds, toDeletes := filterLinterOutputs(lintResults, existedCommentsToKeep)
+	if err := g.DeletePullReviewComments(ctx, org, repo, toDeletes); err != nil {
+		log.Errorf("failed to delete comments: %v", err)
+		return nil, err
+	}
+	log.Infof("[%s] delete %d comments for this PR %d (%s) \n", linterName, len(toDeletes), num, orgRepo)
+	comments := constructPullRequestComments(toAdds, linterNamePrefix(linterName), a.Provider.GetCodeReviewInfo().HeadSHA)
+	return comments, nil
 }

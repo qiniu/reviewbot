@@ -193,12 +193,12 @@ func NewGitlabProvider(gitlabClient *gitlab.Client, gitClient gitv2.ClientFactor
 	}, nil
 }
 
-func ReportFormMatCheck(gc *gitlab.Client, reportFormat config.GitlabReportType) (reportType config.GitlabReportType) {
+func ReportFormMatCheck(gc *gitlab.Client, reportFormat config.ReportType) (reportType config.ReportType) {
 	//  gitlab  verion below 10.8 not support discussion resource api
 	v, r, e := gc.Version.GetVersion()
 	if e != nil {
 		log.Fatalf("Failed to get version: %v,response is %v", e, r)
-		return config.QuietGitlab
+		return config.Quiet
 	}
 	v1, _ := version.NewVersion(v.Version)
 	v2, _ := version.NewVersion("10.8")
@@ -314,7 +314,7 @@ func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[st
 			log.Errorf("failed to post comments: %v", commerr)
 		}
 		metric.NotifyWebhookByText(ConstructGotchaMsg(linterName, g.MergeRequestEvent.Project.WebURL, "", lintResults))
-	case config.QuietGitlab:
+	case config.Quiet:
 		return nil
 	default:
 		log.Errorf("unsupported report format: %v", a.LinterConfig.GitlabReportFormat)
