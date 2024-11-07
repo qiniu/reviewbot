@@ -465,20 +465,37 @@ func (s *Server) gitlabHandle(ctx context.Context, event *gitlab.MergeEvent) err
 		}
 	}()
 
-	r, err := s.gitClientFactory.ClientForWithRepoOpts(org, repo, gitv2.RepoOpts{
+	opt := gitv2.ClientFactoryOpts{
+		CacheDirBase: github.String(s.repoCacheDir),
+		Persist:      github.Bool(true),
+		UseSSH:       github.Bool(false),
+		Host:         s.gitLabHost,
+		Username:     func() (string, error) { return "oauth2", nil },
+		Token: func(v string) (string, error) {
+			return s.gitLabAccessToken, nil
+		},
+	}
+	v2, errapp := gitv2.NewClientFactory(opt.Apply)
+	s.gitClientFactory = v2
+
+	r, errclone := s.gitClientFactory.ClientForWithRepoOpts(org, repo, gitv2.RepoOpts{
 		CopyTo: defaultWorkDir + "/" + repo,
 	})
-	if err != nil {
+	if errapp != nil {
 		log.Errorf("failed to create git client: %v", err)
-		return err
+		return errapp
 	}
-	if err := r.Checkout(latestCommit); err != nil {
-		log.Errorf("failed to checkout pull request %d: %v", num, err)
-		return err
+	if errclone != nil {
+		log.Errorf("failed to clone code repo : %v", err)
+		return errclone
+	}
+	if errcheckout := r.Checkout(latestCommit); err != nil {
+		log.Errorf("failed to checkout pull request %d: %v", num, errcheckout)
+		return errcheckout
 	}
 	gitModulesFile := path.Join(r.Directory(), ".gitmodules")
-	_, err = os.Stat(gitModulesFile)
-	if err == nil {
+	_, errpro := os.Stat(gitModulesFile)
+	if errpro == nil {
 		log.Info("git pull submodule in progress")
 		cmd := exec.Command("git", "submodule", "update", "--init", "--recursive")
 		cmd.Dir = r.Directory()
@@ -490,9 +507,9 @@ func (s *Server) gitlabHandle(ctx context.Context, event *gitlab.MergeEvent) err
 	} else {
 		log.Infof("no .gitmodules file in repo %s", repo)
 	}
-
 	for name, fn := range linters.TotalPullRequestHandlers() {
-		linterConfig := s.config.GetLinterConfig(org, repo, name)
+
+		linterConfig := s.config.GetLinterConfig(org, repo, name, config.GitLab)
 
 		// skip linter if it is disabled
 		if linterConfig.Enable != nil && !*linterConfig.Enable {
@@ -506,21 +523,8 @@ func (s *Server) gitlabHandle(ctx context.Context, event *gitlab.MergeEvent) err
 		}
 
 		log.Infof("[%s] config on repo %v: %+v", name, orgRepo, linterConfig)
-		opt := gitv2.ClientFactoryOpts{
-			CacheDirBase: github.String(s.repoCacheDir),
-			Persist:      github.Bool(true),
-			UseSSH:       github.Bool(false),
-			Host:         s.gitLabHost,
-			Username:     func() (string, error) { return "oauth2", nil },
-			Token: func(v string) (string, error) {
-				return s.gitLabAccessToken, nil
-			},
-		}
-		v2new, err := gitv2.NewClientFactory(opt.Apply)
-		if err != nil {
-			log.Fatalf("failed to create git client factory: %v", err)
-		}
-		gitlabProvider, err := linters.NewGitlabProvider(s.GitLabClient(), v2new, mergeRequestAffectedFiles, *event)
+
+		gitlabProvider, err := linters.NewGitlabProvider(s.GitLabClient(), v2, mergeRequestAffectedFiles, *event)
 
 		if err != nil {
 			log.Errorf("failed to create provider: %v", err)
@@ -634,7 +638,7 @@ func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) err
 	}()
 
 	for name, fn := range linters.TotalPullRequestHandlers() {
-		linterConfig := s.config.GetLinterConfig(org, repo, name)
+		linterConfig := s.config.GetLinterConfig(org, repo, name, config.GitHub)
 		linterConfig.Number = num
 		linterConfig.Workspace = workspace
 		// skip linter if it is disabled

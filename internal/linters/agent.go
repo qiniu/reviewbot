@@ -59,7 +59,7 @@ type Agent struct {
 func (a *Agent) ApplyIssueReferences(ctx context.Context, lintResults map[string][]LinterOutput) {
 	log := lintersutil.FromContext(ctx)
 	var msgFormat string
-	format := a.LinterConfig.GithubReportFormat
+	format := a.LinterConfig.ReportFormat
 	switch format {
 	case config.GithubCheckRuns:
 		msgFormat = "%s\nmore info: %s"

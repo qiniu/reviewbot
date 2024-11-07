@@ -195,6 +195,8 @@ func NewGitlabProvider(gitlabClient *gitlab.Client, gitClient gitv2.ClientFactor
 
 func ReportFormMatCheck(gc *gitlab.Client, reportFormat config.ReportType) (reportType config.ReportType) {
 	//  gitlab  verion below 10.8 not support discussion resource api
+	//  gitlab reportformart  not config:  version=>10.8: GitlabCommentAndDiscussion, version<10.8: GitlabComment
+	//  gitlab reportformart  config:  version=>10.8: use config, version<10.8: GitlabComment
 	v, r, e := gc.Version.GetVersion()
 	if e != nil {
 		log.Fatalf("Failed to get version: %v,response is %v", e, r)
@@ -202,10 +204,16 @@ func ReportFormMatCheck(gc *gitlab.Client, reportFormat config.ReportType) (repo
 	}
 	v1, _ := version.NewVersion(v.Version)
 	v2, _ := version.NewVersion("10.8")
+	if reportFormat != "" {
+		if v1.LessThan(v2) {
+			return config.GitlabComment
+		}
+		return reportFormat
+	}
 	if v1.LessThan(v2) {
 		return config.GitlabComment
 	}
-	return reportFormat
+	return config.GitlabCommentAndDiscussion
 }
 
 func (g *GitlabProvider) HandleComments(ctx context.Context, outputs map[string][]LinterOutput) error {
@@ -222,7 +230,7 @@ func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[st
 	repo := a.Provider.GetCodeReviewInfo().Repo
 	num := a.Provider.GetCodeReviewInfo().Number
 	orgRepo := fmt.Sprintf("%s/%s", org, repo)
-	reportformat := ReportFormMatCheck(g.GitLabClient, a.LinterConfig.GitlabReportFormat)
+	reportformat := ReportFormMatCheck(g.GitLabClient, a.LinterConfig.ReportFormat)
 	switch reportformat {
 	case config.GitlabCommentAndDiscussion:
 		// list   MR  comments
@@ -317,7 +325,7 @@ func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[st
 	case config.Quiet:
 		return nil
 	default:
-		log.Errorf("unsupported report format: %v", a.LinterConfig.GitlabReportFormat)
+		log.Errorf("unsupported report format: %v", a.LinterConfig.ReportFormat)
 	}
 	return nil
 }
@@ -335,9 +343,8 @@ func CreateGitLabCommentsReport(ctx context.Context, gc *gitlab.Client, outputs 
 	var errormessage string
 	var tabletop10 string
 	tabletop10 = "\n| FilePath    | Line    |ErrorMessage     |\n"
-	tabletop10 = tabletop10 + "| -------- | -------- | -------- |\n"
-	var top10 int64
-	top10 = 0
+	tabletop10 += "| -------- | -------- | -------- |\n"
+	var top10 = 0
 	var totalerrorscount int
 	totalerrorscount = 0
 	// for combine the linter result
@@ -349,9 +356,8 @@ func CreateGitLabCommentsReport(ctx context.Context, gc *gitlab.Client, outputs 
 				if top10 < 10 {
 					tabletop10 += "|" + outputmessage.File + "|" + strconv.Itoa(outputmessage.Line) + "|" + outputmessage.Message + "|\n"
 				}
-				top10 += 1
+				top10++
 			}
-
 		}
 		message = fmt.Sprintf("[**%s**]  check failed❌ , %v files exist errors,%v errors found.     This is [the detailed log](%s).<br>Top 10 errors as below：\r\n"+tabletop10+"\n%s", lintername, len(outputs), totalerrorscount, logurl, comentDetailHeader+errormessage+"<br>"+commentDetail)
 	} else {

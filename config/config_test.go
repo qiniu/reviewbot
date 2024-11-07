@@ -487,7 +487,7 @@ customConfig: # custom config for specific orgs or repos
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			got := c.GetLinterConfig(tc.org, tc.repo, tc.linter)
+			got := c.GetLinterConfig(tc.org, tc.repo, tc.linter, GitHub)
 			if *got.Enable != *tc.want.Enable {
 				t.Errorf("expected %v, got %v", *tc.want.Enable, *got.Enable)
 			}
