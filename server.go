@@ -357,7 +357,7 @@ func (s *Server) gitlabRequestHandle(w http.ResponseWriter, r *http.Request) {
 		// limit the length of eventGUID to 12
 		eventGUID = eventGUID[len(eventGUID)-12:]
 	}
-	ctx := context.WithValue(r.Context(), lintersutil.EventGUIDKey, eventGUID)
+	ctx := context.WithValue(context.Background(), lintersutil.EventGUIDKey, eventGUID)
 	log := lintersutil.FromContext(ctx)
 
 	payload, err := ioutil.ReadAll(r.Body)
