@@ -333,6 +333,10 @@ func CreateGitLabCommentsReport(ctx context.Context, gc *gitlab.Client, outputs 
 	log.Infof("CreateMergeReviewDiscussion%v", outputs)
 	var message string
 	var errormessage string
+	var tabletop10 string
+	tabletop10 = "\n| FilePath    | Line    |ErrorMessage     |\n"
+	tabletop10 = tabletop10 + "| -------- | -------- | -------- |\n"
+
 	var totalerrorscount int
 	totalerrorscount = 0
 	// for combine the linter result
@@ -341,9 +345,11 @@ func CreateGitLabCommentsReport(ctx context.Context, gc *gitlab.Client, outputs 
 			totalerrorscount += len(output)
 			for _, outputmessage := range output {
 				errormessage = errormessage + "<br>`" + outputmessage.File + ", line:" + strconv.Itoa(outputmessage.Line) + "` <br>" + outputmessage.Message
+				tabletop10 = tabletop10 + "|" + outputmessage.File + "|" + strconv.Itoa(outputmessage.Line) + "|" + outputmessage.Message + "|\n"
 			}
+
 		}
-		message = fmt.Sprintf("[**%s**]  check failed❌ , %v files exist errors,%v errors found.     This is [the detailed log](%s).\n%s", lintername, len(outputs), totalerrorscount, logurl, comentDetailHeader+errormessage+"<br>"+commentDetail)
+		message = fmt.Sprintf("[**%s**]  check failed❌ , %v files exist errors,%v errors found.     This is [the detailed log](%s).<br>Top 10 show as below："+tabletop10+"\n%s", lintername, len(outputs), totalerrorscount, logurl, comentDetailHeader+errormessage+"<br>"+commentDetail)
 	} else {
 		message = fmt.Sprintf("[**%s**]  check passed✅ . \n%s", lintername, comentDetailHeader+commentDetail)
 	}

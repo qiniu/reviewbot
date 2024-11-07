@@ -509,8 +509,12 @@ func (s *Server) gitlabHandle(ctx context.Context, event *gitlab.MergeEvent) err
 		opt := gitv2.ClientFactoryOpts{
 			CacheDirBase: github.String(s.repoCacheDir),
 			Persist:      github.Bool(true),
-			UseSSH:       github.Bool(true),
+			UseSSH:       github.Bool(false),
 			Host:         s.gitLabHost,
+			Username:     func() (string, error) { return "oauth2", nil },
+			Token: func(v string) (string, error) {
+				return s.gitLabAccessToken, nil
+			},
 		}
 		v2new, err := gitv2.NewClientFactory(opt.Apply)
 		if err != nil {
@@ -763,8 +767,12 @@ func (s *Server) prepareGitRepos(ctx context.Context, org, repo string, num int)
 		opt := gitv2.ClientFactoryOpts{
 			CacheDirBase: github.String(s.repoCacheDir),
 			Persist:      github.Bool(true),
-			UseSSH:       github.Bool(true),
-			Host:         ref.Host,
+			UseSSH:       github.Bool(false),
+			Host:         s.gitLabHost,
+			Username:     func() (string, error) { return "oauth2", nil },
+			Token: func(v string) (string, error) {
+				return s.gitLabAccessToken, nil
+			},
 		}
 
 		gitClient, err := gitv2.NewClientFactory(opt.Apply)
