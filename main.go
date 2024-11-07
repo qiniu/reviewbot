@@ -213,7 +213,12 @@ func main() {
 	opt := gitv2.ClientFactoryOpts{
 		CacheDirBase: github.String(o.codeCacheDir),
 		Persist:      github.Bool(true),
-		UseSSH:       github.Bool(true),
+		UseSSH:       github.Bool(false),
+		Host:         o.gitLabHost,
+		Username:     func() (string, error) { return "oauth2", nil },
+		Token: func(v string) (string, error) {
+			return o.gitLabAccessToken, nil
+		},
 	}
 	v2, err := gitv2.NewClientFactory(opt.Apply)
 	if err != nil {
