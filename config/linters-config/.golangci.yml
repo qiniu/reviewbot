@@ -87,3 +87,4 @@ linters:
     - tagliatelle # see too many false positives
     - intrange # see too many false positives
     - gosmopolitan # see too many false positives
+    - gosec # it was used by customizedExtraLinter, see config.yaml
