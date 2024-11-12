@@ -376,6 +376,11 @@ func GeneralLineParser(line string) (*LinterOutput, error) {
 	}, nil
 }
 
+func GeneralLinterHandler(ctx context.Context, a Agent) error {
+	log := lintersutil.FromContext(ctx)
+	return GeneralHandler(ctx, log, a, ExecRun, GeneralParse)
+}
+
 func isGeneratedFile(file string) (bool, error) {
 	data, err := os.ReadFile(file)
 	if err != nil {

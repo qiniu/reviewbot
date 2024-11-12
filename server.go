@@ -77,9 +77,25 @@ var (
 	prMap = make(map[string]context.CancelFunc)
 )
 
+func (s *Server) initCustomLinters() {
+	if len(s.config.CustomLinters) == 0 {
+		return
+	}
+	for linterName, customLinter := range s.config.CustomLinters {
+		linters.RegisterPullRequestHandler(linterName, linters.GeneralLinterHandler)
+		linters.RegisterLinterLanguages(linterName, customLinter.Languages)
+		log.Infof("register linter handler and languages for %s , languages: %v", linterName, customLinter.Languages)
+	}
+}
+
 func (s *Server) initKubernetesRunner() {
 	var toChecks []config.KubernetesAsRunner
-	for _, customConfig := range s.config.CustomConfig {
+	for _, customLinter := range s.config.CustomLinters {
+		if customLinter.KubernetesAsRunner.Image != "" {
+			toChecks = append(toChecks, customLinter.KubernetesAsRunner)
+		}
+	}
+	for _, customConfig := range s.config.CustomRepos {
 		for _, linter := range customConfig.Linters {
 			if linter.KubernetesAsRunner.Image != "" {
 				toChecks = append(toChecks, linter.KubernetesAsRunner)
@@ -128,7 +144,12 @@ func checkKubectlInstalled() error {
 
 func (s *Server) initDockerRunner() {
 	var images []string
-	for _, customConfig := range s.config.CustomConfig {
+	for _, customLinter := range s.config.CustomLinters {
+		if customLinter.DockerAsRunner.Image != "" {
+			images = append(images, customLinter.DockerAsRunner.Image)
+		}
+	}
+	for _, customConfig := range s.config.CustomRepos {
 		for _, linter := range customConfig.Linters {
 			if linter.DockerAsRunner.Image != "" {
 				images = append(images, linter.DockerAsRunner.Image)
@@ -591,10 +612,10 @@ func updateSubmodules(ctx context.Context, repoDir, repo string) error {
 
 func (s *Server) fixRefs(workspace string, org, repo string) ([]config.Refs, string) {
 	var repoCfg config.RepoConfig
-	if v, ok := s.config.CustomConfig[org]; ok {
+	if v, ok := s.config.CustomRepos[org]; ok {
 		repoCfg = v
 	}
-	if v, ok := s.config.CustomConfig[org+"/"+repo]; ok {
+	if v, ok := s.config.CustomRepos[org+"/"+repo]; ok {
 		repoCfg = v
 	}
 

@@ -10,7 +10,7 @@ globalDefaultConfig: # global default settings, will be overridden by qbox org a
   golangcilintConfig: "config/linters-config/.golangci.yml" # golangci-lint config file to use
   copySSHKeyToContainer: "/root/.ssh/id_rsa"
 
-customConfig: # custom config for specific orgs or repos
+customRepos: # custom config for specific orgs or repos
   goplus:
     linters:
       golangci-lint:
@@ -149,3 +149,19 @@ issueReferences:
   shellcheck:
     - pattern: '\[SC2086\]$'
       url: "https://github.com/qiniu/reviewbot/issues/413"
+
+
+
+customLinters:
+  pylint: 
+    languages: [".py"]
+    command:
+      - "/bin/sh"
+      - "-c"
+      - "--"
+    args:
+      - |
+         pylint --recursive=y ./
+    kubernetesAsRunner:
+      namespace: "reviewbot"
+      image: "aslan-spock-register.qiniu.io/reviewbot/base:go1.22.3-pylint3.3.1"

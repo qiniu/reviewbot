@@ -21,7 +21,7 @@ type Config struct {
 	// e.g.
 	// * "org/repo": {"extraRefs":{org:xxx, repo:xxx, path_alias:github.com/repo }, "golangci-lint": {"enable": true, "workDir": "", "command": "golangci-lint", "args": ["run", "--config", ".golangci.yml"], "reportFormat": "github_checks"}}
 	// * "org": {"extraRefs":{org:xxx, repo:xxx, path_alias:github.com/repo }, "golangci-lint": {"enable": true, "workDir": "", "command": "golangci-lint", "args": ["run", "--config", ".golangci.yml"], "reportFormat": "github_checks"}}
-	CustomConfig map[string]RepoConfig `json:"customConfig,omitempty"`
+	CustomRepos map[string]RepoConfig `json:"customRepos,omitempty"`
 
 	// IssueReferences is the issue references config.
 	// key is the linter name.
@@ -32,6 +32,13 @@ type Config struct {
 	IssueReferences map[string][]IssueReference `json:"issueReferences,omitempty"`
 	// compiledIssueReferences is the compiled issue references config.
 	compiledIssueReferences map[string][]CompiledIssueReference
+
+	CustomLinters map[string]CustomLinters `json:"customLinters,omitempty"`
+}
+
+type CustomLinters struct {
+	Linter
+	Languages []string `json:"languages,omitempty"`
 }
 
 type RepoConfig struct {
@@ -282,13 +289,17 @@ func (c Config) GetLinterConfig(org, repo, ln string) Linter {
 		linter.DockerAsRunner.CopySSHKeyToContainer = c.GlobalDefaultConfig.CopySSHKeyToContainer
 	}
 
-	if orgConfig, ok := c.CustomConfig[org]; ok {
+	if custom, ok := c.CustomLinters[ln]; ok {
+		linter = applyCustomLintersConfig(linter, custom)
+	}
+
+	if orgConfig, ok := c.CustomRepos[org]; ok {
 		if l, ok := orgConfig.Linters[ln]; ok {
 			linter = applyCustomConfig(linter, l)
 		}
 	}
 
-	if repoConfig, ok := c.CustomConfig[org+"/"+repo]; ok {
+	if repoConfig, ok := c.CustomRepos[org+"/"+repo]; ok {
 		if l, ok := repoConfig.Linters[ln]; ok {
 			linter = applyCustomConfig(linter, l)
 		}
@@ -312,7 +323,7 @@ func (c Config) GetCompiledIssueReferences(linterName string) []CompiledIssueRef
 	return nil
 }
 
-func applyCustomConfig(legacy, custom Linter) Linter {
+func applyCustomConfig(legacy Linter, custom Linter) Linter {
 	if custom.Enable != nil {
 		legacy.Enable = custom.Enable
 	}
@@ -335,6 +346,10 @@ func applyCustomConfig(legacy, custom Linter) Linter {
 
 	if custom.ConfigPath != "" {
 		legacy.ConfigPath = custom.ConfigPath
+	}
+
+	if custom.Env != nil {
+		legacy.Env = custom.Env
 	}
 
 	if custom.DockerAsRunner.Image != "" {
@@ -367,6 +382,22 @@ func applyCustomConfig(legacy, custom Linter) Linter {
 	}
 
 	return legacy
+}
+
+func applyCustomLintersConfig(legacy Linter, custom CustomLinters) Linter {
+	// Convert CustomizedExtraLinter to Linter for reuse
+	tempLinter := Linter{
+		Command:            custom.Command,
+		Args:               custom.Args,
+		ReportType:         custom.ReportType,
+		ConfigPath:         custom.ConfigPath,
+		KubernetesAsRunner: custom.KubernetesAsRunner,
+		DockerAsRunner:     custom.DockerAsRunner,
+		WorkDir:            custom.WorkDir,
+		Env:                custom.Env,
+	}
+
+	return applyCustomConfig(legacy, tempLinter)
 }
 
 // ReportType is the type of the report.
@@ -428,7 +459,7 @@ func (*baseModifier) Modify(cfg *Linter) (*Linter, error) {
 func (c *Config) parseCloneURLs() error {
 	re := regexp.MustCompile(`^(?:git@|https://)?([^:/]+)[:/]{1}(.*?)/(.*?)\.git$`)
 
-	for orgRepo, refConfig := range c.CustomConfig {
+	for orgRepo, refConfig := range c.CustomRepos {
 		for k, ref := range refConfig.Refs {
 			if ref.CloneURL == "" {
 				continue
@@ -444,7 +475,7 @@ func (c *Config) parseCloneURLs() error {
 }
 
 func (c *Config) validateRefs() error {
-	for orgRepo, refConfig := range c.CustomConfig {
+	for orgRepo, refConfig := range c.CustomRepos {
 		for _, ref := range refConfig.Refs {
 			if ref.PathAlias != "" && (ref.Repo == "" || ref.Org == "") {
 				log.Errorf("invalid ref: %v for org/repo: %s", ref, orgRepo)
@@ -495,7 +526,7 @@ func (c *Config) parseIssueReferences() error {
 }
 
 func (c *Config) parseAndUpdateCloneURL(re *regexp.Regexp, orgRepo string, k int) error {
-	ref := &c.CustomConfig[orgRepo].Refs[k]
+	ref := &c.CustomRepos[orgRepo].Refs[k]
 	matches := re.FindStringSubmatch(ref.CloneURL)
 	if len(matches) != 4 {
 		log.Errorf("failed to parse CloneURL, please check the format of %s", ref.CloneURL)
