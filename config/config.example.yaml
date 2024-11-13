@@ -6,7 +6,7 @@
 # 3. Conducting specific gray testing for a particular feature.
 
 globalDefaultConfig: # global default settings, will be overridden by qbox org and repo specific settings if they exist
-  githubReportType: "github_mix" # github_pr_review, github_check_run, github_mix
+  githubReportType: "github_check_run" # github_pr_review, github_check_run, github_mix
   golangcilintConfig: "config/linters-config/.golangci.yml" # golangci-lint config file to use
   copySSHKeyToContainer: "/root/.ssh/id_rsa"
 
@@ -117,6 +117,7 @@ customConfig: # custom config for specific orgs or repos
     linters:
       golangci-lint:
         enable: true
+        reportType: "github_mix"
         kubernetesAsRunner:
           image: "aslan-spock-register.qiniu.io/reviewbot/base:go1.23.2-gocilint.1.61.0"
           namespace: "reviewbot"

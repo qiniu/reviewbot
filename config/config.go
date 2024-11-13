@@ -166,13 +166,13 @@ type Linter struct {
 	// Env is the environment variables required for the linter execution.
 	Env []string `json:"env,omitempty"`
 
-	// ReportFormat is the format of the report, if empty, use globalDefaultConfig.
+	// ReportType is the format of the report, if empty, use globalDefaultConfig.
 	// For more details, see:
 	// github_check_run: https://developer.github.com/v3/checks/runs/#create-a-check-run
 	// github_pr_review: https://developer.github.com/v3/pulls/reviews/#create-a-pull-request-review
 	// Note:
 	// * github_check_run only support on Github Apps, not support on Github OAuth Apps or authenticated users.
-	ReportFormat ReportType `json:"githubReportType,omitempty"`
+	ReportType ReportType `json:"reportType,omitempty"`
 
 	// ConfigPath is the path of the linter config file.
 	// If not empty, use the config to run the linter.
@@ -184,8 +184,8 @@ type Linter struct {
 
 func (l Linter) String() string {
 	return fmt.Sprintf(
-		"Linter{Enable: %v, DockerAsRunner: %v, Workspace: %v, WorkDir: %v, Command: %v, Args: %v, ReportFormat: %v, ConfigPath: %v}",
-		*l.Enable, l.DockerAsRunner, l.Workspace, l.WorkDir, l.Command, l.Args, l.ReportFormat, l.ConfigPath)
+		"Linter{Enable: %v, DockerAsRunner: %v, Workspace: %v, WorkDir: %v, Command: %v, Args: %v, ReportType: %v, ConfigPath: %v}",
+		*l.Enable, l.DockerAsRunner, l.Workspace, l.WorkDir, l.Command, l.Args, l.ReportType, l.ConfigPath)
 }
 
 var (
@@ -256,12 +256,12 @@ func NewConfig(conf string) (Config, error) {
 
 func (c Config) GetLinterConfig(org, repo, ln string) Linter {
 	linter := Linter{
-		Enable:       boolPtr(true),
-		ReportFormat: c.GlobalDefaultConfig.GithubReportType,
-		Modifier:     NewBaseModifier(),
-		Name:         ln,
-		Org:          org,
-		Repo:         repo,
+		Enable:     boolPtr(true),
+		ReportType: c.GlobalDefaultConfig.GithubReportType,
+		Modifier:   NewBaseModifier(),
+		Name:       ln,
+		Org:        org,
+		Repo:       repo,
 	}
 
 	// set golangci-lint config path if exists
@@ -329,8 +329,8 @@ func applyCustomConfig(legacy, custom Linter) Linter {
 		legacy.Args = custom.Args
 	}
 
-	if custom.ReportFormat != "" {
-		legacy.ReportFormat = custom.ReportFormat
+	if custom.ReportType != "" {
+		legacy.ReportType = custom.ReportType
 	}
 
 	if custom.ConfigPath != "" {
