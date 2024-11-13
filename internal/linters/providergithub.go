@@ -127,15 +127,22 @@ func RetryWithBackoff(ctx context.Context, f func() error) error {
 }
 
 func linterNamePrefix(linterName string) string {
-	return fmt.Sprintf("**[%s]** reported by [reviewbot](https://github.com/qiniu/reviewbot):cow:\n", linterName)
+	return fmt.Sprintf("**[%s]** <sub>reported by [reviewbot](https://github.com/qiniu/reviewbot):cow:</sub>\n", linterName)
 }
 
 func constructPullRequestComments(linterOutputs map[string][]LinterOutput, linterName, commitID string) []*github.PullRequestComment {
 	var comments []*github.PullRequestComment
 	for file, outputs := range linterOutputs {
 		for _, output := range outputs {
-			message := fmt.Sprintf("%s %s\n%s",
-				linterName, output.Message, CommentFooter)
+			// use the typed message as first priority
+			var message string
+			if output.TypedMessage != "" {
+				message = fmt.Sprintf("%s %s",
+					linterName, output.TypedMessage)
+			} else {
+				message = fmt.Sprintf("%s %s",
+					linterName, output.Message)
+			}
 
 			if output.StartLine != 0 {
 				comments = append(comments, &github.PullRequestComment{
@@ -249,6 +256,7 @@ func (g *GithubProvider) HandleComments(ctx context.Context, outputs map[string]
 }
 
 func (g *GithubProvider) Report(ctx context.Context, a Agent, lintResults map[string][]LinterOutput) error {
+	log := lintersutil.FromContext(ctx)
 	linterName := a.LinterConfig.Name
 	org := a.Provider.GetCodeReviewInfo().Org
 	repo := a.Provider.GetCodeReviewInfo().Repo
@@ -257,7 +265,8 @@ func (g *GithubProvider) Report(ctx context.Context, a Agent, lintResults map[st
 
 	switch a.LinterConfig.ReportFormat {
 	case config.GithubCheckRuns:
-		ch, err := g.CreateGithubChecks(ctx, a, lintResults)
+		check := newBaseCheckRun(a, lintResults)
+		ch, err := g.CreateCheckRun(ctx, org, repo, check)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
 				log.Errorf("failed to create github checks: %v", err)
@@ -268,7 +277,7 @@ func (g *GithubProvider) Report(ctx context.Context, a Agent, lintResults map[st
 
 		metric.NotifyWebhookByText(ConstructGotchaMsg(linterName, a.Provider.GetCodeReviewInfo().URL, ch.GetHTMLURL(), lintResults))
 	case config.GithubPRReview:
-		comments, err := g.ProcessNeedToAddComments(ctx, a, lintResults)
+		comments, err := g.ProcessComments(ctx, a, lintResults)
 		if err != nil {
 			log.Errorf("failed to process need to add comments: %v", err)
 			return err
@@ -287,7 +296,8 @@ func (g *GithubProvider) Report(ctx context.Context, a Agent, lintResults map[st
 		metric.NotifyWebhookByText(ConstructGotchaMsg(linterName, a.Provider.GetCodeReviewInfo().URL, addedCmts[0].GetHTMLURL(), lintResults))
 	case config.GithubMixType:
 		// report all lint results as a check run summary, but not annotations
-		ch, err := g.CreateGithubChecks(ctx, a, lintResults)
+		check := newMixCheckRun(a, lintResults)
+		ch, err := g.CreateCheckRun(ctx, org, repo, check)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
 				log.Errorf("failed to create github checks: %v", err)
@@ -298,7 +308,7 @@ func (g *GithubProvider) Report(ctx context.Context, a Agent, lintResults map[st
 
 		// report top 10 lint results to pull request review comments at most
 		top10LintResults := listTop10LintResults(lintResults)
-		comments, err := g.ProcessNeedToAddComments(ctx, a, top10LintResults)
+		comments, err := g.ProcessComments(ctx, a, top10LintResults)
 		if err != nil {
 			log.Errorf("failed to process need to add comments: %v", err)
 			return err
@@ -424,7 +434,7 @@ func (g *GithubProvider) DeletePullReviewComments(ctx context.Context, owner, re
 			return err
 		}
 
-		log.Infof("delete comment success: %v", comment)
+		log.Infof("delete comment success: %v", comment.GetHTMLURL())
 	}
 
 	return nil
@@ -446,71 +456,20 @@ func (g *GithubProvider) CreatePullReviewComments(ctx context.Context, owner str
 				log.Errorf("create comment failed: %v", resp)
 				return ErrCreateComment
 			}
+			log.Infof("create comment success: %v", cm.GetHTMLURL())
 			addedComments = append(addedComments, cm)
 			return nil
 		})
 		if err != nil {
 			return nil, err
 		}
-
-		log.Infof("create comment success: %v", comment)
 	}
 
 	return addedComments, nil
 }
 
-// CreateGithubChecks creates github checks for the specified pull request.
-func (g *GithubProvider) CreateGithubChecks(ctx context.Context, a Agent, lintErrs map[string][]LinterOutput) (*github.CheckRun, error) {
-	var (
-		headSha    = a.Provider.GetCodeReviewInfo().HeadSHA
-		owner      = a.Provider.GetCodeReviewInfo().Org
-		repo       = a.Provider.GetCodeReviewInfo().Repo
-		startTime  = a.Provider.GetCodeReviewInfo().UpdatedAt
-		linterName = a.LinterConfig.Name
-	)
-	log := lintersutil.FromContext(ctx)
-	annotations := toGithubCheckRunAnnotations(lintErrs)
-	// limit the number of annotations to 50
-	// see: https://github.com/qiniu/reviewbot/issues/258
-	if len(annotations) > 50 {
-		annotations = annotations[:50]
-	}
-	check := github.CreateCheckRunOptions{
-		Name:    linterName,
-		HeadSHA: headSha,
-		Status:  github.String("completed"),
-		StartedAt: &github.Timestamp{
-			Time: startTime,
-		},
-		CompletedAt: &github.Timestamp{
-			Time: time.Now(),
-		},
-		Output: &github.CheckRunOutput{
-			Title:       github.String(fmt.Sprintf("%s found %d issues related to your changes", linterName, len(annotations))),
-			Annotations: annotations,
-		},
-	}
-
-	logURL := a.GenLogViewURL()
-	if logURL == "" {
-		check.Output.Summary = github.String(Reference)
-	} else {
-		log.Debugf("Log view :%s", logURL)
-		check.Output.Summary = github.String(fmt.Sprintf("This is [the detailed log](%s).\n\n%s", logURL, Reference))
-	}
-
-	if len(annotations) > 0 {
-		check.Conclusion = github.String("failure")
-	} else {
-		check.Conclusion = github.String("success")
-	}
-
-	if a.LinterConfig.ReportFormat == config.GithubMixType {
-		check.Output.Title = github.String(fmt.Sprintf("[%s] found %d issues related to your changes", linterName, len(annotations)))
-		check.Output.Annotations = nil
-		check.Output.Summary = github.String("All issues are be shown in the following table \n" + printAllLintResultswithMarkdown(lintErrs))
-	}
-
+// CreateCheckRun submits the check run to GitHub.
+func (g *GithubProvider) CreateCheckRun(ctx context.Context, owner string, repo string, check github.CreateCheckRunOptions) (*github.CheckRun, error) {
 	var ch *github.CheckRun
 	err := RetryWithBackoff(ctx, func() error {
 		checkRun, resp, err := g.GithubClient.Checks.CreateCheckRun(ctx, owner, repo, check)
@@ -532,23 +491,6 @@ func (g *GithubProvider) CreateGithubChecks(ctx context.Context, a Agent, lintEr
 
 	return ch, err
 }
-
-func printAllLintResultswithMarkdown(lintErrs map[string][]LinterOutput) string {
-	info := markdownTableHeader
-	for file, outputs := range lintErrs {
-		for _, output := range outputs {
-			// It's not necessary to show the details, just show the error line is enough.
-			outMsg := strings.Split(output.Message, "\n")[0]
-			info += fmt.Sprintf("| %s:%d | %s |\n", file, output.Line, outMsg)
-		}
-	}
-	return info
-}
-
-var markdownTableHeader = `
-| filepath          | linter error                  |
-|-------------------|-------------------------------|
-`
 
 func (g *GithubProvider) ListCommits(ctx context.Context, org, repo string, number int) ([]Commit, error) {
 	log := lintersutil.FromContext(ctx)
@@ -653,7 +595,7 @@ func (g *GithubProvider) GetCodeReviewInfo() CodeReview {
 	}
 }
 
-func (g *GithubProvider) ProcessNeedToAddComments(ctx context.Context, a Agent, lintResults map[string][]LinterOutput) ([]*github.PullRequestComment, error) {
+func (g *GithubProvider) ProcessComments(ctx context.Context, a Agent, lintResults map[string][]LinterOutput) ([]*github.PullRequestComment, error) {
 	org := a.Provider.GetCodeReviewInfo().Org
 	repo := a.Provider.GetCodeReviewInfo().Repo
 	num := a.Provider.GetCodeReviewInfo().Number
@@ -688,4 +630,90 @@ func (g *GithubProvider) ProcessNeedToAddComments(ctx context.Context, a Agent, 
 	log.Infof("[%s] delete %d comments for this PR %d (%s) \n", linterName, len(toDeletes), num, orgRepo)
 	comments := constructPullRequestComments(toAdds, linterNamePrefix(linterName), a.Provider.GetCodeReviewInfo().HeadSHA)
 	return comments, nil
+}
+
+// newBaseCheckRun creates the base check run options.
+func newBaseCheckRun(a Agent, lintErrs map[string][]LinterOutput) github.CreateCheckRunOptions {
+	var (
+		headSha    = a.Provider.GetCodeReviewInfo().HeadSHA
+		startTime  = a.Provider.GetCodeReviewInfo().UpdatedAt
+		linterName = a.LinterConfig.Name
+	)
+
+	annotations := toGithubCheckRunAnnotations(lintErrs)
+	if len(annotations) > 50 {
+		annotations = annotations[:50]
+	}
+
+	check := github.CreateCheckRunOptions{
+		Name:    linterName,
+		HeadSHA: headSha,
+		Status:  github.String("completed"),
+		StartedAt: &github.Timestamp{
+			Time: startTime,
+		},
+		CompletedAt: &github.Timestamp{
+			Time: time.Now(),
+		},
+		Output: &github.CheckRunOutput{
+			Title:       github.String(fmt.Sprintf("%s found %d issues related to your changes", linterName, len(annotations))),
+			Annotations: annotations,
+		},
+	}
+
+	logURL := a.GenLogViewURL()
+	if logURL == "" {
+		check.Output.Summary = github.String(Reference)
+	} else {
+		log.Debugf("Log view :%s", logURL)
+		check.Output.Summary = github.String(fmt.Sprintf("This is [the detailed log](%s).\n\n%s", logURL, Reference))
+	}
+
+	if len(annotations) > 0 {
+		check.Conclusion = github.String("failure")
+	} else {
+		check.Conclusion = github.String("success")
+	}
+
+	return check
+}
+
+func newMixCheckRun(a Agent, lintErrs map[string][]LinterOutput) github.CreateCheckRunOptions {
+	check := newBaseCheckRun(a, lintErrs)
+	if len(lintErrs) == 0 {
+		// if no lint errors, just return the base check run
+		return check
+	}
+
+	// delete annotations since it will use PR review comments to show the details in mix report type
+	check.Output.Annotations = nil
+
+	// but still use details to all linter outputs
+	var b strings.Builder
+	// Add title and description
+	b.WriteString("## 🔍 Check Results Details\n\n")
+	b.WriteString("The following shows all issues found related to your changes:\n\n")
+
+	// Group results by file
+	b.WriteString("```text\n")
+	for file, outputs := range lintErrs {
+		for _, output := range outputs {
+			b.WriteString(fmt.Sprintf("%s:%d: %s\n", file, output.Line, output.Message))
+		}
+	}
+	b.WriteString("```\n")
+
+	// Add action guide
+	b.WriteString("\n### 🔄 How to Handle?\n\n")
+	b.WriteString("1. Fix the issues above and submit your code again\n")
+	b.WriteString("2. Or click the `Re-run` button to run the check again\n")
+	b.WriteString("3. If you think this is a false positive, please contact your support team\n\n")
+
+	// Add notes
+	b.WriteString("### ℹ️ Notes\n\n")
+	b.WriteString("- To avoid too many comments, only the top 10 issues will be shown in PR comments\n")
+	b.WriteString("- For any other issues, feel free to create an issue in [reviewbot](https://github.com/qiniu/reviewbot) repository\n")
+
+	check.Output.Text = github.String(b.String())
+	return check
 }

@@ -146,7 +146,7 @@ func handle(ctx context.Context, agent linters.Agent, org, repo, author string, 
 		if err != nil {
 			return err
 		}
-		log.Infof("create comment success: %v", c)
+		log.Infof("create comment success: %v", c.HTMLURL)
 	}
 
 	return nil

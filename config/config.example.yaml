@@ -1,3 +1,4 @@
+# This is an example of the config file for reviewbot.
 # Reviewbot follows a zero-configuration approach in its design, where the default behavior implemented in the code should be suitable for the majority of scenarios.
 # Configuration of the file is only necessary in special cases, such as:
 # 1. Using specific commands for a particular repository.
@@ -5,7 +6,7 @@
 # 3. Conducting specific gray testing for a particular feature.
 
 globalDefaultConfig: # global default settings, will be overridden by qbox org and repo specific settings if they exist
-  githubReportType: "github_check_run" # github_pr_review, github_check_run
+  githubReportType: "github_mix" # github_pr_review, github_check_run, github_mix
   golangcilintConfig: "config/linters-config/.golangci.yml" # golangci-lint config file to use
   copySSHKeyToContainer: "/root/.ssh/id_rsa"
 
@@ -138,7 +139,7 @@ customConfig: # custom config for specific orgs or repos
 
 issueReferences:
   golangci-lint:
-    - pattern: 'ST1003'
+    - pattern: "ST1003"
       url: "https://github.com/qiniu/reviewbot/issues/398"
     - pattern: '^do not define dynamic errors, use wrapped static errors instead:.*\(err113\)$'
       url: "https://github.com/qiniu/reviewbot/issues/418"

@@ -89,10 +89,12 @@ type LinterOutput struct {
 	Line int
 	// Column is the Column number
 	Column int
-	// Message is the staticcheck Message
+	// Message is the linter message
 	Message string
 	// StartLine required when using multi-line comments
 	StartLine int
+	// TypedMessage is the typed message
+	TypedMessage string
 }
 
 const CommentFooter = `
@@ -192,12 +194,11 @@ func Report(ctx context.Context, a Agent, lintResults map[string][]LinterOutput)
 
 	log.Infof("[%s] found %d files with valid %d linter errors related to this PR %d (%s) \n", linterName, len(lintResults), countLinterErrors(lintResults), num, orgRepo)
 
-	a.ApplyIssueReferences(ctx, lintResults)
+	lintResults = a.ApplyTypedMessageByIssueReferences(ctx, lintResults)
 
 	if len(lintResults) > 0 {
 		metric.IncIssueCounter(orgRepo, linterName, a.Provider.GetCodeReviewInfo().URL, a.Provider.GetCodeReviewInfo().HeadSHA, float64(countLinterErrors(lintResults)))
 	}
-	log.Infof("[%s] lint results: %v", linterName, lintResults)
 
 	return a.Provider.Report(ctx, a, lintResults)
 }
