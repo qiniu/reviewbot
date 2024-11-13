@@ -379,6 +379,8 @@ const (
 	GithubCheckRuns ReportType = "github_check_run"
 	GithubPRReview  ReportType = "github_pr_review"
 	// GithubMixType is the type of the report that mix the github_check_run and github_pr_review.
+	// which use the github_check_run to report all lint results as a check run summary,
+	// but use the github_pr_review to report top 10 lint results to pull request review comments at most.
 	GithubMixType ReportType = "github_mix"
 	// for debug and testing.
 	Quiet ReportType = "quiet"
