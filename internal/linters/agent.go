@@ -32,7 +32,7 @@ import (
 )
 
 // issueCache is the issue references cache.
-var issueCache = cache.NewIssueReferencesCache(time.Minute * 10)
+var issueCache = cache.NewIssueReferencesCache(time.Hour * 2)
 
 var (
 	ErrIssueNumberIsZero         = errors.New("issue number is 0, this should not happen except for test cases")
@@ -111,7 +111,7 @@ func (a *Agent) processOutput(ctx context.Context, output LinterOutput, ref conf
 	newOutput.TypedMessage = fmt.Sprintf(msgFormat, output.Message, ref.URL)
 
 	// Add issue content for PR review formats
-	if a.LinterConfig.ReportFormat == config.GithubPRReview || a.LinterConfig.ReportFormat == config.GithubMixType {
+	if a.LinterConfig.ReportType == config.GithubPRReview || a.LinterConfig.ReportType == config.GithubMixType {
 		if content, err := a.getIssueContent(ctx, ref); err == nil {
 			newOutput.TypedMessage += fmt.Sprintf(ReferenceFooter, content)
 		}
@@ -122,7 +122,7 @@ func (a *Agent) processOutput(ctx context.Context, output LinterOutput, ref conf
 
 // ApplyTypedMessageByIssueReferences applies the issue references to the lint results with the typed message.
 func (a *Agent) ApplyTypedMessageByIssueReferences(ctx context.Context, lintResults map[string][]LinterOutput) map[string][]LinterOutput {
-	msgFormat := getMsgFormat(a.LinterConfig.ReportFormat)
+	msgFormat := getMsgFormat(a.LinterConfig.ReportType)
 	newLintResults := make(map[string][]LinterOutput, len(lintResults))
 
 	// Process each file's outputs

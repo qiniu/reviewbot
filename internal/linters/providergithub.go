@@ -263,7 +263,7 @@ func (g *GithubProvider) Report(ctx context.Context, a Agent, lintResults map[st
 	num := a.Provider.GetCodeReviewInfo().Number
 	orgRepo := fmt.Sprintf("%s/%s", org, repo)
 
-	switch a.LinterConfig.ReportFormat {
+	switch a.LinterConfig.ReportType {
 	case config.GithubCheckRuns:
 		check := newBaseCheckRun(a, lintResults)
 		ch, err := g.CreateCheckRun(ctx, org, repo, check)
@@ -329,7 +329,7 @@ func (g *GithubProvider) Report(ctx context.Context, a Agent, lintResults map[st
 	case config.Quiet:
 		return nil
 	default:
-		log.Errorf("unsupported report format: %v", a.LinterConfig.ReportFormat)
+		log.Errorf("unsupported report format: %v", a.LinterConfig.ReportType)
 	}
 
 	return nil

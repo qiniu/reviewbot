@@ -192,7 +192,7 @@ func TestApplyTypedMessageByIssueReferences(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create agent with test configuration
 			agent := &Agent{
-				LinterConfig:    config.Linter{ReportFormat: tc.reportFormat},
+				LinterConfig:    config.Linter{ReportType: tc.reportFormat},
 				IssueReferences: tc.issueRefs,
 			}
 
