@@ -238,7 +238,7 @@ type GithubProvider struct {
 }
 
 func NewGithubProvider(githubClient *github.Client, gitClient gitv2.ClientFactory, pullRequestChangedFiles []*github.CommitFile, pullRequestEvent github.PullRequestEvent) (*GithubProvider, error) {
-	checker, err := NewFileHunkChecker(pullRequestChangedFiles)
+	checker, err := newGithubHunkChecker(pullRequestChangedFiles)
 	if err != nil {
 		return nil, err
 	}
@@ -716,4 +716,35 @@ func newMixCheckRun(a Agent, lintErrs map[string][]LinterOutput) github.CreateCh
 
 	check.Output.Text = github.String(b.String())
 	return check
+}
+
+func newGithubHunkChecker(commitFiles []*github.CommitFile) (*FileHunkChecker, error) {
+	hunks := make(map[string][]Hunk)
+	for _, commitFile := range commitFiles {
+		if !isValidGithubCommitFile(commitFile) {
+			continue
+		}
+
+		fileHunks, err := parseGithubPatch(commitFile.GetPatch())
+		if err != nil {
+			return nil, err
+		}
+
+		if existing, ok := hunks[commitFile.GetFilename()]; ok {
+			log.Warnf("duplicate commitFiles: %v, %v", commitFile, existing)
+			continue
+		}
+
+		hunks[commitFile.GetFilename()] = fileHunks
+	}
+
+	return NewFileHunkChecker(hunks), nil
+}
+
+func isValidGithubCommitFile(file *github.CommitFile) bool {
+	return file != nil && file.GetPatch() != "" && file.GetStatus() != "removed"
+}
+
+func parseGithubPatch(patch string) ([]Hunk, error) {
+	return ParsePatch(patch)
 }

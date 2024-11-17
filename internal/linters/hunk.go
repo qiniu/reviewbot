@@ -20,11 +20,6 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
-
-	"github.com/google/go-github/v57/github"
-	"github.com/qiniu/x/errors"
-	"github.com/qiniu/x/log"
-	"github.com/xanzy/go-gitlab"
 )
 
 type HunkChecker interface {
@@ -32,74 +27,19 @@ type HunkChecker interface {
 }
 
 type FileHunkChecker struct {
-	// map[file][]hunks
 	Hunks map[string][]Hunk
 }
 
-var (
-	errCommitFile = errors.New("commit file error")
-)
+type Hunk struct {
+	StartLine int
+	EndLine   int
+}
 
-func NewFileHunkChecker(commitFiles []*github.CommitFile) (*FileHunkChecker, error) {
-	hunks := make(map[string][]Hunk)
-	for _, commitFile := range commitFiles {
-		if commitFile == nil || commitFile.GetPatch() == "" {
-			continue
-		}
-
-		if commitFile.GetStatus() == "removed" {
-			continue
-		}
-
-		fileHunks, err := DiffHunks(commitFile)
-		if err != nil {
-			return nil, err
-		}
-
-		v, ok := hunks[commitFile.GetFilename()]
-		if ok {
-			log.Warnf("duplicate commitFiles: %v, %v", commitFile, v)
-			continue
-		}
-
-		hunks[commitFile.GetFilename()] = fileHunks
-	}
-
+// NewFileHunkChecker creates a new FileHunkChecker with given hunks map.
+func NewFileHunkChecker(hunks map[string][]Hunk) *FileHunkChecker {
 	return &FileHunkChecker{
 		Hunks: hunks,
-	}, nil
-}
-func NewGitLabCommitFileHunkChecker(commitFiles []*gitlab.MergeRequestDiff) (*FileHunkChecker, error) {
-	hunks := make(map[string][]Hunk)
-	for _, commitFile := range commitFiles {
-		if commitFile == nil || commitFile.NewPath == "" {
-			continue
-		}
-		if commitFile.DeletedFile {
-			continue
-		}
-		fileHunks, err := DiffHunksMerge(commitFile)
-		if err != nil {
-			return nil, err
-		}
-		v, ok := hunks[commitFile.NewPath]
-		if ok {
-			log.Warnf("duplicate commitFiles: %v, %v", commitFile, v)
-			continue
-		}
-		hunks[commitFile.NewPath] = fileHunks
 	}
-
-	return &FileHunkChecker{
-		Hunks: hunks,
-	}, nil
-}
-func DiffHunksMerge(commitFile *gitlab.MergeRequestDiff) ([]Hunk, error) {
-	if commitFile == nil || commitFile.NewPath == "" {
-		log.Errorf("invalid commitFile: %v", commitFile)
-		return nil, errCommitFile
-	}
-	return ParsePatch(commitFile.Diff)
 }
 
 func (c *FileHunkChecker) InHunk(file string, line, startLine int) bool {
@@ -114,14 +54,12 @@ func (c *FileHunkChecker) InHunk(file string, line, startLine int) bool {
 			}
 		}
 	}
-
 	return false
 }
 
-var patchRegex = regexp.MustCompile(`@@ \-(\d+),(\d+) \+(\d+),(\d+) @@`)
-
+// ParsePatch parses a unified diff patch string and returns hunks.
 func ParsePatch(patch string) ([]Hunk, error) {
-	var hunks []Hunk
+	hunks := make([]Hunk, 0)
 
 	groups := patchRegex.FindAllStringSubmatch(patch, -1)
 	for _, group := range groups {
@@ -147,15 +85,4 @@ func ParsePatch(patch string) ([]Hunk, error) {
 	return hunks, nil
 }
 
-type Hunk struct {
-	StartLine int
-	EndLine   int
-}
-
-func DiffHunks(commitFile *github.CommitFile) ([]Hunk, error) {
-	if commitFile == nil || commitFile.GetPatch() == "" {
-		return nil, fmt.Errorf("invalid commitFile: %v", commitFile)
-	}
-
-	return ParsePatch(commitFile.GetPatch())
-}
+var patchRegex = regexp.MustCompile(`@@ \-(\d+),(\d+) \+(\d+),(\d+) @@`)
