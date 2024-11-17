@@ -22,7 +22,9 @@ import (
 	"strconv"
 
 	"github.com/google/go-github/v57/github"
+	"github.com/qiniu/x/errors"
 	"github.com/qiniu/x/log"
+	"github.com/xanzy/go-gitlab"
 )
 
 type HunkChecker interface {
@@ -33,6 +35,10 @@ type FileHunkChecker struct {
 	// map[file][]hunks
 	Hunks map[string][]Hunk
 }
+
+var (
+	errCommitFile = errors.New("commit file error")
+)
 
 func NewFileHunkChecker(commitFiles []*github.CommitFile) (*FileHunkChecker, error) {
 	hunks := make(map[string][]Hunk)
@@ -62,6 +68,38 @@ func NewFileHunkChecker(commitFiles []*github.CommitFile) (*FileHunkChecker, err
 	return &FileHunkChecker{
 		Hunks: hunks,
 	}, nil
+}
+func NewGitLabCommitFileHunkChecker(commitFiles []*gitlab.MergeRequestDiff) (*FileHunkChecker, error) {
+	hunks := make(map[string][]Hunk)
+	for _, commitFile := range commitFiles {
+		if commitFile == nil || commitFile.NewPath == "" {
+			continue
+		}
+		if commitFile.DeletedFile {
+			continue
+		}
+		fileHunks, err := DiffHunksMerge(commitFile)
+		if err != nil {
+			return nil, err
+		}
+		v, ok := hunks[commitFile.NewPath]
+		if ok {
+			log.Warnf("duplicate commitFiles: %v, %v", commitFile, v)
+			continue
+		}
+		hunks[commitFile.NewPath] = fileHunks
+	}
+
+	return &FileHunkChecker{
+		Hunks: hunks,
+	}, nil
+}
+func DiffHunksMerge(commitFile *gitlab.MergeRequestDiff) ([]Hunk, error) {
+	if commitFile == nil || commitFile.NewPath == "" {
+		log.Errorf("invalid commitFile: %v", commitFile)
+		return nil, errCommitFile
+	}
+	return ParsePatch(commitFile.Diff)
 }
 
 func (c *FileHunkChecker) InHunk(file string, line, startLine int) bool {

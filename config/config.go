@@ -69,9 +69,10 @@ type Refs struct {
 }
 
 type GlobalConfig struct {
-	// GithubReportType is the format of the report, will be used if linterConfig.ReportFormat is empty.
+	// GithubReportType/GitlabReportType is the format of the report, will be used if linterConfig.ReportFormat is empty.
 	// e.g. "github_checks", "github_pr_review"
 	GithubReportType ReportType `json:"githubReportType,omitempty"`
+	GitlabReportType ReportType `json:"gitlabReportType,omitempty"`
 
 	// GolangciLintConfig is the path of golangci-lint config file to run golangci-lint globally.
 	// if not empty, use the config to run golangci-lint.
@@ -261,14 +262,19 @@ func NewConfig(conf string) (Config, error) {
 	return c, nil
 }
 
-func (c Config) GetLinterConfig(org, repo, ln string) Linter {
+func (c Config) GetLinterConfig(org, repo, ln string, repotype RepoType) Linter {
 	linter := Linter{
-		Enable:     boolPtr(true),
-		ReportType: c.GlobalDefaultConfig.GithubReportType,
-		Modifier:   NewBaseModifier(),
-		Name:       ln,
-		Org:        org,
-		Repo:       repo,
+		Enable:   boolPtr(true),
+		Modifier: NewBaseModifier(),
+		Name:     ln,
+		Org:      org,
+		Repo:     repo,
+	}
+	if repotype == GitLab {
+		linter.ReportType = c.GlobalDefaultConfig.GithubReportType
+	}
+	if repotype == GitHub {
+		linter.ReportType = c.GlobalDefaultConfig.GithubReportType
 	}
 
 	// set golangci-lint config path if exists
@@ -407,14 +413,23 @@ func applyCustomLintersConfig(legacy Linter, custom CustomLinters) Linter {
 type ReportType string
 
 const (
-	GithubCheckRuns ReportType = "github_check_run"
-	GithubPRReview  ReportType = "github_pr_review"
+	GithubCheckRuns            ReportType = "github_check_run"
+	GithubPRReview             ReportType = "github_pr_review"
+	GitlabComment              ReportType = "gitlab_mr_comment"
+	GitlabCommentAndDiscussion ReportType = "gitlab_mr_comment_discussion"
 	// GithubMixType is the type of the report that mix the github_check_run and github_pr_review.
 	// which use the github_check_run to report all lint results as a check run summary,
 	// but use the github_pr_review to report top 10 lint results to pull request review comments at most.
 	GithubMixType ReportType = "github_mix"
 	// for debug and testing.
 	Quiet ReportType = "quiet"
+)
+
+type RepoType string
+
+const (
+	GitLab RepoType = "gitlab"
+	GitHub RepoType = "github"
 )
 
 func boolPtr(b bool) *bool {

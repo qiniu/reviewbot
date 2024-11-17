@@ -51,14 +51,16 @@ import (
 )
 
 type options struct {
-	port          int
-	dryRun        bool
-	debug         bool
-	logLevel      int
-	accessToken   string
-	webhookSecret string
-	codeCacheDir  string
-	config        string
+	port              int
+	dryRun            bool
+	debug             bool
+	logLevel          int
+	gitHubAccessToken string
+	gitLabAccessToken string
+	gitLabHost        string
+	webhookSecret     string
+	codeCacheDir      string
+	config            string
 
 	// support github app
 	appID          int64
@@ -76,19 +78,22 @@ type options struct {
 	kubeConfig string
 }
 
+var (
+	errGitlabAccessTokenNotSet = errors.New("either access-token or github app information should be provided")
+	errAppNotSet               = errors.New("app-private-key is required when using github app")
+	errWebHookNotSet           = errors.New("webhook-secret is required")
+)
+
 func (o options) Validate() error {
-	if o.accessToken == "" && o.appID == 0 {
-		return errors.New("either access-token or github app information should be provided")
+	if o.gitHubAccessToken == "" && o.appID == 0 {
+		return errGitlabAccessTokenNotSet
 	}
-
 	if o.appID != 0 && o.appPrivateKey == "" {
-		return errors.New("app-private-key is required when using github app")
+		return errAppNotSet
 	}
-
 	if o.webhookSecret == "" {
-		return errors.New("webhook-secret is required")
+		return errWebHookNotSet
 	}
-
 	return nil
 }
 
@@ -99,7 +104,9 @@ func gatherOptions() options {
 	fs.BoolVar(&o.dryRun, "dry-run", false, "dry run")
 	fs.BoolVar(&o.debug, "debug", false, "debug mode")
 	fs.IntVar(&o.logLevel, "log-level", 0, "log level")
-	fs.StringVar(&o.accessToken, "access-token", "", "personal access token")
+	fs.StringVar(&o.gitHubAccessToken, "github-access-token", "", "personal github access token")
+	fs.StringVar(&o.gitLabAccessToken, "gitlab-access-token", "", "personal gitlab access token")
+	fs.StringVar(&o.gitLabHost, "gitlab-host", "", "gitlab server")
 	fs.StringVar(&o.webhookSecret, "webhook-secret", "", "webhook secret file")
 	fs.StringVar(&o.codeCacheDir, "code-cache-dir", "/tmp", "code cache dir")
 	fs.StringVar(&o.config, "config", "", "config file")
@@ -224,16 +231,18 @@ func main() {
 	}
 
 	s := &Server{
-		webhookSecret:    []byte(o.webhookSecret),
-		gitClientFactory: v2,
-		config:           cfg,
-		accessToken:      o.accessToken,
-		appID:            o.appID,
-		appPrivateKey:    o.appPrivateKey,
-		debug:            o.debug,
-		serverAddr:       o.serverAddr,
-		repoCacheDir:     o.codeCacheDir,
-		kubeConfig:       o.kubeConfig,
+		webhookSecret:     []byte(o.webhookSecret),
+		gitClientFactory:  v2,
+		config:            cfg,
+		gitHubAccessToken: o.gitHubAccessToken,
+		gitLabAccessToken: o.gitLabAccessToken,
+		appID:             o.appID,
+		appPrivateKey:     o.appPrivateKey,
+		debug:             o.debug,
+		serverAddr:        o.serverAddr,
+		repoCacheDir:      o.codeCacheDir,
+		kubeConfig:        o.kubeConfig,
+		gitLabHost:        o.gitLabHost,
 	}
 
 	go s.initDockerRunner()
