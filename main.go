@@ -247,6 +247,7 @@ func main() {
 
 	go s.initDockerRunner()
 	go s.initKubernetesRunner()
+	s.initCustomLinters()
 
 	if o.S3CredentialsFile != "" {
 		s.storage, err = storage.NewS3Storage(o.S3CredentialsFile)

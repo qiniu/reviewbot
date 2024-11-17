@@ -18,6 +18,7 @@ package linters
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -31,7 +32,12 @@ import (
 )
 
 // issueCache is the issue references cache.
-var issueCache = cache.NewIssueReferencesCache(time.Minute * 10)
+var issueCache = cache.NewIssueReferencesCache(time.Hour * 2)
+
+var (
+	ErrIssueNumberIsZero         = errors.New("issue number is 0, this should not happen except for test cases")
+	ErrFailedToFetchIssueContent = errors.New("failed to fetch issue content")
+)
 
 // Agent knows necessary information in order to run linters.
 type Agent struct {
@@ -55,64 +61,99 @@ type Agent struct {
 	IssueReferences []config.CompiledIssueReference
 }
 
-// ApplyIssueReferences applies the issue references to the lint results.
-func (a *Agent) ApplyIssueReferences(ctx context.Context, lintResults map[string][]LinterOutput) {
-	log := lintersutil.FromContext(ctx)
-	var msgFormat string
-	format := a.LinterConfig.ReportFormat
+// getMsgFormat returns the message format based on report type.
+func getMsgFormat(format config.ReportType) string {
 	switch format {
-	case config.GithubCheckRuns:
-		msgFormat = "%s\nmore info: %s"
-	case config.GithubPRReview:
-		msgFormat = "[%s](%s)"
-	case config.GithubMixType:
-		msgFormat = "[%s](%s)"
-	case config.Quiet:
-		return
+	case config.GithubPRReview, config.GithubMixType:
+		return "[%s](%s)"
 	default:
-		msgFormat = "%s\nmore info: %s"
+		return "%s\nmore info: %s"
 	}
-	for _, ref := range a.IssueReferences {
-		for file, outputs := range lintResults {
-			for i, o := range outputs {
-				if !ref.Pattern.MatchString(o.Message) {
-					continue
-				}
-				lintResults[file][i].Message = fmt.Sprintf(msgFormat, o.Message, ref.URL)
+}
 
-				if format != config.GithubPRReview && format != config.GithubMixType {
-					continue
-				}
+// getIssueContent fetches issue content with cache support.
+func (a *Agent) getIssueContent(ctx context.Context, ref config.CompiledIssueReference) (string, error) {
+	log := lintersutil.FromContext(ctx)
 
-				// specific for github pr review format
-				if issueContent, ok := issueCache.Get(ref.URL); ok && !issueCache.IsExpired(ref.URL) {
-					lintResults[file][i].Message += fmt.Sprintf(ReferenceFooter, issueContent)
-					continue
-				}
+	// Try cache first
+	if content, ok := issueCache.Get(ref.URL); ok && !issueCache.IsExpired(ref.URL) {
+		return content, nil
+	}
 
-				issue, resp, err := github.NewClient(http.DefaultClient).Issues.Get(ctx, "qiniu", "reviewbot", ref.IssueNumber)
-				if err != nil {
-					log.Errorf("failed to fetch issue content: %s", err)
-					// just log and continue.
-					continue
-				}
+	if ref.IssueNumber == 0 {
+		return "", ErrIssueNumberIsZero
+	}
 
-				if resp.StatusCode != http.StatusOK {
-					log.Errorf("failed to fetch issue content, resp: %v", resp)
-					// just log and continue.
-					continue
-				}
+	// Fetch from GitHub
+	issue, resp, err := github.NewClient(http.DefaultClient).Issues.Get(ctx, "qiniu", "reviewbot", ref.IssueNumber)
+	if err != nil {
+		log.Errorf("failed to fetch issue content: %s", err)
+		return "", err
+	}
 
-				issueContent := issue.GetBody()
-				issueCache.Set(ref.URL, issueContent)
-				lintResults[file][i].Message += fmt.Sprintf(ReferenceFooter, issueContent)
-			}
+	if resp.StatusCode != http.StatusOK {
+		log.Errorf("failed to fetch issue content, resp: %v", resp)
+		return "", ErrFailedToFetchIssueContent
+	}
+
+	content := issue.GetBody()
+	issueCache.Set(ref.URL, content)
+	return content, nil
+}
+
+// processOutput processes a single lint output.
+func (a *Agent) processOutput(ctx context.Context, output LinterOutput, ref config.CompiledIssueReference, msgFormat string) (LinterOutput, bool) {
+	if !ref.Pattern.MatchString(output.Message) {
+		return output, false
+	}
+
+	newOutput := output
+	newOutput.TypedMessage = fmt.Sprintf(msgFormat, output.Message, ref.URL)
+
+	// Add issue content for PR review formats
+	if a.LinterConfig.ReportType == config.GithubPRReview || a.LinterConfig.ReportType == config.GithubMixType {
+		if content, err := a.getIssueContent(ctx, ref); err == nil {
+			newOutput.TypedMessage += fmt.Sprintf(ReferenceFooter, content)
 		}
 	}
+
+	return newOutput, true
+}
+
+// ApplyTypedMessageByIssueReferences applies the issue references to the lint results with the typed message.
+func (a *Agent) ApplyTypedMessageByIssueReferences(ctx context.Context, lintResults map[string][]LinterOutput) map[string][]LinterOutput {
+	msgFormat := getMsgFormat(a.LinterConfig.ReportType)
+	newLintResults := make(map[string][]LinterOutput, len(lintResults))
+
+	// Process each file's outputs
+	for file, outputs := range lintResults {
+		newOutputs := make([]LinterOutput, 0, len(outputs))
+
+		// Apply each reference pattern
+		for _, output := range outputs {
+			processed := false
+			for _, ref := range a.IssueReferences {
+				if newOutput, ok := a.processOutput(ctx, output, ref, msgFormat); ok {
+					newOutputs = append(newOutputs, newOutput)
+					processed = true
+					break
+				}
+			}
+			if !processed {
+				newOutputs = append(newOutputs, output)
+			}
+		}
+
+		if len(newOutputs) > 0 {
+			newLintResults[file] = newOutputs
+		}
+	}
+
+	return newLintResults
 }
 
 const ReferenceFooter = `
 <details>
-<summary>详细解释</summary>
+<summary>Details</summary>
 %s
 </details>`

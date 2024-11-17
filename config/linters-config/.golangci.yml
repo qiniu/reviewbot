@@ -37,6 +37,9 @@ linters-settings:
         disabled: true
       - name: cyclomatic
         arguments: [30]
+      # revive 的 unhandled-error 误报太多, 本身已有 errcheck 检查
+      - name: unhandled-error
+        disabled: true
 
   errcheck:
     exclude-functions:
@@ -84,3 +87,4 @@ linters:
     - tagliatelle # see too many false positives
     - intrange # see too many false positives
     - gosmopolitan # see too many false positives
+    - gosec # it was used by customizedExtraLinter, see config.yaml

@@ -1,3 +1,4 @@
+# This is an example of the config file for reviewbot.
 # Reviewbot follows a zero-configuration approach in its design, where the default behavior implemented in the code should be suitable for the majority of scenarios.
 # Configuration of the file is only necessary in special cases, such as:
 # 1. Using specific commands for a particular repository.
@@ -10,7 +11,7 @@ globalDefaultConfig: # global default settings, will be overridden by qbox org a
   golangcilintConfig: "config/linters-config/.golangci.yml" # golangci-lint config file to use
   copySSHKeyToContainer: "/root/.ssh/id_rsa"
 
-customConfig: # custom config for specific orgs or repos
+customRepos: # custom config for specific orgs or repos
   goplus:
     linters:
       golangci-lint:
@@ -117,6 +118,7 @@ customConfig: # custom config for specific orgs or repos
     linters:
       golangci-lint:
         enable: true
+        reportType: "github_mix"
         kubernetesAsRunner:
           image: "aslan-spock-register.qiniu.io/reviewbot/base:go1.23.2-gocilint.1.61.0"
           namespace: "reviewbot"
@@ -139,7 +141,7 @@ customConfig: # custom config for specific orgs or repos
 
 issueReferences:
   golangci-lint:
-    - pattern: 'ST1003'
+    - pattern: "ST1003"
       url: "https://github.com/qiniu/reviewbot/issues/398"
     - pattern: '^do not define dynamic errors, use wrapped static errors instead:.*\(err113\)$'
       url: "https://github.com/qiniu/reviewbot/issues/418"
@@ -148,3 +150,19 @@ issueReferences:
   shellcheck:
     - pattern: '\[SC2086\]$'
       url: "https://github.com/qiniu/reviewbot/issues/413"
+
+
+
+customLinters:
+  pylint:
+    languages: [".py"]
+    command:
+      - "/bin/sh"
+      - "-c"
+      - "--"
+    args:
+      - |
+         pylint --recursive=y ./
+    kubernetesAsRunner:
+      namespace: "reviewbot"
+      image: "aslan-spock-register.qiniu.io/reviewbot/base:go1.22.3-pylint3.3.1"

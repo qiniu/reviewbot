@@ -230,7 +230,7 @@ func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[st
 	repo := a.Provider.GetCodeReviewInfo().Repo
 	num := a.Provider.GetCodeReviewInfo().Number
 	orgRepo := fmt.Sprintf("%s/%s", org, repo)
-	reportformat := ReportFormMatCheck(g.GitLabClient, a.LinterConfig.ReportFormat)
+	reportformat := ReportFormMatCheck(g.GitLabClient, a.LinterConfig.ReportType)
 	switch reportformat {
 	case config.GitlabCommentAndDiscussion:
 		// list   MR  comments
@@ -325,7 +325,7 @@ func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[st
 	case config.Quiet:
 		return nil
 	default:
-		log.Errorf("unsupported report format: %v", a.LinterConfig.ReportFormat)
+		log.Errorf("unsupported report format: %v", a.LinterConfig.ReportType)
 	}
 	return nil
 }

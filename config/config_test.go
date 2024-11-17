@@ -32,7 +32,7 @@ func TestConfig(t *testing.T) {
 globalDefaultConfig: # global default settings, will be overridden by qbox org and repo specific settings if they exist
   githubReportType: "github_check_run" # github_pr_review, github_check_run
 
-customConfig: # custom config for specific orgs or repos
+customRepos: # custom config for specific orgs or repos
   qbox: # github organization name
     refs:
     - org: qbox
@@ -92,7 +92,7 @@ issueReferences:
 				GlobalDefaultConfig: GlobalConfig{
 					GithubReportType: GithubCheckRuns,
 				},
-				CustomConfig: map[string]RepoConfig{
+				CustomRepos: map[string]RepoConfig{
 					"qbox": {
 						Linters: map[string]Linter{
 							"golangci-lint": {
@@ -178,7 +178,7 @@ golangci-lint run --timeout=10m0s --allow-parallel-runners=true --print-issued-l
 globalDefaultConfig: # global default settings, will be overridden by qbox org and repo specific settings if they exist
   githubReportType: "github_check_run" # github_pr_review, github_check_run
   golangciLintConfig: "linters-config/.golangci.yml"
-customConfig: # custom config for specific orgs or repos
+customRepos: # custom config for specific orgs or repos
   qbox: # github organization name
     refs:
     - org: qbox
@@ -201,7 +201,7 @@ customConfig: # custom config for specific orgs or repos
 					GithubReportType:   GithubCheckRuns,
 					GolangCiLintConfig: "linters-config/.golangci.yml",
 				},
-				CustomConfig: map[string]RepoConfig{
+				CustomRepos: map[string]RepoConfig{
 					"qbox": {
 						Linters: map[string]Linter{
 							"golangci-lint": {
@@ -260,8 +260,8 @@ customConfig: # custom config for specific orgs or repos
 					t.Errorf("expected: %v\ngot: %v", tc.expected.GlobalDefaultConfig.GolangCiLintConfig, c.GlobalDefaultConfig.GolangCiLintConfig)
 				}
 
-				if !reflect.DeepEqual(c.CustomConfig, tc.expected.CustomConfig) {
-					t.Errorf("expected:\n%v\ngot:\n%v", tc.expected.CustomConfig, c.CustomConfig)
+				if !reflect.DeepEqual(c.CustomRepos, tc.expected.CustomRepos) {
+					t.Errorf("expected:\n%v\ngot:\n%v", tc.expected.CustomRepos, c.CustomRepos)
 				}
 
 				if !reflect.DeepEqual(c.IssueReferences, tc.expected.IssueReferences) {
@@ -280,7 +280,7 @@ globalDefaultConfig:
   githubReportType: "github_check_run" # github_pr_review, github_check_run
   golangciLintConfig: "linters-config/.golangci.yml"
 
-customConfig: # custom config for specific orgs or repos
+customRepos: # custom config for specific orgs or repos
   goplus:
     linters:
       golangci-lint:

@@ -21,7 +21,7 @@ type Config struct {
 	// e.g.
 	// * "org/repo": {"extraRefs":{org:xxx, repo:xxx, path_alias:github.com/repo }, "golangci-lint": {"enable": true, "workDir": "", "command": "golangci-lint", "args": ["run", "--config", ".golangci.yml"], "reportFormat": "github_checks"}}
 	// * "org": {"extraRefs":{org:xxx, repo:xxx, path_alias:github.com/repo }, "golangci-lint": {"enable": true, "workDir": "", "command": "golangci-lint", "args": ["run", "--config", ".golangci.yml"], "reportFormat": "github_checks"}}
-	CustomConfig map[string]RepoConfig `json:"customConfig,omitempty"`
+	CustomRepos map[string]RepoConfig `json:"customRepos,omitempty"`
 
 	// IssueReferences is the issue references config.
 	// key is the linter name.
@@ -32,6 +32,13 @@ type Config struct {
 	IssueReferences map[string][]IssueReference `json:"issueReferences,omitempty"`
 	// compiledIssueReferences is the compiled issue references config.
 	compiledIssueReferences map[string][]CompiledIssueReference
+
+	CustomLinters map[string]CustomLinters `json:"customLinters,omitempty"`
+}
+
+type CustomLinters struct {
+	Linter
+	Languages []string `json:"languages,omitempty"`
 }
 
 type RepoConfig struct {
@@ -167,13 +174,13 @@ type Linter struct {
 	// Env is the environment variables required for the linter execution.
 	Env []string `json:"env,omitempty"`
 
-	// ReportFormat is the format of the report, if empty, use globalDefaultConfig.
+	// ReportType is the format of the report, if empty, use globalDefaultConfig.
 	// For more details, see:
 	// github_check_run: https://developer.github.com/v3/checks/runs/#create-a-check-run
 	// github_pr_review: https://developer.github.com/v3/pulls/reviews/#create-a-pull-request-review
 	// Note:
 	// * github_check_run only support on Github Apps, not support on Github OAuth Apps or authenticated users.
-	ReportFormat ReportType `json:"githubReportType,omitempty"`
+	ReportType ReportType `json:"reportType,omitempty"`
 
 	// ConfigPath is the path of the linter config file.
 	// If not empty, use the config to run the linter.
@@ -185,8 +192,8 @@ type Linter struct {
 
 func (l Linter) String() string {
 	return fmt.Sprintf(
-		"Linter{Enable: %v, DockerAsRunner: %v, Workspace: %v, WorkDir: %v, Command: %v, Args: %v, ReportFormat: %v, ConfigPath: %v}",
-		*l.Enable, l.DockerAsRunner, l.Workspace, l.WorkDir, l.Command, l.Args, l.ReportFormat, l.ConfigPath)
+		"Linter{Enable: %v, DockerAsRunner: %v, Workspace: %v, WorkDir: %v, Command: %v, Args: %v, ReportType: %v, ConfigPath: %v}",
+		*l.Enable, l.DockerAsRunner, l.Workspace, l.WorkDir, l.Command, l.Args, l.ReportType, l.ConfigPath)
 }
 
 var (
@@ -264,10 +271,10 @@ func (c Config) GetLinterConfig(org, repo, ln string, repotype RepoType) Linter 
 		Repo:     repo,
 	}
 	if repotype == GitLab {
-		linter.ReportFormat = c.GlobalDefaultConfig.GithubReportType
+		linter.ReportType = c.GlobalDefaultConfig.GithubReportType
 	}
 	if repotype == GitHub {
-		linter.ReportFormat = c.GlobalDefaultConfig.GithubReportType
+		linter.ReportType = c.GlobalDefaultConfig.GithubReportType
 	}
 
 	// set golangci-lint config path if exists
@@ -288,13 +295,17 @@ func (c Config) GetLinterConfig(org, repo, ln string, repotype RepoType) Linter 
 		linter.DockerAsRunner.CopySSHKeyToContainer = c.GlobalDefaultConfig.CopySSHKeyToContainer
 	}
 
-	if orgConfig, ok := c.CustomConfig[org]; ok {
+	if custom, ok := c.CustomLinters[ln]; ok {
+		linter = applyCustomLintersConfig(linter, custom)
+	}
+
+	if orgConfig, ok := c.CustomRepos[org]; ok {
 		if l, ok := orgConfig.Linters[ln]; ok {
 			linter = applyCustomConfig(linter, l)
 		}
 	}
 
-	if repoConfig, ok := c.CustomConfig[org+"/"+repo]; ok {
+	if repoConfig, ok := c.CustomRepos[org+"/"+repo]; ok {
 		if l, ok := repoConfig.Linters[ln]; ok {
 			linter = applyCustomConfig(linter, l)
 		}
@@ -318,7 +329,7 @@ func (c Config) GetCompiledIssueReferences(linterName string) []CompiledIssueRef
 	return nil
 }
 
-func applyCustomConfig(legacy, custom Linter) Linter {
+func applyCustomConfig(legacy Linter, custom Linter) Linter {
 	if custom.Enable != nil {
 		legacy.Enable = custom.Enable
 	}
@@ -335,12 +346,16 @@ func applyCustomConfig(legacy, custom Linter) Linter {
 		legacy.Args = custom.Args
 	}
 
-	if custom.ReportFormat != "" {
-		legacy.ReportFormat = custom.ReportFormat
+	if custom.ReportType != "" {
+		legacy.ReportType = custom.ReportType
 	}
 
 	if custom.ConfigPath != "" {
 		legacy.ConfigPath = custom.ConfigPath
+	}
+
+	if custom.Env != nil {
+		legacy.Env = custom.Env
 	}
 
 	if custom.DockerAsRunner.Image != "" {
@@ -375,6 +390,22 @@ func applyCustomConfig(legacy, custom Linter) Linter {
 	return legacy
 }
 
+func applyCustomLintersConfig(legacy Linter, custom CustomLinters) Linter {
+	// Convert CustomizedExtraLinter to Linter for reuse
+	tempLinter := Linter{
+		Command:            custom.Command,
+		Args:               custom.Args,
+		ReportType:         custom.ReportType,
+		ConfigPath:         custom.ConfigPath,
+		KubernetesAsRunner: custom.KubernetesAsRunner,
+		DockerAsRunner:     custom.DockerAsRunner,
+		WorkDir:            custom.WorkDir,
+		Env:                custom.Env,
+	}
+
+	return applyCustomConfig(legacy, tempLinter)
+}
+
 // ReportType is the type of the report.
 // Different report types will show different UI and style for the lint results.
 // Reviewbot has default report type for each linter and git provider, which are been thought as best practice by the maintainers.
@@ -387,6 +418,8 @@ const (
 	GitlabComment              ReportType = "gitlab_mr_comment"
 	GitlabCommentAndDiscussion ReportType = "gitlab_mr_comment_discussion"
 	// GithubMixType is the type of the report that mix the github_check_run and github_pr_review.
+	// which use the github_check_run to report all lint results as a check run summary,
+	// but use the github_pr_review to report top 10 lint results to pull request review comments at most.
 	GithubMixType ReportType = "github_mix"
 	// for debug and testing.
 	Quiet ReportType = "quiet"
@@ -441,7 +474,7 @@ func (*baseModifier) Modify(cfg *Linter) (*Linter, error) {
 func (c *Config) parseCloneURLs() error {
 	re := regexp.MustCompile(`^(?:git@|https://)?([^:/]+)[:/]{1}(.*?)/(.*?)\.git$`)
 
-	for orgRepo, refConfig := range c.CustomConfig {
+	for orgRepo, refConfig := range c.CustomRepos {
 		for k, ref := range refConfig.Refs {
 			if ref.CloneURL == "" {
 				continue
@@ -457,7 +490,7 @@ func (c *Config) parseCloneURLs() error {
 }
 
 func (c *Config) validateRefs() error {
-	for orgRepo, refConfig := range c.CustomConfig {
+	for orgRepo, refConfig := range c.CustomRepos {
 		for _, ref := range refConfig.Refs {
 			if ref.PathAlias != "" && (ref.Repo == "" || ref.Org == "") {
 				log.Errorf("invalid ref: %v for org/repo: %s", ref, orgRepo)
@@ -508,7 +541,7 @@ func (c *Config) parseIssueReferences() error {
 }
 
 func (c *Config) parseAndUpdateCloneURL(re *regexp.Regexp, orgRepo string, k int) error {
-	ref := &c.CustomConfig[orgRepo].Refs[k]
+	ref := &c.CustomRepos[orgRepo].Refs[k]
 	matches := re.FindStringSubmatch(ref.CloneURL)
 	if len(matches) != 4 {
 		log.Errorf("failed to parse CloneURL, please check the format of %s", ref.CloneURL)
