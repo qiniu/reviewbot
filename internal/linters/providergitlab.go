@@ -48,7 +48,8 @@ type DiffSha struct {
 }
 
 func ListMergeRequestsFiles(ctx context.Context, gc *gitlab.Client, owner string, repo string, pid int, number int) ([]*gitlab.MergeRequestDiff, *gitlab.Response, error) {
-	// For version compatibility,because verion below 10.8 not support ListMergeRequestDiffs
+	// For version compatibility,because version below 10.8 not support ListMergeRequestDiffs
+	//nolint:staticcheck
 	files, response, err := gc.MergeRequests.GetMergeRequestChanges(pid, number, nil)
 	if err != nil {
 		return nil, nil, err
@@ -177,7 +178,7 @@ func (g *GitlabProvider) GetCodeReviewInfo() CodeReview {
 }
 
 func NewGitlabProvider(gitlabClient *gitlab.Client, gitClient gitv2.ClientFactory, mergeRequestChangedFiles []*gitlab.MergeRequestDiff, mergeRequestEvent gitlab.MergeEvent) (*GitlabProvider, error) {
-	checker, err := NewGitLabCommitFileHunkChecker(mergeRequestChangedFiles)
+	checker, err := newGitlabHunkChecker(mergeRequestChangedFiles)
 	if err != nil {
 		log.Fatalf("Failed to create client: %v", err)
 	}
@@ -579,4 +580,35 @@ func constructMergeRequestDiscussion(linterOutputs map[string][]LinterOutput, li
 		}
 	}
 	return comments
+}
+
+func newGitlabHunkChecker(commitFiles []*gitlab.MergeRequestDiff) (*FileHunkChecker, error) {
+	hunks := make(map[string][]Hunk)
+	for _, commitFile := range commitFiles {
+		if !isValidGitlabCommitFile(commitFile) {
+			continue
+		}
+
+		fileHunks, err := parseGitlabPatch(commitFile.Diff)
+		if err != nil {
+			return nil, err
+		}
+
+		if existing, ok := hunks[commitFile.NewPath]; ok {
+			log.Warnf("duplicate commitFiles: %v, %v", commitFile, existing)
+			continue
+		}
+
+		hunks[commitFile.NewPath] = fileHunks
+	}
+
+	return NewFileHunkChecker(hunks), nil
+}
+
+func isValidGitlabCommitFile(file *gitlab.MergeRequestDiff) bool {
+	return file != nil && file.NewPath != "" && !file.DeletedFile
+}
+
+func parseGitlabPatch(patch string) ([]Hunk, error) {
+	return ParsePatch(patch)
 }
