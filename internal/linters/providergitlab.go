@@ -194,13 +194,16 @@ func NewGitlabProvider(gitlabClient *gitlab.Client, gitClient gitv2.ClientFactor
 	}, nil
 }
 
-func ReportFormMatCheck(gc *gitlab.Client, reportFormat config.ReportType) (reportType config.ReportType) {
-	//  gitlab  verion below 10.8 not support discussion resource api
-	//  gitlab reportformart  not config:  version=>10.8: GitlabCommentAndDiscussion, version<10.8: GitlabComment
-	//  gitlab reportformart  config:  version=>10.8: use config, version<10.8: GitlabComment
+func reportFormatMatCheck(gc *gitlab.Client, reportFormat config.ReportType) (reportType config.ReportType) {
+	// gitlab version below 10.8 not support discussion resource api.
+	// see https://gitlab.com/gitlab-org/gitlab-foss/-/blob/v10.8.7/CHANGELOG.md
+	// gitlab reportFormat not config:
+	//    version=>10.8: GitlabCommentAndDiscussion, version<10.8: GitlabComment
+	// gitlab reportFormat config:
+	//    version=>10.8: use config, version<10.8: GitlabComment
 	v, r, e := gc.Version.GetVersion()
 	if e != nil {
-		log.Fatalf("Failed to get version: %v,response is %v", e, r)
+		log.Errorf("Failed to get version: %v,response is %v", e, r)
 		return config.Quiet
 	}
 	v1, _ := version.NewVersion(v.Version)
@@ -231,8 +234,8 @@ func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[st
 	repo := a.Provider.GetCodeReviewInfo().Repo
 	num := a.Provider.GetCodeReviewInfo().Number
 	orgRepo := fmt.Sprintf("%s/%s", org, repo)
-	reportformat := ReportFormMatCheck(g.GitLabClient, a.LinterConfig.ReportType)
-	switch reportformat {
+	reportFormat := reportFormatMatCheck(g.GitLabClient, a.LinterConfig.ReportType)
+	switch reportFormat {
 	case config.GitlabCommentAndDiscussion:
 		// list   MR  comments
 		var pid = g.MergeRequestEvent.ObjectAttributes.TargetProjectID

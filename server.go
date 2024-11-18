@@ -20,7 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math"
 	"math/rand"
 	"net/http"
@@ -46,52 +46,325 @@ import (
 	gitv2 "sigs.k8s.io/prow/pkg/git/v2"
 )
 
-type Server struct {
-	gitClientFactory gitv2.ClientFactory
-	config           config.Config
-
-	// server addr which is used to generate the log view url
-	// e.g. https://domain
-	serverAddr string
-
-	// getDockerRunner returns the docker runner
-	getDockerRunner func() runner.Runner
-	// getKubernetesRunner returns the kubernetes runner
-	getKubernetesRunner func() runner.Runner
-
-	storage storage.Storage
-
-	webhookSecret []byte
-	// support gitlab
-	gitLabHost string
-
-	// support developer access token model
-	gitLabAccessToken string
-	gitHubAccessToken string
-	// support github app model
-	appID         int64
-	appPrivateKey string
-
-	debug bool
-
-	repoCacheDir string
-	kubeConfig   string
-}
-
 var (
 	mu    sync.Mutex
 	prMap = make(map[string]context.CancelFunc)
 )
 
 var (
-	errListFile   = errors.New("list files failed")
-	errPrepareDir = errors.New("failed to prepare repo dir")
+	ErrListFile   = errors.New("list files failed")
+	ErrPrepareDir = errors.New("failed to prepare repo dir")
 )
 
-func (s *Server) initCustomLinters() {
-	if len(s.config.CustomLinters) == 0 {
+type Server struct {
+	gitClientFactory gitv2.ClientFactory
+	config           config.Config
+	storage          storage.Storage
+	// server addr which is used to generate the log view url
+	// e.g. https://domain
+	serverAddr          string
+	getDockerRunner     func() runner.Runner
+	getKubernetesRunner func() runner.Runner
+	kubeConfig          string
+	webhookSecret       []byte
+	debug               bool
+	repoCacheDir        string
+
+	// support gitlab
+	gitLabHost        string
+	gitLabAccessToken string
+
+	// support github app model
+	appID             int64
+	gitHubAccessToken string
+	appPrivateKey     string
+}
+
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("X-Gitlab-Event") != "" {
+		s.serveGitLab(w, r)
 		return
 	}
+	s.serveGitHub(w, r)
+}
+
+func (s *Server) serveGitHub(w http.ResponseWriter, r *http.Request) {
+	eventGUID := github.DeliveryID(r)
+	if len(eventGUID) > 12 {
+		// limit the length of eventGUID to 12
+		eventGUID = eventGUID[len(eventGUID)-12:]
+	}
+	ctx := context.WithValue(context.Background(), lintersutil.EventGUIDKey, eventGUID)
+	log := lintersutil.FromContext(ctx)
+
+	payload, err := github.ValidatePayload(r, s.webhookSecret)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	event, err := github.ParseWebHook(github.WebHookType(r), payload)
+	if err != nil {
+		log.Errorf("parse webhook failed: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	fmt.Fprint(w, "Event received. Have a nice day.")
+
+	switch event := event.(type) {
+	case *github.PullRequestEvent:
+		go func() {
+			if err := s.processPullRequestEvent(ctx, event); err != nil {
+				log.Errorf("process pull request event: %v", err)
+			}
+		}()
+	case *github.CheckRunEvent:
+		go func() {
+			if err := s.processCheckRunRequestEvent(ctx, event); err != nil {
+				log.Errorf("process check run request event: %v", err)
+			}
+		}()
+	case *github.CheckSuiteEvent:
+		go func() {
+			if err := s.processCheckSuiteEvent(ctx, event); err != nil {
+				log.Errorf("process check run request event: %v", err)
+			}
+		}()
+	default:
+		log.Debugf("skipping event type %s\n", github.WebHookType(r))
+	}
+}
+
+func (s *Server) serveGitLab(w http.ResponseWriter, r *http.Request) {
+	now := time.Now()
+	eventGUID := strconv.FormatInt(now.Unix(), 12)
+	if len(eventGUID) > 12 {
+		// limit the length of eventGUID to 12
+		eventGUID = eventGUID[len(eventGUID)-12:]
+	}
+	ctx := context.WithValue(context.Background(), lintersutil.EventGUIDKey, eventGUID)
+	log := lintersutil.FromContext(ctx)
+
+	payload, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	v := gitlab.HookEventType(r)
+
+	event, err := gitlab.ParseHook(v, payload)
+	if err != nil {
+		log.Errorf("parse webhook failed: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	fmt.Fprint(w, "Event received. Have a nice day.")
+
+	switch event := event.(type) {
+	case *gitlab.MergeEvent:
+		go func() {
+			if err := s.processMergeRequestEvent(ctx, event); err != nil {
+				log.Errorf("process merge request event: %v", err)
+			}
+		}()
+
+	default:
+		log.Debugf("skipping event type %s\n", github.WebHookType(r))
+	}
+}
+
+func (s *Server) handleGitHubEvent(ctx context.Context, event *github.PullRequestEvent) error {
+	info := &codeRequestInfo{
+		platform: "github",
+		num:      event.GetPullRequest().GetNumber(),
+		org:      event.GetRepo().GetOwner().GetLogin(),
+		repo:     event.GetRepo().GetName(),
+		orgRepo:  event.GetRepo().GetOwner().GetLogin() + "/" + event.GetRepo().GetName(),
+	}
+
+	installationID := event.GetInstallation().GetID()
+	files, resp, err := linters.ListPullRequestsFiles(ctx, s.GithubClient(installationID), info.org, info.repo, info.num)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != http.StatusOK {
+		log.Errorf("failed to list pull request files, status code: %d", resp.StatusCode)
+		return ErrListFile
+	}
+
+	workspace, workDir, err := s.prepareGitRepos(ctx, info.org, info.repo, info.num)
+	if err != nil {
+		return err
+	}
+	info.workDir = workDir
+	info.repoDir = workspace
+
+	provider, err := linters.NewGithubProvider(s.GithubClient(installationID), s.gitClientFactory, files, *event)
+	if err != nil {
+		return err
+	}
+	info.provider = provider
+
+	return s.handleCodeRequestEvent(ctx, info)
+}
+
+func (s *Server) handleGitLabEvent(ctx context.Context, event *gitlab.MergeEvent) error {
+	info := &codeRequestInfo{
+		platform: "gitlab",
+		num:      event.ObjectAttributes.IID,
+		org:      event.Project.Namespace,
+		repo:     event.Project.Name,
+		orgRepo:  event.Project.Namespace + "/" + event.Project.Name,
+	}
+
+	pid := event.ObjectAttributes.TargetProjectID
+
+	mergeRequestAffectedFiles, resp, err := linters.ListMergeRequestsFiles(ctx, s.GitLabClient(), info.org, info.repo, pid, info.num)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != http.StatusOK {
+		log.Errorf("failed to list merge request files, status code: %d", resp.StatusCode)
+		return ErrListFile
+	}
+
+	workspace, workDir, err := s.prepareGitRepos(ctx, info.org, info.repo, info.num)
+	if err != nil {
+		log.Errorf("prepare repo dir failed: %v", err)
+		return ErrPrepareDir
+	}
+	// clean up workspace
+	defer func() {
+		if err := os.RemoveAll(workspace); err != nil {
+			log.Errorf("failed to remove the repository, err: %v", err)
+		}
+	}()
+	info.workDir = workDir
+	info.repoDir = workspace
+
+	gitlabProvider, err := linters.NewGitlabProvider(s.GitLabClient(), s.gitClientFactory, mergeRequestAffectedFiles, *event)
+	if err != nil {
+		log.Errorf("failed to create provider: %v", err)
+		return err
+	}
+
+	info.provider = gitlabProvider
+
+	return s.handleCodeRequestEvent(ctx, info)
+}
+
+type codeRequestInfo struct {
+	platform string
+	num      int
+	org      string
+	repo     string
+	orgRepo  string
+	workDir  string
+	repoDir  string
+	// affectedFiles []string
+	provider linters.Provider
+}
+
+func (s *Server) handleCodeRequestEvent(ctx context.Context, info *codeRequestInfo) error {
+	log := lintersutil.FromContext(ctx)
+
+	prID := fmt.Sprintf("%s-%s-%s-%d", info.platform, info.org, info.repo, info.num)
+	if cancel, exists := prMap[prID]; exists {
+		log.Infof("Cancelling processing for Pull Request : %s\n", prID)
+		cancel()
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	mu.Lock()
+	prMap[prID] = cancel
+	mu.Unlock()
+
+	defer func() {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			mu.Lock()
+			delete(prMap, prID)
+			mu.Unlock()
+		}
+	}()
+
+	for name, fn := range linters.TotalPullRequestHandlers() {
+		linterConfig := s.config.GetLinterConfig(info.org, info.repo, name, config.GitHub)
+
+		// skip if linter is not enabled
+		if linterConfig.Enable != nil && !*linterConfig.Enable {
+			continue
+		}
+
+		// set work dir
+		if linterConfig.WorkDir != "" {
+			linterConfig.WorkDir = info.workDir + "/" + linterConfig.WorkDir
+		} else {
+			linterConfig.WorkDir = info.workDir
+		}
+
+		log.Infof("[%s] config on repo %v: %+v", name, info.orgRepo, linterConfig)
+
+		agent := linters.Agent{
+			LinterConfig: linterConfig,
+			RepoDir:      info.repoDir,
+			ID:           lintersutil.GetEventGUID(ctx),
+			Provider:     info.provider,
+		}
+
+		// skip if linter is not language related
+		if !linters.LinterRelated(linterConfig.Name, agent) {
+			log.Debugf("linter %s is not related, skipping", linterConfig.Name)
+			continue
+		}
+
+		// set runner
+		r := runner.NewLocalRunner()
+		if linterConfig.DockerAsRunner.Image != "" {
+			r = s.getDockerRunner()
+		} else if linterConfig.KubernetesAsRunner.Image != "" {
+			r = s.getKubernetesRunner()
+		}
+		agent.Runner = r
+
+		// set storage
+		agent.Storage = s.storage
+
+		// generate log key
+		agent.GenLogKey = func() string {
+			return fmt.Sprintf("%s/%s/%s", agent.LinterConfig.Name, agent.Provider.GetCodeReviewInfo().Org+"/"+agent.Provider.GetCodeReviewInfo().Repo, agent.ID)
+		}
+		// generate log view url
+		agent.GenLogViewURL = func() string {
+			// if serverAddr is not provided, return empty string
+			if s.serverAddr == "" {
+				return ""
+			}
+			return s.serverAddr + "/view/" + agent.GenLogKey()
+		}
+
+		// set issue references
+		agent.IssueReferences = s.config.GetCompiledIssueReferences(name)
+
+		// run linter finally
+		if err := fn(ctx, agent); err != nil {
+			if errors.Is(err, context.Canceled) {
+				return nil
+			}
+			log.Errorf("failed to run linter: %v", err)
+			continue
+		}
+	}
+
+	return nil
+}
+
+func (s *Server) initCustomLinters() {
 	for linterName, customLinter := range s.config.CustomLinters {
 		linters.RegisterPullRequestHandler(linterName, linters.GeneralLinterHandler)
 		linters.RegisterLinterLanguages(linterName, customLinter.Languages)
@@ -142,15 +415,6 @@ func (s *Server) initKubernetesRunner() {
 	}
 
 	log.Infof("init kubernetes runner success")
-}
-
-// check kubectl installed
-func checkKubectlInstalled() error {
-	cmd := exec.Command("kubectl", "version", "--client")
-	if err := cmd.Run(); err != nil {
-		return err
-	}
-	return nil
 }
 
 func (s *Server) initDockerRunner() {
@@ -230,58 +494,6 @@ func (s *Server) pullImageWithRetry(ctx context.Context, image string, dockerRun
 	}
 }
 
-func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get("X-Gitlab-Event") != "" {
-		s.gitlabRequestHandle(w, r)
-	}
-
-	eventGUID := github.DeliveryID(r)
-	if len(eventGUID) > 12 {
-		// limit the length of eventGUID to 12
-		eventGUID = eventGUID[len(eventGUID)-12:]
-	}
-	ctx := context.WithValue(context.Background(), lintersutil.EventGUIDKey, eventGUID)
-	log := lintersutil.FromContext(ctx)
-
-	payload, err := github.ValidatePayload(r, s.webhookSecret)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	event, err := github.ParseWebHook(github.WebHookType(r), payload)
-	if err != nil {
-		log.Errorf("parse webhook failed: %v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	fmt.Fprint(w, "Event received. Have a nice day.")
-
-	switch event := event.(type) {
-	case *github.PullRequestEvent:
-		go func() {
-			if err := s.processPullRequestEvent(ctx, event); err != nil {
-				log.Errorf("process pull request event: %v", err)
-			}
-		}()
-	case *github.CheckRunEvent:
-		go func() {
-			if err := s.processCheckRunRequestEvent(ctx, event); err != nil {
-				log.Errorf("process check run request event: %v", err)
-			}
-		}()
-	case *github.CheckSuiteEvent:
-		go func() {
-			if err := s.processCheckSuiteEvent(ctx, event); err != nil {
-				log.Errorf("process check run request event: %v", err)
-			}
-		}()
-	default:
-		log.Debugf("skipping event type %s\n", github.WebHookType(r))
-	}
-}
-
 func (s *Server) processPullRequestEvent(ctx context.Context, event *github.PullRequestEvent) error {
 	log := lintersutil.FromContext(ctx)
 	if event.GetAction() != "opened" && event.GetAction() != "reopened" && event.GetAction() != "synchronize" {
@@ -289,7 +501,7 @@ func (s *Server) processPullRequestEvent(ctx context.Context, event *github.Pull
 		return nil
 	}
 
-	return s.handle(ctx, event)
+	return s.handleGitHubEvent(ctx, event)
 }
 
 func (s *Server) processCheckRunRequestEvent(ctx context.Context, event *github.CheckRunEvent) error {
@@ -326,7 +538,7 @@ func (s *Server) processCheckRunRequestEvent(ctx context.Context, event *github.
 			Installation: event.GetInstallation(),
 		}
 
-		if err := s.handle(ctx, event); err != nil {
+		if err := s.handleGitHubEvent(ctx, event); err != nil {
 			log.Errorf("failed to handle pull request event: %v", err)
 			// continue to handle other pull requests
 		}
@@ -364,230 +576,22 @@ func (s *Server) processCheckSuiteEvent(ctx context.Context, event *github.Check
 			PullRequest:  pr,
 			Installation: event.GetInstallation(),
 		}
-		if err := s.handle(ctx, &event); err != nil {
+		if err := s.handleGitHubEvent(ctx, &event); err != nil {
 			log.Errorf("failed to handle pull request event: %v", err)
 			// continue to handle other pull requests
 		}
 	}
 	return nil
 }
-func (s *Server) gitlabRequestHandle(w http.ResponseWriter, r *http.Request) {
-	now := time.Now()
-	eventGUID := strconv.FormatInt(now.Unix(), 12)
-	if len(eventGUID) > 12 {
-		// limit the length of eventGUID to 12
-		eventGUID = eventGUID[len(eventGUID)-12:]
-	}
-	ctx := context.WithValue(context.Background(), lintersutil.EventGUIDKey, eventGUID)
-	log := lintersutil.FromContext(ctx)
 
-	payload, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	log.Infof("%v", string(payload))
-	v := gitlab.HookEventType(r)
-	log.Infof("%v", string(v))
-
-	event, err := gitlab.ParseHook(v, payload)
-	if err != nil {
-		log.Errorf("parse webhook failed: %v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	_, errf := fmt.Fprint(w, "Event received. Have a nice day.")
-	if errf != nil {
-		fmt.Println("Event received Failed.")
-	}
-
-	switch event := event.(type) {
-	case *gitlab.MergeEvent:
-		go func() {
-			log.Info("start process")
-			if err := s.processMergeRequestEvent(ctx, event); err != nil {
-				log.Errorf("process merge request event: %v", err)
-			}
-		}()
-
-	default:
-		log.Debugf("skipping event type %s\n", github.WebHookType(r))
-	}
-}
 func (s *Server) processMergeRequestEvent(ctx context.Context, event *gitlab.MergeEvent) error {
-	log.Infof("stastr evet")
 	log := lintersutil.FromContext(ctx)
 	if event.ObjectAttributes.State != "opened" && event.ObjectAttributes.State != "reopened" {
-		log.Debugf("skipping action %s\n", event.ObjectAttributes.Action)
+		log.Debugf("skipping action %s\n", event.ObjectAttributes.State)
 		return nil
 	}
 
-	return s.gitlabHandle(ctx, event)
-}
-
-func (s *Server) gitlabHandle(ctx context.Context, event *gitlab.MergeEvent) error {
-	var (
-		num          = event.ObjectAttributes.IID
-		org          = event.Project.Namespace
-		repo         = event.Repository.Name
-		orgRepo      = event.Project.PathWithNamespace
-		pid          = event.ObjectAttributes.TargetProjectID
-		latestCommit = event.ObjectAttributes.LastCommit.ID
-	)
-	log := lintersutil.FromContext(ctx)
-
-	prID := fmt.Sprintf("%s-%s-%d", org, repo, num)
-	if cancel, exists := prMap[prID]; exists {
-		log.Infof("Cancelling processing for Pull Request : %s\n", prID)
-		cancel()
-	}
-
-	ctx, cancel := context.WithCancel(ctx)
-	mu.Lock()
-	prMap[prID] = cancel
-	mu.Unlock()
-
-	defer func() {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			mu.Lock()
-			delete(prMap, prID)
-			mu.Unlock()
-		}
-	}()
-
-	log.Infof("processing pull request %d, (%v/%v)\n", num, org, repo)
-
-	mergeRequestAffectedFiles, response, errx := linters.ListMergeRequestsFiles(ctx, s.GitLabClient(), org, repo, pid, num)
-	if errx != nil {
-		log.Errorf("List MergeRequestFiles Error: %v\n", errx)
-		return errx
-	}
-
-	if response.StatusCode != http.StatusOK {
-		log.Errorf("list files failed: %v", response)
-		return errListFile
-	}
-	log.Infof("found %d files affected by pull request %d\n", len(mergeRequestAffectedFiles), num)
-
-	defaultWorkDir, err := prepareRepoDir(org, repo, num)
-	if err != nil {
-		log.Errorf("prepare repo dir failed: %v", err)
-		return errPrepareDir
-	}
-	defer func() {
-		if s.debug {
-			return // do not remove the repository in debug mode
-		}
-		if err := os.RemoveAll(defaultWorkDir); err != nil {
-			log.Errorf("failed to remove the repository , err : %v", err)
-		}
-	}()
-
-	opt := gitv2.ClientFactoryOpts{
-		CacheDirBase: github.String(s.repoCacheDir),
-		Persist:      github.Bool(true),
-		UseSSH:       github.Bool(false),
-		Host:         s.gitLabHost,
-		Username:     func() (string, error) { return "oauth2", nil },
-		Token: func(v string) (string, error) {
-			return s.gitLabAccessToken, nil
-		},
-	}
-	v2, errapp := gitv2.NewClientFactory(opt.Apply)
-	s.gitClientFactory = v2
-
-	r, errclone := s.gitClientFactory.ClientForWithRepoOpts(org, repo, gitv2.RepoOpts{
-		CopyTo: defaultWorkDir + "/" + repo,
-	})
-	if errapp != nil {
-		log.Errorf("failed to create git client: %v", err)
-		return errapp
-	}
-	if errclone != nil {
-		log.Errorf("failed to clone code repo : %v", err)
-		return errclone
-	}
-	if errcheckout := r.Checkout(latestCommit); err != nil {
-		log.Errorf("failed to checkout pull request %d: %v", num, errcheckout)
-		return errcheckout
-	}
-	gitModulesFile := path.Join(r.Directory(), ".gitmodules")
-	_, errpro := os.Stat(gitModulesFile)
-	if errpro == nil {
-		log.Info("git pull submodule in progress")
-		cmd := exec.Command("git", "submodule", "update", "--init", "--recursive")
-		cmd.Dir = r.Directory()
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			log.Errorf("error when git pull submodule, marked and continue, details :%v ", err)
-		}
-		log.Infof("git pull submodule output: %s ", out)
-	} else {
-		log.Infof("no .gitmodules file in repo %s", repo)
-	}
-	for name, fn := range linters.TotalPullRequestHandlers() {
-
-		linterConfig := s.config.GetLinterConfig(org, repo, name, config.GitLab)
-
-		// skip linter if it is disabled
-		if linterConfig.Enable != nil && !*linterConfig.Enable {
-			continue
-		}
-
-		if linterConfig.WorkDir != "" {
-			linterConfig.WorkDir = r.Directory() + "/" + linterConfig.WorkDir
-		} else {
-			linterConfig.WorkDir = r.Directory()
-		}
-
-		log.Infof("[%s] config on repo %v: %+v", name, orgRepo, linterConfig)
-
-		gitlabProvider, err := linters.NewGitlabProvider(s.GitLabClient(), v2, mergeRequestAffectedFiles, *event)
-
-		if err != nil {
-			log.Errorf("failed to create provider: %v", err)
-			return err
-		}
-		agent := linters.Agent{
-			LinterConfig: linterConfig,
-			RepoDir:      r.Directory(),
-			ID:           lintersutil.GetEventGUID(ctx),
-			Provider:     gitlabProvider,
-		}
-
-		if !linters.LinterRelated(name, agent) {
-			log.Infof("[%s] linter is not related to the PR, skipping", name)
-			continue
-		}
-
-		r := runner.NewLocalRunner()
-		if linterConfig.DockerAsRunner.Image != "" {
-			r = s.getDockerRunner()
-		}
-		agent.Runner = r
-		agent.Storage = s.storage
-		agent.GenLogKey = func() string {
-			return fmt.Sprintf("%s/%s/%s", agent.LinterConfig.Name, agent.Provider.GetCodeReviewInfo().Org+"/"+agent.Provider.GetCodeReviewInfo().Repo, agent.ID)
-		}
-		agent.GenLogViewURL = func() string {
-			// if serverAddr is not provided, return empty string
-			if s.serverAddr == "" {
-				return ""
-			}
-			return s.serverAddr + "/view/" + agent.GenLogKey()
-		}
-
-		if err := fn(ctx, agent); err != nil {
-			log.Errorf("failed to run linter: %v", err)
-			// continue to run other linters
-			continue
-		}
-	}
-
-	return nil
+	return s.handleGitLabEvent(ctx, event)
 }
 
 func (s *Server) GitLabClient() *gitlab.Client {
@@ -596,140 +600,6 @@ func (s *Server) GitLabClient() *gitlab.Client {
 		log.Fatalf("Failed to create client: %v", err)
 	}
 	return git
-}
-
-func (s *Server) handle(ctx context.Context, event *github.PullRequestEvent) error {
-	var (
-		num     = event.GetPullRequest().GetNumber()
-		org     = event.GetRepo().GetOwner().GetLogin()
-		repo    = event.GetRepo().GetName()
-		orgRepo = org + "/" + repo
-	)
-	log := lintersutil.FromContext(ctx)
-
-	prID := fmt.Sprintf("%s-%s-%d", org, repo, num)
-	if cancel, exists := prMap[prID]; exists {
-		log.Infof("Cancelling processing for Pull Request : %s\n", prID)
-		cancel()
-	}
-
-	ctx, cancel := context.WithCancel(ctx)
-	mu.Lock()
-	prMap[prID] = cancel
-	mu.Unlock()
-
-	defer func() {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			mu.Lock()
-			delete(prMap, prID)
-			mu.Unlock()
-		}
-	}()
-
-	installationID := event.GetInstallation().GetID()
-	log.Infof("processing pull request %d, (%v/%v), installationID: %d\n", num, org, repo, installationID)
-
-	pullRequestAffectedFiles, response, err := linters.ListPullRequestsFiles(ctx, s.GithubClient(installationID), org, repo, num)
-	if err != nil {
-		return err
-	}
-
-	if response.StatusCode != http.StatusOK {
-		log.Errorf("list files failed: %v", response)
-		return fmt.Errorf("list files failed: %v", response)
-	}
-	log.Infof("found %d files affected by pull request %d\n", len(pullRequestAffectedFiles), num)
-
-	workspace, defaultWorkDir, err := s.prepareGitRepos(ctx, org, repo, num)
-	if err != nil {
-		return err
-	}
-
-	// clean up workspace
-	defer func() {
-		if s.debug {
-			return // do not remove the repository in debug mode
-		}
-		if err := os.RemoveAll(workspace); err != nil {
-			log.Errorf("failed to remove the repository, err: %v", err)
-		}
-	}()
-
-	for name, fn := range linters.TotalPullRequestHandlers() {
-		linterConfig := s.config.GetLinterConfig(org, repo, name, config.GitHub)
-		linterConfig.Number = num
-		linterConfig.Workspace = workspace
-		// skip linter if it is disabled
-		if linterConfig.Enable != nil && !*linterConfig.Enable {
-			continue
-		}
-
-		if linterConfig.WorkDir != "" {
-			linterConfig.WorkDir = defaultWorkDir + "/" + linterConfig.WorkDir
-		} else {
-			linterConfig.WorkDir = defaultWorkDir
-		}
-
-		log.Infof("[%s] config on repo %v: %+v", name, orgRepo, linterConfig)
-
-		agent := linters.Agent{
-			LinterConfig: linterConfig,
-			RepoDir:      defaultWorkDir,
-			ID:           lintersutil.GetEventGUID(ctx),
-		}
-
-		provider, err := linters.NewGithubProvider(s.GithubClient(installationID), s.gitClientFactory, pullRequestAffectedFiles, *event)
-		if err != nil {
-			log.Errorf("failed to create provider: %v", err)
-			return err
-		}
-		agent.Provider = provider
-
-		if !linters.LinterRelated(name, agent) {
-			log.Infof("[%s] linter is not related to the PR, skipping", name)
-			continue
-		}
-
-		var r runner.Runner
-		switch {
-		case linterConfig.DockerAsRunner.Image != "":
-			r = s.getDockerRunner()
-		case linterConfig.KubernetesAsRunner.Image != "":
-			r = s.getKubernetesRunner()
-		default:
-			r = runner.NewLocalRunner()
-		}
-		agent.Runner = r
-		agent.Storage = s.storage
-		agent.GenLogKey = func() string {
-			return fmt.Sprintf("%s/%s/%s", agent.LinterConfig.Name, agent.Provider.GetCodeReviewInfo().Org+"/"+agent.Provider.GetCodeReviewInfo().Repo, agent.ID)
-		}
-		agent.GenLogViewURL = func() string {
-			// if serverAddr is not provided, return empty string
-			if s.serverAddr == "" {
-				return ""
-			}
-			return s.serverAddr + "/view/" + agent.GenLogKey()
-		}
-
-		agent.IssueReferences = s.config.GetCompiledIssueReferences(name)
-
-		if err := fn(ctx, agent); err != nil {
-			if errors.Is(err, context.Canceled) {
-				log.Infof("linter %s is canceled", name)
-				// no need to continue
-				return nil
-			}
-			log.Errorf("failed to run linter: %v", err)
-			// continue to run other linters
-			continue
-		}
-	}
-
-	return nil
 }
 
 func (s *Server) githubAppClient(installationID int64) *github.Client {
@@ -746,7 +616,7 @@ func (s *Server) githubAccessTokenClient() *github.Client {
 	return gc
 }
 
-// GithubClient returns a github client
+// GithubClient returns a github client.
 func (s *Server) GithubClient(installationID int64) *github.Client {
 	if s.gitHubAccessToken != "" {
 		return s.githubAccessTokenClient()
@@ -792,12 +662,8 @@ func (s *Server) prepareGitRepos(ctx context.Context, org, repo string, num int)
 		opt := gitv2.ClientFactoryOpts{
 			CacheDirBase: github.String(s.repoCacheDir),
 			Persist:      github.Bool(true),
-			UseSSH:       github.Bool(false),
-			Host:         s.gitLabHost,
-			Username:     func() (string, error) { return "oauth2", nil },
-			Token: func(v string) (string, error) {
-				return s.gitLabAccessToken, nil
-			},
+			UseSSH:       github.Bool(true),
+			Host:         ref.Host,
 		}
 		gitClient, err := gitv2.NewClientFactory(opt.Apply)
 		if err != nil {
@@ -892,4 +758,10 @@ func (s *Server) fixRefs(workspace string, org, repo string) ([]config.Refs, str
 	}
 
 	return refs, workDir
+}
+
+// check kubectl installed.
+func checkKubectlInstalled() error {
+	cmd := exec.Command("kubectl", "version", "--client")
+	return cmd.Run()
 }
