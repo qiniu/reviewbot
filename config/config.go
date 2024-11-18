@@ -33,11 +33,17 @@ type Config struct {
 	// compiledIssueReferences is the compiled issue references config.
 	compiledIssueReferences map[string][]CompiledIssueReference
 
-	CustomLinters map[string]CustomLinters `json:"customLinters,omitempty"`
+	// CustomLinters is the custom linters config.
+	// key is the linter name.
+	// value is the custom linter config.
+	// the custom linter config will be used as the default config for the linter.
+	// it can be overridden by CustomRepos linter config for the specific repo.
+	CustomLinters map[string]CustomLinter `json:"customLinters,omitempty"`
 }
 
-type CustomLinters struct {
+type CustomLinter struct {
 	Linter
+	// Languages is the languages of the linter.
 	Languages []string `json:"languages,omitempty"`
 }
 
@@ -200,6 +206,7 @@ var (
 	ErrEmptyRepoOrOrg                    = errors.New("empty repo or org")
 	ErrIssueReferenceMustInReviewbotRepo = errors.New("issue reference must in reviewbot repo")
 	ErrInvalidIssueNumber                = errors.New("invalid issue number")
+	ErrCustomLinterConfig                = errors.New("custom linter must specify at least one language")
 )
 
 // NewConfig returns a new Config.
@@ -215,7 +222,9 @@ func NewConfig(conf string) (Config, error) {
 	}
 
 	// ============ validate and update the config ============
-
+	if err := c.validateCustomLinters(); err != nil {
+		return c, err
+	}
 	if err := c.parseCloneURLs(); err != nil {
 		return c, err
 	}
@@ -262,7 +271,7 @@ func NewConfig(conf string) (Config, error) {
 	return c, nil
 }
 
-func (c Config) GetLinterConfig(org, repo, ln string, repotype RepoType) Linter {
+func (c Config) GetLinterConfig(org, repo, ln string, repoType RepoType) Linter {
 	linter := Linter{
 		Enable:   boolPtr(true),
 		Modifier: NewBaseModifier(),
@@ -270,10 +279,10 @@ func (c Config) GetLinterConfig(org, repo, ln string, repotype RepoType) Linter 
 		Org:      org,
 		Repo:     repo,
 	}
-	if repotype == GitLab {
+	if repoType == GitLab {
 		linter.ReportType = c.GlobalDefaultConfig.GithubReportType
 	}
-	if repotype == GitHub {
+	if repoType == GitHub {
 		linter.ReportType = c.GlobalDefaultConfig.GithubReportType
 	}
 
@@ -390,7 +399,7 @@ func applyCustomConfig(legacy Linter, custom Linter) Linter {
 	return legacy
 }
 
-func applyCustomLintersConfig(legacy Linter, custom CustomLinters) Linter {
+func applyCustomLintersConfig(legacy Linter, custom CustomLinter) Linter {
 	// Convert CustomizedExtraLinter to Linter for reuse
 	tempLinter := Linter{
 		Command:            custom.Command,
@@ -552,5 +561,15 @@ func (c *Config) parseAndUpdateCloneURL(re *regexp.Regexp, orgRepo string, k int
 	ref.Org = matches[2]
 	ref.Repo = matches[3]
 
+	return nil
+}
+
+func (c Config) validateCustomLinters() error {
+	for name, linter := range c.CustomLinters {
+		if len(linter.Languages) == 0 {
+			log.Errorf("custom linter %s must specify at least one language", name)
+			return ErrCustomLinterConfig
+		}
+	}
 	return nil
 }
