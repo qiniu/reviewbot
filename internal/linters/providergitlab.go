@@ -254,23 +254,22 @@ func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[st
 		}
 		log.Infof("%s found %d existed comments for this PR %d (%s) \n", linterFlag, len(existedCommentsToKeep), num, orgRepo)
 		toDeletes := existedCommentsToKeep
-		// delete comments that are  related to the linter
+		// delete comments that are related to the linter
 		if err := DeleteMergeReviewCommentsForGitLab(ctx, g.GitLabClient, org, repo, toDeletes, pid, num); err != nil {
 			log.Errorf("failed to delete comments: %v", err)
 			return err
 		}
 		log.Infof("%s delete %d comments for this PR %d (%s) \n", linterFlag, len(toDeletes), num, orgRepo)
-		h, e := MergeRequestSHA(g.GitLabClient, pid, num)
-
-		if e != nil {
-			log.Errorf("failed to delete comments: %v", e)
-			return e
+		h, err := MergeRequestSHA(g.GitLabClient, pid, num)
+		if err != nil {
+			log.Errorf("failed to get merge request sha: %v", err)
+			return err
 		}
 		// create  MR  comments form linter result
 		logURL := a.GenLogViewURL()
-		commerr := CreateGitLabCommentsReport(ctx, g.GitLabClient, lintResults, linterName, pid, num, logURL)
-		if commerr != nil {
-			log.Errorf("failed to delete comments: %v", commerr)
+		cmtErr := CreateGitLabCommentsReport(ctx, g.GitLabClient, lintResults, linterName, pid, num, logURL)
+		if cmtErr != nil {
+			log.Errorf("failed to post comments: %v", cmtErr)
 		}
 		// list discussions
 		dlist, err := ListMergeRequestDiscussions(ctx, g.GitLabClient, num, pid)
@@ -278,13 +277,13 @@ func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[st
 			log.Errorf("failed to list comments: %v", err)
 			return err
 		}
-		// delete discussion  that are related the linter
+		// delete discussion that are related the linter
 		errd := DeleteMergeRequestDiscussions(ctx, g.GitLabClient, num, pid, dlist, linterFlag)
 		if errd != nil {
 			log.Errorf("failed to delete discussion: %v", err)
 			return errd
 		}
-		// construct  discussion  from lint result
+		// construct discussion from lint result
 		discussion := constructMergeRequestDiscussion(lintResults, linterFlag, g.MergeRequestEvent.ObjectAttributes.LastCommit.ID, h.HeadSha, h.BaseSha, h.StartSha)
 		if len(discussion) == 0 {
 			return nil
@@ -321,9 +320,9 @@ func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[st
 		}
 		log.Infof("%s delete %d comments for this PR %d (%s) \n", linterFlag, len(existedCommentsToKeep), num, orgRepo)
 		logURL := a.GenLogViewURL()
-		commerr := CreateGitLabCommentsReport(ctx, g.GitLabClient, lintResults, linterName, pid, num, logURL)
-		if commerr != nil {
-			log.Errorf("failed to post comments: %v", commerr)
+		cmtErr := CreateGitLabCommentsReport(ctx, g.GitLabClient, lintResults, linterName, pid, num, logURL)
+		if cmtErr != nil {
+			log.Errorf("failed to post comments: %v", cmtErr)
 		}
 		metric.NotifyWebhookByText(ConstructGotchaMsg(linterName, g.MergeRequestEvent.Project.WebURL, "", lintResults))
 	case config.Quiet:
