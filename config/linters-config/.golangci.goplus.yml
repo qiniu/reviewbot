@@ -89,4 +89,5 @@ linters:
     - tagliatelle # see too many false positives
     - intrange # see too many false positives
     - gosmopolitan # see too many false positives
+    - canonicalheader # see https://github.com/qiniu/reviewbot/issues/457
 
