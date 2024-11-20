@@ -31,10 +31,11 @@ import (
 )
 
 var (
-	address = flag.String("address", "http://localhost:8888/hook", "Where to send the fake hook.")
-	hmacS   = flag.String("hmac", "abcde12345", "HMAC token to sign payload with.")
-	event   = flag.String("event", "ping", "Type of event to send, such as pull_request.")
-	payload = flag.String("payload", "", "File to send as payload. If unspecified, sends \"{}\".")
+	address  = flag.String("address", "http://localhost:8888/hook", "Where to send the fake hook.")
+	hmacS    = flag.String("hmac", "abcde12345", "HMAC token to sign payload with.")
+	event    = flag.String("event", "ping", "Type of event to send, such as pull_request.")
+	payload  = flag.String("payload", "", "File to send as payload. If unspecified, sends \"{}\".")
+	platform = flag.String("platform", "github", "Type of webhook to send: github or gitlab")
 )
 
 func main() {
@@ -51,7 +52,7 @@ func main() {
 		body = d
 	}
 
-	if err := SendHook(*address, *event, body, []byte(*hmacS)); err != nil {
+	if err := SendHook(*address, *event, body, []byte(*hmacS), *platform); err != nil {
 		log.Errorf("Error sending hook. err: %v", err)
 	} else {
 		log.Info("Hook sent.")
@@ -59,14 +60,23 @@ func main() {
 }
 
 // SendHook sends a GitHub event of type eventType to the provided address.
-func SendHook(address, eventType string, payload, hmac []byte) error {
+func SendHook(address, eventType string, payload, hmac []byte, platform string) error {
 	req, err := http.NewRequest(http.MethodPost, address, bytes.NewBuffer(payload))
 	if err != nil {
 		return err
 	}
-	req.Header.Set("X-GitHub-Event", eventType)
-	req.Header.Set("X-GitHub-Delivery", "GUID")
-	req.Header.Set("X-Hub-Signature", PayloadSignature(payload, hmac))
+	switch platform {
+	case "github":
+		req.Header.Set("X-GitHub-Event", eventType)
+		req.Header.Set("X-GitHub-Delivery", "GUID")
+		req.Header.Set("X-Hub-Signature", PayloadSignature(payload, hmac))
+	case "gitlab":
+		req.Header.Set("X-Gitlab-Event", eventType)
+		req.Header.Set("X-Gitlab-Delivery", "GUID")
+		req.Header.Set("X-Gitlab-Token", string(hmac))
+	default:
+		return fmt.Errorf("unknown platform: %s", platform)
+	}
 	req.Header.Set("content-type", "application/json")
 
 	c := &http.Client{}

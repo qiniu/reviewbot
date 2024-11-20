@@ -51,21 +51,23 @@ import (
 )
 
 type options struct {
-	port              int
-	dryRun            bool
-	debug             bool
-	logLevel          int
-	gitHubAccessToken string
+	port          int
+	dryRun        bool
+	debug         bool
+	logLevel      int
+	webhookSecret string
+	codeCacheDir  string
+	config        string
+
+	// support gitlab
 	gitLabAccessToken string
 	gitLabHost        string
-	webhookSecret     string
-	codeCacheDir      string
-	config            string
 
-	// support github app
-	appID          int64
-	installationID int64
-	appPrivateKey  string
+	// support github
+	gitHubAccessToken       string
+	gitHubAppID             int64
+	gitHubAppInstallationID int64
+	gitHubAppPrivateKey     string
 
 	// log storage dir for local storage
 	logDir string
@@ -79,18 +81,15 @@ type options struct {
 }
 
 var (
-	errGitlabAccessTokenNotSet = errors.New("either access-token or github app information should be provided")
-	errAppNotSet               = errors.New("app-private-key is required when using github app")
-	errWebHookNotSet           = errors.New("webhook-secret is required")
+	errAppNotSet     = errors.New("app-private-key is required when using github app")
+	errWebHookNotSet = errors.New("webhook-secret is required")
 )
 
 func (o options) Validate() error {
-	if o.gitHubAccessToken == "" && o.appID == 0 {
-		return errGitlabAccessTokenNotSet
-	}
-	if o.appID != 0 && o.appPrivateKey == "" {
+	if o.gitHubAppID != 0 && o.gitHubAppPrivateKey == "" {
 		return errAppNotSet
 	}
+
 	if o.webhookSecret == "" {
 		return errWebHookNotSet
 	}
@@ -104,19 +103,23 @@ func gatherOptions() options {
 	fs.BoolVar(&o.dryRun, "dry-run", false, "dry run")
 	fs.BoolVar(&o.debug, "debug", false, "debug mode")
 	fs.IntVar(&o.logLevel, "log-level", 0, "log level")
-	fs.StringVar(&o.gitHubAccessToken, "github-access-token", "", "personal github access token")
-	fs.StringVar(&o.gitLabAccessToken, "gitlab-access-token", "", "personal gitlab access token")
-	fs.StringVar(&o.gitLabHost, "gitlab-host", "", "gitlab server")
 	fs.StringVar(&o.webhookSecret, "webhook-secret", "", "webhook secret file")
 	fs.StringVar(&o.codeCacheDir, "code-cache-dir", "/tmp", "code cache dir")
 	fs.StringVar(&o.config, "config", "", "config file")
-	fs.Int64Var(&o.appID, "app-id", 0, "github app id")
-	fs.Int64Var(&o.installationID, "app-installation-id", 0, "github app installation id")
-	fs.StringVar(&o.appPrivateKey, "app-private-key", "", "github app private key")
 	fs.StringVar(&o.logDir, "log-dir", "/tmp", "log storage dir for local storage")
 	fs.StringVar(&o.serverAddr, "server-addr", "", "server addr which is used to generate the log view url")
 	fs.StringVar(&o.S3CredentialsFile, "s3-credentials-file", "", "File where s3 credentials are stored. For the exact format see http://xxxx/doc")
 	fs.StringVar(&o.kubeConfig, "kube-config", "", "kube config file")
+
+	// github related
+	fs.StringVar(&o.gitHubAccessToken, "github.access-token", "", "personal github access token")
+	fs.Int64Var(&o.gitHubAppID, "github.app-id", 0, "github app id")
+	fs.Int64Var(&o.gitHubAppInstallationID, "github.app-installation-id", 0, "github app installation id")
+	fs.StringVar(&o.gitHubAppPrivateKey, "github.app-private-key", "", "github app private key")
+
+	// gitlab related
+	fs.StringVar(&o.gitLabAccessToken, "gitlab.access-token", "", "personal gitlab access token")
+	fs.StringVar(&o.gitLabHost, "gitlab.host", "gitlab.com", "gitlab server")
 
 	err := fs.Parse(os.Args[1:])
 	if err != nil {
@@ -236,8 +239,8 @@ func main() {
 		config:            cfg,
 		gitHubAccessToken: o.gitHubAccessToken,
 		gitLabAccessToken: o.gitLabAccessToken,
-		appID:             o.appID,
-		appPrivateKey:     o.appPrivateKey,
+		appID:             o.gitHubAppID,
+		appPrivateKey:     o.gitHubAppPrivateKey,
 		debug:             o.debug,
 		serverAddr:        o.serverAddr,
 		repoCacheDir:      o.codeCacheDir,
