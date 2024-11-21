@@ -166,3 +166,15 @@ customLinters:
     kubernetesAsRunner:
       namespace: "reviewbot"
       image: "aslan-spock-register.qiniu.io/reviewbot/base:go1.22.3-pylint3.3.1"
+  p3cpmd:
+    languages: [ ".java" ]
+    command:
+      - "/bin/sh"
+      - "-c"
+      - "--"
+    args:
+      - |
+        java -cp /source/p3c/p3c-pmd/target/p3c-pmd-2.1.1-jar-with-dependencies.jar net.sourceforge.pmd.PMD -f emacs -R rulesets/java/ali-comment.xml,rulesets/java/ali-concurrent.xml,rulesets/java/ali-constant.xml,rulesets/java/ali-exception.xml,rulesets/java/ali-flowcontrol.xml,rulesets/java/ali-naming.xml,rulesets/java/ali-oop.xml,rulesets/java/ali-orm.xml,rulesets/java/ali-other.xml,rulesets/java/ali-set.xml -d ./
+    kubernetesAsRunner:
+      namespace: "reviewbot"
+      image: "aslan-spock-register.qiniu.io/reviewbot/base:go1.22.3-java11-p3cpmd2.1.1"
