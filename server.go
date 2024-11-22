@@ -26,10 +26,10 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -71,13 +71,17 @@ type Server struct {
 	repoCacheDir        string
 
 	// support gitlab
-	gitLabHost        string
-	gitLabAccessToken string
+	gitLabHost                string
+	gitLabPersonalAccessToken string
 
 	// support github app model
-	appID             int64
+	// gitHubAppID         int64
+	// gitHubAppPrivateKey string
+	gitHubAppAuth     *GitHubAppAuth
 	gitHubAccessToken string
-	appPrivateKey     string
+
+	// token cache
+	githubAppTokenCache *githubAppTokenCache
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -178,7 +182,7 @@ func (s *Server) serveGitLab(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleGitHubEvent(ctx context.Context, event *github.PullRequestEvent) error {
 	info := &codeRequestInfo{
-		platform: "github",
+		platform: config.GitHub,
 		num:      event.GetPullRequest().GetNumber(),
 		org:      event.GetRepo().GetOwner().GetLogin(),
 		repo:     event.GetRepo().GetName(),
@@ -194,15 +198,14 @@ func (s *Server) handleGitHubEvent(ctx context.Context, event *github.PullReques
 		log.Errorf("failed to list pull request files, status code: %d", resp.StatusCode)
 		return ErrListFile
 	}
-
-	workspace, workDir, err := s.prepareGitRepos(ctx, info.org, info.repo, info.num)
+	workspace, workDir, err := s.prepareGitRepos(ctx, info.org, info.repo, info.num, config.GitHub, installationID)
 	if err != nil {
 		return err
 	}
 	info.workDir = workDir
 	info.repoDir = workspace
 
-	provider, err := linters.NewGithubProvider(s.GithubClient(installationID), s.gitClientFactory, files, *event)
+	provider, err := linters.NewGithubProvider(s.GithubClient(installationID), files, *event)
 	if err != nil {
 		return err
 	}
@@ -213,7 +216,7 @@ func (s *Server) handleGitHubEvent(ctx context.Context, event *github.PullReques
 
 func (s *Server) handleGitLabEvent(ctx context.Context, event *gitlab.MergeEvent) error {
 	info := &codeRequestInfo{
-		platform: "gitlab",
+		platform: config.GitLab,
 		num:      event.ObjectAttributes.IID,
 		org:      event.Project.Namespace,
 		repo:     event.Project.Name,
@@ -224,6 +227,7 @@ func (s *Server) handleGitLabEvent(ctx context.Context, event *gitlab.MergeEvent
 
 	mergeRequestAffectedFiles, resp, err := linters.ListMergeRequestsFiles(ctx, s.GitLabClient(), info.org, info.repo, pid, info.num)
 	if err != nil {
+		log.Errorf("failed to list merge request files: %v", err)
 		return err
 	}
 	if resp.StatusCode != http.StatusOK {
@@ -231,21 +235,15 @@ func (s *Server) handleGitLabEvent(ctx context.Context, event *gitlab.MergeEvent
 		return ErrListFile
 	}
 
-	workspace, workDir, err := s.prepareGitRepos(ctx, info.org, info.repo, info.num)
+	workspace, workDir, err := s.prepareGitRepos(ctx, info.org, info.repo, info.num, config.GitLab, 0)
 	if err != nil {
 		log.Errorf("prepare repo dir failed: %v", err)
 		return ErrPrepareDir
 	}
-	// clean up workspace
-	defer func() {
-		if err := os.RemoveAll(workspace); err != nil {
-			log.Errorf("failed to remove the repository, err: %v", err)
-		}
-	}()
 	info.workDir = workDir
 	info.repoDir = workspace
 
-	gitlabProvider, err := linters.NewGitlabProvider(s.GitLabClient(), s.gitClientFactory, mergeRequestAffectedFiles, *event)
+	gitlabProvider, err := linters.NewGitlabProvider(s.GitLabClient(), mergeRequestAffectedFiles, *event)
 	if err != nil {
 		log.Errorf("failed to create provider: %v", err)
 		return err
@@ -257,7 +255,7 @@ func (s *Server) handleGitLabEvent(ctx context.Context, event *gitlab.MergeEvent
 }
 
 type codeRequestInfo struct {
-	platform string
+	platform config.Platform
 	num      int
 	org      string
 	repo     string
@@ -595,7 +593,12 @@ func (s *Server) processMergeRequestEvent(ctx context.Context, event *gitlab.Mer
 }
 
 func (s *Server) GitLabClient() *gitlab.Client {
-	git, err := gitlab.NewClient(s.gitLabAccessToken, gitlab.WithBaseURL("https://"+s.gitLabHost+"/"))
+	host := s.gitLabHost
+	if !strings.HasPrefix(host, "http") {
+		// default to https if not specified
+		host = "https://" + host
+	}
+	git, err := gitlab.NewClient(s.gitLabPersonalAccessToken, gitlab.WithBaseURL(host))
 	if err != nil {
 		log.Fatalf("Failed to create client: %v", err)
 	}
@@ -603,7 +606,7 @@ func (s *Server) GitLabClient() *gitlab.Client {
 }
 
 func (s *Server) githubAppClient(installationID int64) *github.Client {
-	tr, err := ghinstallation.NewKeyFromFile(httpcache.NewMemoryCacheTransport(), s.appID, installationID, s.appPrivateKey)
+	tr, err := ghinstallation.NewKeyFromFile(httpcache.NewMemoryCacheTransport(), s.gitHubAppAuth.AppID, installationID, s.gitHubAppAuth.PrivateKeyPath)
 	if err != nil {
 		log.Fatalf("failed to create github app transport: %v", err)
 	}
@@ -646,118 +649,6 @@ func prepareRepoDir(org, repo string, num int) (string, error) {
 	}
 
 	return dir, nil
-}
-
-func (s *Server) prepareGitRepos(ctx context.Context, org, repo string, num int) (workspace string, workDir string, err error) {
-	log := lintersutil.FromContext(ctx)
-	workspace, err = prepareRepoDir(org, repo, num)
-	if err != nil {
-		log.Errorf("failed to prepare workspace: %v", err)
-		return "", "", err
-	}
-
-	refs, workDir := s.fixRefs(workspace, org, repo)
-	log.Debugf("refs: %+v", refs)
-	for _, ref := range refs {
-		opt := gitv2.ClientFactoryOpts{
-			CacheDirBase: github.String(s.repoCacheDir),
-			Persist:      github.Bool(true),
-			UseSSH:       github.Bool(true),
-			Host:         ref.Host,
-		}
-		gitClient, err := gitv2.NewClientFactory(opt.Apply)
-		if err != nil {
-			log.Errorf("failed to create git client factory: %v", err)
-			return "", "", err
-		}
-
-		r, err := gitClient.ClientForWithRepoOpts(ref.Org, ref.Repo, gitv2.RepoOpts{
-			CopyTo: ref.PathAlias,
-		})
-		if err != nil {
-			log.Errorf("failed to clone for %s/%s: %v", ref.Org, ref.Repo, err)
-			return "", "", err
-		}
-
-		// main repo, need to checkout PR and update submodules if any
-		if ref.Org == org && ref.Repo == repo {
-			if err := r.CheckoutPullRequest(num); err != nil {
-				log.Errorf("failed to checkout pull request %d: %v", num, err)
-				return "", "", err
-			}
-
-			// update submodules if any
-			if err := updateSubmodules(ctx, r.Directory(), repo); err != nil {
-				log.Errorf("error updating submodules: %v", err)
-				// continue to run other linters
-			}
-		}
-	}
-
-	return workspace, workDir, nil
-}
-
-func updateSubmodules(ctx context.Context, repoDir, repo string) error {
-	log := lintersutil.FromContext(ctx)
-	gitModulesFile := path.Join(repoDir, ".gitmodules")
-	if _, err := os.Stat(gitModulesFile); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			log.Infof("no .gitmodules file in repo %s", repo)
-			return nil
-		}
-		return err
-	}
-
-	log.Info("git pull submodule in progress")
-	cmd := exec.Command("git", "submodule", "update", "--init", "--recursive")
-	cmd.Dir = repoDir
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		log.Errorf("error when git pull submodule: %v, output: %s", err, out)
-		return err
-	}
-
-	log.Infof("git pull submodule output: %s", out)
-	return nil
-}
-
-func (s *Server) fixRefs(workspace string, org, repo string) ([]config.Refs, string) {
-	var repoCfg config.RepoConfig
-	if v, ok := s.config.CustomRepos[org]; ok {
-		repoCfg = v
-	}
-	if v, ok := s.config.CustomRepos[org+"/"+repo]; ok {
-		repoCfg = v
-	}
-
-	var mainRepoFound bool
-	var workDir string
-	refs := make([]config.Refs, 0, len(repoCfg.Refs))
-	for _, ref := range repoCfg.Refs {
-		if ref.PathAlias != "" {
-			ref.PathAlias = filepath.Join(workspace, ref.PathAlias)
-		} else {
-			ref.PathAlias = filepath.Join(workspace, ref.Repo)
-		}
-		refs = append(refs, ref)
-
-		if ref.Repo == repo && ref.Org == org {
-			mainRepoFound = true
-			workDir = ref.PathAlias
-		}
-	}
-
-	if !mainRepoFound {
-		// always add the main repo to the list
-		workDir = filepath.Join(workspace, repo)
-		refs = append(refs, config.Refs{
-			Org:       org,
-			Repo:      repo,
-			PathAlias: workDir,
-		})
-	}
-
-	return refs, workDir
 }
 
 // check kubectl installed.

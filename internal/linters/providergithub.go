@@ -29,7 +29,6 @@ import (
 	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/reviewbot/internal/metric"
 	"github.com/qiniu/x/log"
-	gitv2 "sigs.k8s.io/prow/pkg/git/v2"
 )
 
 var (
@@ -225,9 +224,6 @@ var _ Provider = (*GithubProvider)(nil)
 type GithubProvider struct {
 	// GitHubClient is the GitHub client.
 	GithubClient *github.Client
-	// GitClient is the Git client factory.
-	GitClient gitv2.ClientFactory
-
 	// HunkChecker is the hunk checker for the file.
 	HunkChecker *FileHunkChecker
 
@@ -237,14 +233,13 @@ type GithubProvider struct {
 	PullRequestEvent github.PullRequestEvent
 }
 
-func NewGithubProvider(githubClient *github.Client, gitClient gitv2.ClientFactory, pullRequestChangedFiles []*github.CommitFile, pullRequestEvent github.PullRequestEvent) (*GithubProvider, error) {
+func NewGithubProvider(githubClient *github.Client, pullRequestChangedFiles []*github.CommitFile, pullRequestEvent github.PullRequestEvent) (*GithubProvider, error) {
 	checker, err := newGithubHunkChecker(pullRequestChangedFiles)
 	if err != nil {
 		return nil, err
 	}
 	return &GithubProvider{
 		GithubClient:            githubClient,
-		GitClient:               gitClient,
 		PullRequestChangedFiles: pullRequestChangedFiles,
 		PullRequestEvent:        pullRequestEvent,
 		HunkChecker:             checker,

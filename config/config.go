@@ -266,12 +266,11 @@ func NewConfig(conf string) (Config, error) {
 	}
 
 	// TODO(CarlJi): do we need to check the format of the copy ssh key here?
-	log.Debugf("config %+v", c)
 
 	return c, nil
 }
 
-func (c Config) GetLinterConfig(org, repo, ln string, repoType RepoType) Linter {
+func (c Config) GetLinterConfig(org, repo, ln string, repoType Platform) Linter {
 	linter := Linter{
 		Enable:   boolPtr(true),
 		Modifier: NewBaseModifier(),
@@ -434,11 +433,11 @@ const (
 	Quiet ReportType = "quiet"
 )
 
-type RepoType string
+type Platform string
 
 const (
-	GitLab RepoType = "gitlab"
-	GitHub RepoType = "github"
+	GitLab Platform = "GitLab"
+	GitHub Platform = "GitHub"
 )
 
 func boolPtr(b bool) *bool {

@@ -31,7 +31,6 @@ import (
 	"github.com/qiniu/x/errors"
 	"github.com/qiniu/x/log"
 	gitlab "github.com/xanzy/go-gitlab"
-	gitv2 "sigs.k8s.io/prow/pkg/git/v2"
 )
 
 var (
@@ -96,8 +95,6 @@ var _ Provider = (*GitlabProvider)(nil)
 type GitlabProvider struct {
 	// GitHubClient is the GitHub client.
 	GitLabClient *gitlab.Client
-	// GitClient is the Git client factory.
-	GitClient gitv2.ClientFactory
 
 	// HunkChecker is the hunk checker for the file.
 	HunkChecker *FileHunkChecker
@@ -177,7 +174,7 @@ func (g *GitlabProvider) GetCodeReviewInfo() CodeReview {
 	}
 }
 
-func NewGitlabProvider(gitlabClient *gitlab.Client, gitClient gitv2.ClientFactory, mergeRequestChangedFiles []*gitlab.MergeRequestDiff, mergeRequestEvent gitlab.MergeEvent) (*GitlabProvider, error) {
+func NewGitlabProvider(gitlabClient *gitlab.Client, mergeRequestChangedFiles []*gitlab.MergeRequestDiff, mergeRequestEvent gitlab.MergeEvent) (*GitlabProvider, error) {
 	checker, err := newGitlabHunkChecker(mergeRequestChangedFiles)
 	if err != nil {
 		log.Fatalf("Failed to create client: %v", err)
@@ -187,7 +184,6 @@ func NewGitlabProvider(gitlabClient *gitlab.Client, gitClient gitv2.ClientFactor
 	}
 	return &GitlabProvider{
 		GitLabClient:             gitlabClient,
-		GitClient:                gitClient,
 		MergeRequestChangedFiles: mergeRequestChangedFiles,
 		MergeRequestEvent:        mergeRequestEvent,
 		HunkChecker:              checker,
