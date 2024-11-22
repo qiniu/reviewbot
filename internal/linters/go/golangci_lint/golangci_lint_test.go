@@ -415,7 +415,7 @@ func TestFindGoModsPaths(t *testing.T) {
 					defer file.Close()
 				}
 			}
-			p, err := linters.NewGithubProvider(nil, nil, tc.changedFiles, github.PullRequestEvent{})
+			p, err := linters.NewGithubProvider(nil, tc.changedFiles, github.PullRequestEvent{})
 			if err != nil {
 				t.Errorf("Error creating github provider: %v", err)
 			}

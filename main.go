@@ -60,8 +60,8 @@ type options struct {
 	config        string
 
 	// support gitlab
-	gitLabAccessToken string
-	gitLabHost        string
+	gitLabPersonalAccessToken string
+	gitLabHost                string
 
 	// support github
 	gitHubAccessToken       string
@@ -116,10 +116,9 @@ func gatherOptions() options {
 	fs.Int64Var(&o.gitHubAppID, "github.app-id", 0, "github app id")
 	fs.Int64Var(&o.gitHubAppInstallationID, "github.app-installation-id", 0, "github app installation id")
 	fs.StringVar(&o.gitHubAppPrivateKey, "github.app-private-key", "", "github app private key")
-
 	// gitlab related
-	fs.StringVar(&o.gitLabAccessToken, "gitlab.access-token", "", "personal gitlab access token")
-	fs.StringVar(&o.gitLabHost, "gitlab.host", "gitlab.com", "gitlab server")
+	fs.StringVar(&o.gitLabPersonalAccessToken, "gitlab.personal-access-token", "", "personal gitlab access token")
+	fs.StringVar(&o.gitLabHost, "gitlab.host", "", "gitlab server")
 
 	err := fs.Parse(os.Args[1:])
 	if err != nil {
@@ -234,18 +233,27 @@ func main() {
 	}
 
 	s := &Server{
-		webhookSecret:     []byte(o.webhookSecret),
-		gitClientFactory:  v2,
-		config:            cfg,
-		gitHubAccessToken: o.gitHubAccessToken,
-		gitLabAccessToken: o.gitLabAccessToken,
-		appID:             o.gitHubAppID,
-		appPrivateKey:     o.gitHubAppPrivateKey,
-		debug:             o.debug,
-		serverAddr:        o.serverAddr,
-		repoCacheDir:      o.codeCacheDir,
-		kubeConfig:        o.kubeConfig,
-		gitLabHost:        o.gitLabHost,
+		webhookSecret:             []byte(o.webhookSecret),
+		gitClientFactory:          v2,
+		config:                    cfg,
+		debug:                     o.debug,
+		serverAddr:                o.serverAddr,
+		repoCacheDir:              o.codeCacheDir,
+		kubeConfig:                o.kubeConfig,
+		gitLabHost:                o.gitLabHost,
+		gitLabPersonalAccessToken: o.gitLabPersonalAccessToken,
+		gitHubAccessToken:         o.gitHubAccessToken,
+	}
+
+	// github app
+	if o.gitHubAppID != 0 {
+		s.gitHubAppAuth = &GitHubAppAuth{
+			AppID:          o.gitHubAppID,
+			InstallationID: o.gitHubAppInstallationID,
+			PrivateKeyPath: o.gitHubAppPrivateKey,
+		}
+
+		s.githubAppTokenCache = newGitHubAppTokenCache(s.gitHubAppAuth.AppID, s.gitHubAppAuth.PrivateKeyPath)
 	}
 
 	go s.initDockerRunner()
