@@ -288,6 +288,9 @@ func (s *Server) handleCodeRequestEvent(ctx context.Context, info *codeRequestIn
 			linterConfig.WorkDir = info.workDir
 		}
 
+		// set workspace
+		linterConfig.Workspace = info.repoDir
+
 		log.Infof("[%s] config on repo %v: %+v", name, info.orgRepo, linterConfig)
 
 		agent := linters.Agent{
@@ -440,23 +443,26 @@ func (s *Server) initDockerRunner() {
 
 	var dockerRunner runner.Runner
 	if len(images) > 0 {
-		dockerRunner, err := runner.NewDockerRunner(nil)
+		dr, err := runner.NewDockerRunner(nil)
 		if err != nil {
 			log.Fatalf("failed to init docker runner: %v", err)
 		}
 
 		s.getDockerRunner = func() runner.Runner {
-			return dockerRunner.Clone()
+			return dr.Clone()
 		}
+		dockerRunner = dr
 	}
 
 	if dockerRunner == nil {
 		return
 	}
 
+	log.Debugf("total images to pull: %d", len(images))
 	go func() {
 		ctx := context.Background()
 		for _, image := range images {
+			log.Debugf("pulling image: %s", image)
 			s.pullImageWithRetry(ctx, image, dockerRunner)
 		}
 	}()
