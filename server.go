@@ -189,29 +189,31 @@ func (s *Server) handleGitHubEvent(ctx context.Context, event *github.PullReques
 		orgRepo:  event.GetRepo().GetOwner().GetLogin() + "/" + event.GetRepo().GetName(),
 	}
 
-	installationID := event.GetInstallation().GetID()
-	files, resp, err := linters.ListPullRequestsFiles(ctx, s.GithubClient(installationID), info.org, info.repo, info.num)
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode != http.StatusOK {
-		log.Errorf("failed to list pull request files, status code: %d", resp.StatusCode)
-		return ErrListFile
-	}
-	workspace, workDir, err := s.prepareGitRepos(ctx, info.org, info.repo, info.num, config.GitHub, installationID)
-	if err != nil {
-		return err
-	}
-	info.workDir = workDir
-	info.repoDir = workspace
+	return s.withPRCancellation(ctx, info, func(ctx context.Context) error {
+		installationID := event.GetInstallation().GetID()
+		files, resp, err := linters.ListPullRequestsFiles(ctx, s.GithubClient(installationID), info.org, info.repo, info.num)
+		if err != nil {
+			return err
+		}
+		if resp.StatusCode != http.StatusOK {
+			log.Errorf("failed to list pull request files, status code: %d", resp.StatusCode)
+			return ErrListFile
+		}
+		workspace, workDir, err := s.prepareGitRepos(ctx, info.org, info.repo, info.num, config.GitHub, installationID)
+		if err != nil {
+			return err
+		}
+		info.workDir = workDir
+		info.repoDir = workspace
 
-	provider, err := linters.NewGithubProvider(s.GithubClient(installationID), files, *event)
-	if err != nil {
-		return err
-	}
-	info.provider = provider
+		provider, err := linters.NewGithubProvider(s.GithubClient(installationID), files, *event)
+		if err != nil {
+			return err
+		}
+		info.provider = provider
 
-	return s.handleCodeRequestEvent(ctx, info)
+		return s.handleCodeRequestEvent(ctx, info)
+	})
 }
 
 func (s *Server) handleGitLabEvent(ctx context.Context, event *gitlab.MergeEvent) error {
@@ -223,35 +225,37 @@ func (s *Server) handleGitLabEvent(ctx context.Context, event *gitlab.MergeEvent
 		orgRepo:  event.Project.Namespace + "/" + event.Project.Name,
 	}
 
-	pid := event.ObjectAttributes.TargetProjectID
+	return s.withPRCancellation(ctx, info, func(ctx context.Context) error {
+		pid := event.ObjectAttributes.TargetProjectID
 
-	mergeRequestAffectedFiles, resp, err := linters.ListMergeRequestsFiles(ctx, s.GitLabClient(), info.org, info.repo, pid, info.num)
-	if err != nil {
-		log.Errorf("failed to list merge request files: %v", err)
-		return err
-	}
-	if resp.StatusCode != http.StatusOK {
-		log.Errorf("failed to list merge request files, status code: %d", resp.StatusCode)
-		return ErrListFile
-	}
+		mergeRequestAffectedFiles, resp, err := linters.ListMergeRequestsFiles(ctx, s.GitLabClient(), info.org, info.repo, pid, info.num)
+		if err != nil {
+			log.Errorf("failed to list merge request files: %v", err)
+			return err
+		}
+		if resp.StatusCode != http.StatusOK {
+			log.Errorf("failed to list merge request files, status code: %d", resp.StatusCode)
+			return ErrListFile
+		}
 
-	workspace, workDir, err := s.prepareGitRepos(ctx, info.org, info.repo, info.num, config.GitLab, 0)
-	if err != nil {
-		log.Errorf("prepare repo dir failed: %v", err)
-		return ErrPrepareDir
-	}
-	info.workDir = workDir
-	info.repoDir = workspace
+		workspace, workDir, err := s.prepareGitRepos(ctx, info.org, info.repo, info.num, config.GitLab, 0)
+		if err != nil {
+			log.Errorf("prepare repo dir failed: %v", err)
+			return ErrPrepareDir
+		}
+		info.workDir = workDir
+		info.repoDir = workspace
 
-	gitlabProvider, err := linters.NewGitlabProvider(s.GitLabClient(), mergeRequestAffectedFiles, *event)
-	if err != nil {
-		log.Errorf("failed to create provider: %v", err)
-		return err
-	}
+		gitlabProvider, err := linters.NewGitlabProvider(s.GitLabClient(), mergeRequestAffectedFiles, *event)
+		if err != nil {
+			log.Errorf("failed to create provider: %v", err)
+			return err
+		}
 
-	info.provider = gitlabProvider
+		info.provider = gitlabProvider
 
-	return s.handleCodeRequestEvent(ctx, info)
+		return s.handleCodeRequestEvent(ctx, info)
+	})
 }
 
 type codeRequestInfo struct {
@@ -268,28 +272,6 @@ type codeRequestInfo struct {
 
 func (s *Server) handleCodeRequestEvent(ctx context.Context, info *codeRequestInfo) error {
 	log := lintersutil.FromContext(ctx)
-
-	prID := fmt.Sprintf("%s-%s-%s-%d", info.platform, info.org, info.repo, info.num)
-	if cancel, exists := prMap[prID]; exists {
-		log.Infof("Cancelling processing for Pull Request : %s\n", prID)
-		cancel()
-	}
-
-	ctx, cancel := context.WithCancel(ctx)
-	mu.Lock()
-	prMap[prID] = cancel
-	mu.Unlock()
-
-	defer func() {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			mu.Lock()
-			delete(prMap, prID)
-			mu.Unlock()
-		}
-	}()
 
 	for name, fn := range linters.TotalPullRequestHandlers() {
 		linterConfig := s.config.GetLinterConfig(info.org, info.repo, name, config.GitHub)
@@ -360,6 +342,32 @@ func (s *Server) handleCodeRequestEvent(ctx context.Context, info *codeRequestIn
 	}
 
 	return nil
+}
+
+func (s *Server) withPRCancellation(ctx context.Context, info *codeRequestInfo, fn func(context.Context) error) error {
+	prID := fmt.Sprintf("%s-%s-%s-%d", info.platform, info.org, info.repo, info.num)
+	if cancel, exists := prMap[prID]; exists {
+		log.Infof("Cancelling processing for Pull Request : %s\n", prID)
+		cancel()
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	mu.Lock()
+	prMap[prID] = cancel
+	mu.Unlock()
+
+	defer func() {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			mu.Lock()
+			delete(prMap, prID)
+			mu.Unlock()
+		}
+	}()
+
+	return fn(ctx)
 }
 
 func (s *Server) initCustomLinters() {
