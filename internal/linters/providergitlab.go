@@ -38,6 +38,7 @@ var (
 	errMrHeadSha     = errors.New("get mr head sha failed")
 	errListComment   = errors.New("failed to list MR comment")
 	errDeleteComment = errors.New("failed to delete MR comment")
+	errListFile      = errors.New("failed to list MR file")
 )
 
 type DiffSha struct {
@@ -95,7 +96,6 @@ var _ Provider = (*GitlabProvider)(nil)
 type GitlabProvider struct {
 	// GitHubClient is the GitHub client.
 	GitLabClient *gitlab.Client
-
 	// HunkChecker is the hunk checker for the file.
 	HunkChecker *FileHunkChecker
 
@@ -174,20 +174,56 @@ func (g *GitlabProvider) GetCodeReviewInfo() CodeReview {
 	}
 }
 
-func NewGitlabProvider(gitlabClient *gitlab.Client, mergeRequestChangedFiles []*gitlab.MergeRequestDiff, mergeRequestEvent gitlab.MergeEvent) (*GitlabProvider, error) {
-	checker, err := newGitlabHunkChecker(mergeRequestChangedFiles)
-	if err != nil {
-		log.Fatalf("Failed to create client: %v", err)
+func NewGitlabProvider(ctx context.Context, gitlabClient *gitlab.Client, mergeRequestEvent gitlab.MergeEvent, options ...GitlabProviderOption) (*GitlabProvider, error) {
+	p := &GitlabProvider{
+		GitLabClient:      gitlabClient,
+		MergeRequestEvent: mergeRequestEvent,
 	}
-	if err != nil {
-		return nil, err
+
+	for _, option := range options {
+		option(p)
 	}
-	return &GitlabProvider{
-		GitLabClient:             gitlabClient,
-		MergeRequestChangedFiles: mergeRequestChangedFiles,
-		MergeRequestEvent:        mergeRequestEvent,
-		HunkChecker:              checker,
-	}, nil
+
+	if p.MergeRequestChangedFiles == nil {
+		pid := mergeRequestEvent.ObjectAttributes.TargetProjectID
+		org := mergeRequestEvent.Project.Namespace
+		repo := mergeRequestEvent.Project.Name
+		number := mergeRequestEvent.ObjectAttributes.IID
+
+		mergeRequestAffectedFiles, resp, err := ListMergeRequestsFiles(ctx, gitlabClient, org, repo, pid, number)
+		if err != nil {
+			log.Errorf("failed to list merge request files: %v", err)
+			return nil, err
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			log.Errorf("failed to list merge request files, status code: %d", resp.StatusCode)
+			return nil, errListFile
+		}
+
+		p.MergeRequestChangedFiles = mergeRequestAffectedFiles
+	}
+
+	if p.HunkChecker == nil {
+		checker, err := newGitlabHunkChecker(p.MergeRequestChangedFiles)
+		if err != nil {
+			return nil, err
+		}
+
+		p.HunkChecker = checker
+	}
+
+	return p, nil
+}
+
+// GitlabProviderOption allows customizing the provider creation.
+type GitlabProviderOption func(*GitlabProvider)
+
+// WithMergeRequestChangedFiles sets the merge request changed files for the provider.
+func WithMergeRequestChangedFiles(files []*gitlab.MergeRequestDiff) GitlabProviderOption {
+	return func(p *GitlabProvider) {
+		p.MergeRequestChangedFiles = files
+	}
 }
 
 func reportFormatMatCheck(gc *gitlab.Client, reportFormat config.ReportType) (reportType config.ReportType) {

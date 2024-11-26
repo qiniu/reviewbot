@@ -233,17 +233,54 @@ type GithubProvider struct {
 	PullRequestEvent github.PullRequestEvent
 }
 
-func NewGithubProvider(githubClient *github.Client, pullRequestChangedFiles []*github.CommitFile, pullRequestEvent github.PullRequestEvent) (*GithubProvider, error) {
-	checker, err := newGithubHunkChecker(pullRequestChangedFiles)
-	if err != nil {
-		return nil, err
+func NewGithubProvider(ctx context.Context, githubClient *github.Client, pullRequestEvent github.PullRequestEvent, options ...GithubProviderOption) (*GithubProvider, error) {
+	p := &GithubProvider{
+		GithubClient:     githubClient,
+		PullRequestEvent: pullRequestEvent,
 	}
-	return &GithubProvider{
-		GithubClient:            githubClient,
-		PullRequestChangedFiles: pullRequestChangedFiles,
-		PullRequestEvent:        pullRequestEvent,
-		HunkChecker:             checker,
-	}, nil
+
+	for _, option := range options {
+		option(p)
+	}
+
+	if p.PullRequestChangedFiles == nil {
+		files, resp, err := ListPullRequestsFiles(ctx, p.GithubClient, pullRequestEvent.GetRepo().GetOwner().GetLogin(), pullRequestEvent.GetRepo().GetName(), pullRequestEvent.GetPullRequest().GetNumber())
+		if err != nil {
+			return nil, err
+		}
+		if resp.StatusCode != http.StatusOK {
+			log.Errorf("failed to list pull request files, status code: %d", resp.StatusCode)
+			return nil, errListFile
+		}
+		p.PullRequestChangedFiles = files
+	}
+
+	if p.HunkChecker == nil {
+		checker, err := newGithubHunkChecker(p.PullRequestChangedFiles)
+		if err != nil {
+			return nil, err
+		}
+		p.HunkChecker = checker
+	}
+
+	return p, nil
+}
+
+// GithubProviderOption allows customizing the provider creation.
+type GithubProviderOption func(*GithubProvider)
+
+// WithPullRequestChangedFiles sets the pull request changed files for the provider.
+func WithPullRequestChangedFiles(files []*github.CommitFile) GithubProviderOption {
+	return func(p *GithubProvider) {
+		p.PullRequestChangedFiles = files
+	}
+}
+
+// WithHunkChecker sets the hunk checker for the provider.
+func WithHunkChecker(checker *FileHunkChecker) GithubProviderOption {
+	return func(p *GithubProvider) {
+		p.HunkChecker = checker
+	}
 }
 
 func (g *GithubProvider) HandleComments(ctx context.Context, outputs map[string][]LinterOutput) error {
