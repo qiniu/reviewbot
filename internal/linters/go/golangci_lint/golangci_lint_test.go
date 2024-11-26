@@ -17,6 +17,7 @@
 package golangcilint
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -415,7 +416,7 @@ func TestFindGoModsPaths(t *testing.T) {
 					defer file.Close()
 				}
 			}
-			p, err := linters.NewGithubProvider(nil, tc.changedFiles, github.PullRequestEvent{})
+			p, err := linters.NewGithubProvider(context.TODO(), nil, github.PullRequestEvent{}, linters.WithPullRequestChangedFiles(tc.changedFiles))
 			if err != nil {
 				t.Errorf("Error creating github provider: %v", err)
 			}
