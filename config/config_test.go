@@ -21,7 +21,7 @@ func TestConfig(t *testing.T) {
 			rawConfig:   ``,
 			expected: Config{
 				GlobalDefaultConfig: GlobalConfig{
-					GithubReportType: GithubPRReview,
+					GitHubReportType: GitHubMixType,
 				},
 			},
 		},
@@ -90,7 +90,7 @@ issueReferences:
 `,
 			expected: Config{
 				GlobalDefaultConfig: GlobalConfig{
-					GithubReportType: GithubCheckRuns,
+					GitHubReportType: GitHubCheckRuns,
 				},
 				CustomRepos: map[string]RepoConfig{
 					"qbox": {
@@ -198,7 +198,7 @@ customRepos: # custom config for specific orgs or repos
         `,
 			expected: Config{
 				GlobalDefaultConfig: GlobalConfig{
-					GithubReportType:   GithubCheckRuns,
+					GitHubReportType:   GitHubCheckRuns,
 					GolangCiLintConfig: "linters-config/.golangci.yml",
 				},
 				CustomRepos: map[string]RepoConfig{
@@ -252,8 +252,8 @@ customRepos: # custom config for specific orgs or repos
 					t.Errorf("expected no error, got %v", err)
 				}
 
-				if c.GlobalDefaultConfig.GithubReportType != tc.expected.GlobalDefaultConfig.GithubReportType {
-					t.Errorf("expected %v, got %v", tc.expected.GlobalDefaultConfig.GithubReportType, c.GlobalDefaultConfig.GithubReportType)
+				if c.GlobalDefaultConfig.GitHubReportType != tc.expected.GlobalDefaultConfig.GitHubReportType {
+					t.Errorf("expected %v, got %v", tc.expected.GlobalDefaultConfig.GitHubReportType, c.GlobalDefaultConfig.GitHubReportType)
 				}
 
 				if !strings.HasSuffix(c.GlobalDefaultConfig.GolangCiLintConfig, tc.expected.GlobalDefaultConfig.GolangCiLintConfig) {

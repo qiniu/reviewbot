@@ -296,7 +296,7 @@ func (g *GithubProvider) Report(ctx context.Context, a Agent, lintResults map[st
 	orgRepo := fmt.Sprintf("%s/%s", org, repo)
 
 	switch a.LinterConfig.ReportType {
-	case config.GithubCheckRuns:
+	case config.GitHubCheckRuns:
 		check := newBaseCheckRun(a, lintResults)
 		ch, err := g.CreateCheckRun(ctx, org, repo, check)
 		if err != nil {
@@ -308,7 +308,7 @@ func (g *GithubProvider) Report(ctx context.Context, a Agent, lintResults map[st
 		log.Infof("[%s] create check run success, HTML_URL: %v", linterName, ch.GetHTMLURL())
 
 		metric.NotifyWebhookByText(ConstructGotchaMsg(linterName, a.Provider.GetCodeReviewInfo().URL, ch.GetHTMLURL(), lintResults))
-	case config.GithubPRReview:
+	case config.GitHubPRReview:
 		comments, err := g.ProcessComments(ctx, a, lintResults)
 		if err != nil {
 			log.Errorf("failed to process need to add comments: %v", err)
@@ -326,7 +326,7 @@ func (g *GithubProvider) Report(ctx context.Context, a Agent, lintResults map[st
 		}
 		log.Infof("[%s] add %d comments for this PR %d (%s) \n", linterName, len(addedCmts), num, orgRepo)
 		metric.NotifyWebhookByText(ConstructGotchaMsg(linterName, a.Provider.GetCodeReviewInfo().URL, addedCmts[0].GetHTMLURL(), lintResults))
-	case config.GithubMixType:
+	case config.GitHubMixType:
 		// report all lint results as a check run summary, but not annotations
 		check := newMixCheckRun(a, lintResults)
 		ch, err := g.CreateCheckRun(ctx, org, repo, check)

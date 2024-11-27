@@ -23,7 +23,7 @@ func TestApplyTypedMessageByIssueReferences(t *testing.T) {
 	}{
 		{
 			name:         "GithubCheckRuns format",
-			reportFormat: config.GithubCheckRuns,
+			reportFormat: config.GitHubCheckRuns,
 			lintResults: map[string][]LinterOutput{
 				"file1.go": {
 					{
@@ -51,7 +51,7 @@ func TestApplyTypedMessageByIssueReferences(t *testing.T) {
 		},
 		{
 			name:         "GithubPRReview format",
-			reportFormat: config.GithubPRReview,
+			reportFormat: config.GitHubPRReview,
 			lintResults: map[string][]LinterOutput{
 				"file2.go": {
 					{
@@ -79,7 +79,7 @@ func TestApplyTypedMessageByIssueReferences(t *testing.T) {
 		},
 		{
 			name:         "GithubMixType format",
-			reportFormat: config.GithubMixType,
+			reportFormat: config.GitHubMixType,
 			lintResults: map[string][]LinterOutput{
 				"file3.go": {
 					{
@@ -107,7 +107,7 @@ func TestApplyTypedMessageByIssueReferences(t *testing.T) {
 		},
 		{
 			name:         "No matching issue reference",
-			reportFormat: config.GithubCheckRuns,
+			reportFormat: config.GitHubCheckRuns,
 			lintResults: map[string][]LinterOutput{
 				"file4.go": {
 					{
@@ -134,7 +134,7 @@ func TestApplyTypedMessageByIssueReferences(t *testing.T) {
 		},
 		{
 			name:         "Multiple files and issues",
-			reportFormat: config.GithubMixType,
+			reportFormat: config.GitHubMixType,
 			lintResults: map[string][]LinterOutput{
 				"file5.go": {
 					{
