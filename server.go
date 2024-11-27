@@ -78,9 +78,6 @@ type Server struct {
 	// gitHubAppPrivateKey string
 	gitHubAppAuth             *GitHubAppAuth
 	gitHubPersonalAccessToken string
-
-	// token cache
-	githubAppTokenCache *githubAppTokenCache
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -190,18 +187,19 @@ func (s *Server) handleGitHubEvent(ctx context.Context, event *github.PullReques
 
 	return s.withCancel(ctx, info, func(ctx context.Context) error {
 		installationID := event.GetInstallation().GetID()
-		workspace, workDir, err := s.prepareGitRepos(ctx, info.org, info.repo, info.num, config.GitHub, installationID)
-		if err != nil {
-			return err
-		}
-		info.workDir = workDir
-		info.repoDir = workspace
 
 		provider, err := linters.NewGithubProvider(ctx, s.GithubClient(installationID), *event)
 		if err != nil {
 			return err
 		}
 		info.provider = provider
+
+		workspace, workDir, err := s.prepareGitRepos(ctx, info.org, info.repo, info.num, config.GitHub, installationID, provider)
+		if err != nil {
+			return err
+		}
+		info.workDir = workDir
+		info.repoDir = workspace
 
 		return s.handleCodeRequestEvent(ctx, info)
 	})
@@ -217,21 +215,20 @@ func (s *Server) handleGitLabEvent(ctx context.Context, event *gitlab.MergeEvent
 	}
 
 	return s.withCancel(ctx, info, func(ctx context.Context) error {
-		workspace, workDir, err := s.prepareGitRepos(ctx, info.org, info.repo, info.num, config.GitLab, 0)
+		gitlabProvider, err := linters.NewGitlabProvider(ctx, s.GitLabClient(), *event)
+		if err != nil {
+			log.Errorf("failed to create provider: %v", err)
+			return err
+		}
+		info.provider = gitlabProvider
+
+		workspace, workDir, err := s.prepareGitRepos(ctx, info.org, info.repo, info.num, config.GitLab, 0, gitlabProvider)
 		if err != nil {
 			log.Errorf("prepare repo dir failed: %v", err)
 			return ErrPrepareDir
 		}
 		info.workDir = workDir
 		info.repoDir = workspace
-
-		gitlabProvider, err := linters.NewGitlabProvider(ctx, s.GitLabClient(), *event)
-		if err != nil {
-			log.Errorf("failed to create provider: %v", err)
-			return err
-		}
-
-		info.provider = gitlabProvider
 
 		return s.handleCodeRequestEvent(ctx, info)
 	})

@@ -73,19 +73,19 @@ func golangciLintHandler(ctx context.Context, a linters.Agent) error {
 }
 
 type goModTidyModifier struct {
-	next      config.Modifier
+	prev      config.Modifier
 	goModDirs []string
 }
 
-func newGoModTidyBuilder(next config.Modifier, goModDirs []string) config.Modifier {
+func newGoModTidyBuilder(prev config.Modifier, goModDirs []string) config.Modifier {
 	return &goModTidyModifier{
-		next:      next,
+		prev:      prev,
 		goModDirs: goModDirs,
 	}
 }
 
 func (b *goModTidyModifier) Modify(cfg *config.Linter) (*config.Linter, error) {
-	base, err := b.next.Modify(cfg)
+	base, err := b.prev.Modify(cfg)
 	if err != nil {
 		return nil, err
 	}

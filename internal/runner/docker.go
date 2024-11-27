@@ -322,15 +322,15 @@ func (c *CleanLogReader) Close() error {
 }
 
 type gitConfigSafeDirModifier struct {
-	next config.Modifier
+	prev config.Modifier
 }
 
-func newGitConfigSafeDirModifier(next config.Modifier) config.Modifier {
-	return &gitConfigSafeDirModifier{next: next}
+func newGitConfigSafeDirModifier(prev config.Modifier) config.Modifier {
+	return &gitConfigSafeDirModifier{prev: prev}
 }
 
 func (g *gitConfigSafeDirModifier) Modify(cfg *config.Linter) (*config.Linter, error) {
-	base, err := g.next.Modify(cfg)
+	base, err := g.prev.Modify(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -345,18 +345,18 @@ func (g *gitConfigSafeDirModifier) Modify(cfg *config.Linter) (*config.Linter, e
 }
 
 type dockerArtifactModifier struct {
-	next config.Modifier
+	prev config.Modifier
 }
 
 // newDockerArtifactModifier creates a new docker artifact modifier.
 // It will modify the linter config to support docker artifact.
-func newDockerArtifactModifier(next config.Modifier) config.Modifier {
-	return &dockerArtifactModifier{next: next}
+func newDockerArtifactModifier(prev config.Modifier) config.Modifier {
+	return &dockerArtifactModifier{prev: prev}
 }
 
 // Modify modifies the linter config to support docker artifact.
 func (d *dockerArtifactModifier) Modify(cfg *config.Linter) (*config.Linter, error) {
-	base, err := d.next.Modify(cfg)
+	base, err := d.prev.Modify(cfg)
 	if err != nil {
 		return nil, err
 	}

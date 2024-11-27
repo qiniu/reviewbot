@@ -24,8 +24,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/reviewbot/config"
+	"github.com/qiniu/reviewbot/internal/cache"
 	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/reviewbot/internal/metric"
 	"github.com/qiniu/x/log"
@@ -33,12 +35,13 @@ import (
 
 var (
 	// ErrAfterTry is the error that the operation failed after 5 retries.
-	ErrAfterTry       = errors.New("failed after 5 retries")
-	ErrDeleteComment  = errors.New("delete comment failed")
-	ErrCreateComment  = errors.New("create comment failed")
-	ErrCreateCheckRun = errors.New("create check run failed")
-	ErrListComments   = errors.New("list comments failed")
-	ErrListCommits    = errors.New("list commits failed")
+	ErrAfterTry                = errors.New("failed after 5 retries")
+	ErrDeleteComment           = errors.New("delete comment failed")
+	ErrCreateComment           = errors.New("create comment failed")
+	ErrCreateCheckRun          = errors.New("create check run failed")
+	ErrListComments            = errors.New("list comments failed")
+	ErrListCommits             = errors.New("list commits failed")
+	ErrUnexpectedTransportType = errors.New("unexpected transport type")
 )
 
 // ListFiles lists all files for the specified pull request.
@@ -662,6 +665,42 @@ func (g *GithubProvider) ProcessComments(ctx context.Context, a Agent, lintResul
 	log.Infof("[%s] delete %d comments for this PR %d (%s) \n", linterName, len(toDeletes), num, orgRepo)
 	comments := constructPullRequestComments(toAdds, linterNamePrefix(linterName), a.Provider.GetCodeReviewInfo().HeadSHA)
 	return comments, nil
+}
+
+func (g *GithubProvider) GetToken() (string, error) {
+	// with platform and org for uniqueness
+	key := fmt.Sprintf("%s:%s", config.GitHub, g.PullRequestEvent.Repo.GetOwner().GetLogin())
+	log.Infof("get token for %s, key: %s", config.GitHub, key)
+	token, ok := cache.DefaultTokenCache.GetToken(key)
+	if ok {
+		return token, nil
+	}
+
+	token, err := g.refreshToken()
+	if err != nil {
+		return "", err
+	}
+
+	// set the token with a little less than 1 hour expiration since github app token will expire in 1 hours
+	// see https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/authenticating-as-a-github-app-installation#about-installation-access-tokens
+	exp := time.Now().Add(time.Hour*1 - time.Minute)
+	cache.DefaultTokenCache.SetToken(key, token, exp)
+
+	return token, nil
+}
+
+// refreshToken refresh the GitHub App token.
+func (g *GithubProvider) refreshToken() (string, error) {
+	tr, ok := g.GithubClient.Client().Transport.(*ghinstallation.Transport)
+	if !ok {
+		log.Errorf("unexpected transport type: %T", g.GithubClient.Client().Transport)
+		return "", ErrUnexpectedTransportType
+	}
+	token, err := tr.Token(context.Background())
+	if err != nil {
+		return "", fmt.Errorf("failed to get installation token: %w", err)
+	}
+	return token, nil
 }
 
 // newBaseCheckRun creates the base check run options.

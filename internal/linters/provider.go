@@ -23,6 +23,10 @@ type Provider interface {
 	GetFiles(predicate func(filepath string) bool) []string
 	// GetCodeReviewInfo gets the code review information for the PR/MR.
 	GetCodeReviewInfo() CodeReview
+	// GetToken gets the token in order to interact with the git provider.
+	// Base on the provider, the token may be the impersonation token or the personal access token.
+	// the instance of a provider should know the necessary information to get the token. like platform, installationID, etc.
+	GetToken() (string, error)
 
 	// ListCommits lists the commits in the PR/MR.
 	ListCommits(ctx context.Context, org, repo string, number int) ([]Commit, error)
