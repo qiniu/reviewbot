@@ -4,23 +4,22 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
-	"sync"
-	"time"
 
-	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/reviewbot/config"
+	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/x/log"
 	gitv2 "sigs.k8s.io/prow/pkg/git/v2"
 )
 
-func (s *Server) prepareGitRepos(ctx context.Context, org, repo string, num int, platform config.Platform, installationID int64) (workspace string, workDir string, err error) {
+var errUnsupportedPlatform = errors.New("unsupported platform")
+
+func (s *Server) prepareGitRepos(ctx context.Context, org, repo string, num int, platform config.Platform, installationID int64, provider linters.Provider) (workspace string, workDir string, err error) {
 	log := lintersutil.FromContext(ctx)
 	workspace, err = prepareRepoDir(org, repo, num)
 	if err != nil {
@@ -38,7 +37,7 @@ func (s *Server) prepareGitRepos(ctx context.Context, org, repo string, num int,
 	refs, workDir := s.fixRefs(workspace, org, repo)
 	log.Debugf("refs: %+v", refs)
 	for _, ref := range refs {
-		if err := s.handleSingleRef(ctx, ref, org, repo, platform, installationID, num); err != nil {
+		if err := s.handleSingleRef(ctx, ref, org, repo, platform, installationID, num, provider); err != nil {
 			return "", "", err
 		}
 	}
@@ -46,15 +45,14 @@ func (s *Server) prepareGitRepos(ctx context.Context, org, repo string, num int,
 	return workspace, workDir, nil
 }
 
-func (s *Server) handleSingleRef(ctx context.Context, ref config.Refs, org, repo string, platform config.Platform, installationID int64, num int) error {
+func (s *Server) handleSingleRef(ctx context.Context, ref config.Refs, org, repo string, platform config.Platform, installationID int64, num int, provider linters.Provider) error {
 	opt := gitv2.ClientFactoryOpts{
 		CacheDirBase: github.String(s.repoCacheDir),
 		Persist:      github.Bool(true),
 	}
 
-	gitConfig := s.newGitConfigBuilder(ref.Org, ref.Repo, platform, installationID).Build()
-	log.Debugf("git config: %+v", gitConfig)
-	if err := s.configureGitAuth(&opt, gitConfig); err != nil {
+	gb := s.newGitConfigBuilder(ref.Org, ref.Repo, platform, installationID, provider)
+	if err := gb.configureGitAuth(&opt); err != nil {
 		return fmt.Errorf("failed to configure git auth: %w", err)
 	}
 
@@ -213,188 +211,100 @@ type GitAuth struct {
 	GitLabPersonalAccessToken string
 }
 
-// GitConfig stores the Git repository configuration.
-type GitConfig struct {
-	Platform config.Platform
-	Host     string // gitlab/github host
-	Auth     GitAuth
-}
-
-// githubAppTokenCache implements the cache for GitHub App tokens.
-type githubAppTokenCache struct {
-	sync.RWMutex
-	tokens  map[string]tokenWithExp // key: installationID, value: token
-	appAuth *GitHubAppAuth
-}
-
 // GitConfigBuilder is used to build the Git configuration for a specific request.
 type GitConfigBuilder struct {
 	server   *Server
 	org      string
 	repo     string
+	host     string
 	platform config.Platform
+	provider linters.Provider
 	// installationID is the installation ID for the GitHub App
 	installationID int64
 }
 
-type tokenWithExp struct {
-	token string
-	exp   time.Time
-}
-
-// newGitHubAppTokenCache creates a new token cache.
-func newGitHubAppTokenCache(appID int64, privateKeyPath string) *githubAppTokenCache {
-	return &githubAppTokenCache{
-		tokens: make(map[string]tokenWithExp),
-		appAuth: &GitHubAppAuth{
-			AppID:          appID,
-			PrivateKeyPath: privateKeyPath,
-		},
-	}
-}
-func (c *githubAppTokenCache) getToken(org string, installationID int64) (string, error) {
-	key := fmt.Sprintf("%s-%d", org, installationID)
-	c.RLock()
-	t, exists := c.tokens[key]
-	c.RUnlock()
-
-	if exists && t.exp.After(time.Now()) {
-		return t.token, nil
-	}
-
-	c.Lock()
-	defer c.Unlock()
-
-	// double check
-	if t, exists := c.tokens[key]; exists {
-		if t.exp.After(time.Now()) {
-			return t.token, nil
-		}
-	}
-
-	// get new token
-	token, err := c.refreshToken(installationID)
-	if err != nil {
-		return "", err
-	}
-
-	log.Debugf("refreshed token for %s, installationID: %d", org, installationID)
-	// cache token, 1 hour expiry
-	c.tokens[key] = tokenWithExp{
-		token: token,
-		// add a buffer to avoid token expired
-		exp: time.Now().Add(time.Hour - time.Minute),
-	}
-
-	return token, nil
-}
-
-// refreshToken refresh the GitHub App token.
-func (c *githubAppTokenCache) refreshToken(installationID int64) (string, error) {
-	tr, err := ghinstallation.NewKeyFromFile(
-		http.DefaultTransport,
-		c.appAuth.AppID,
-		installationID,
-		c.appAuth.PrivateKeyPath,
-	)
-	if err != nil {
-		return "", fmt.Errorf("failed to create github app transport: %w", err)
-	}
-
-	token, err := tr.Token(context.Background())
-	if err != nil {
-		return "", fmt.Errorf("failed to get installation token: %w", err)
-	}
-
-	return token, nil
-}
-
-func (s *Server) newGitConfigBuilder(org, repo string, platform config.Platform, installationID int64) *GitConfigBuilder {
-	return &GitConfigBuilder{
+func (s *Server) newGitConfigBuilder(org, repo string, platform config.Platform, installationID int64, provider linters.Provider) *GitConfigBuilder {
+	g := &GitConfigBuilder{
 		server:         s,
 		org:            org,
 		repo:           repo,
 		platform:       platform,
 		installationID: installationID,
+		provider:       provider,
+	}
+	g.host = g.getHostForPlatform(platform)
+	return g
+}
+
+func (g *GitConfigBuilder) configureGitAuth(opt *gitv2.ClientFactoryOpts) error {
+	auth := g.buildAuth()
+	opt.Host = g.host
+	switch g.platform {
+	case config.GitHub:
+		return g.configureGitHubAuth(opt, auth)
+	case config.GitLab:
+		return g.configureGitLabAuth(opt, auth)
+	default:
+		log.Errorf("unsupported platform: %s", g.platform)
+		return errUnsupportedPlatform
 	}
 }
 
-func (b *GitConfigBuilder) Build() GitConfig {
-	config := GitConfig{
-		Platform: b.platform,
-		Host:     b.getHostForPlatform(b.platform),
-		Auth:     b.buildAuth(),
-	}
-
-	return config
-}
-
-func (b *GitConfigBuilder) getHostForPlatform(platform config.Platform) string {
+func (g *GitConfigBuilder) getHostForPlatform(platform config.Platform) string {
 	switch platform {
 	case config.GitLab:
-		if b.server.gitLabHost != "" {
-			return b.server.gitLabHost
+		if g.server.gitLabHost != "" {
+			return g.server.gitLabHost
 		}
 		return "gitlab.com"
-	default:
+	case config.GitHub:
 		return "github.com"
+	default:
+		log.Errorf("unsupported platform: %s", g.platform)
+		return ""
 	}
 }
 
-func (b *GitConfigBuilder) buildAuth() GitAuth {
-	switch b.platform {
+func (g *GitConfigBuilder) buildAuth() GitAuth {
+	switch g.platform {
 	case config.GitHub:
-		return b.buildGitHubAuth()
+		return g.buildGitHubAuth()
 	case config.GitLab:
-		return b.buildGitLabAuth()
+		return g.buildGitLabAuth()
 	default:
 		return GitAuth{}
 	}
 }
 
-func (b *GitConfigBuilder) buildGitHubAuth() GitAuth {
-	if b.server.gitHubAppAuth != nil {
-		appAuth := *b.server.gitHubAppAuth
-		appAuth.InstallationID = b.installationID
+func (g *GitConfigBuilder) buildGitHubAuth() GitAuth {
+	if g.server.gitHubAppAuth != nil {
+		appAuth := *g.server.gitHubAppAuth
+		appAuth.InstallationID = g.installationID
 		return GitAuth{
 			GitHubAppAuth: &appAuth,
 		}
 	}
 
-	if b.server.gitHubPersonalAccessToken != "" {
+	if g.server.gitHubPersonalAccessToken != "" {
 		return GitAuth{
-			GitHubAccessToken: b.server.gitHubPersonalAccessToken,
+			GitHubAccessToken: g.server.gitHubPersonalAccessToken,
 		}
 	}
 
 	return GitAuth{}
 }
 
-func (b *GitConfigBuilder) buildGitLabAuth() GitAuth {
-	if b.server.gitLabPersonalAccessToken != "" {
+func (g *GitConfigBuilder) buildGitLabAuth() GitAuth {
+	if g.server.gitLabPersonalAccessToken != "" {
 		return GitAuth{
-			GitLabPersonalAccessToken: b.server.gitLabPersonalAccessToken,
+			GitLabPersonalAccessToken: g.server.gitLabPersonalAccessToken,
 		}
 	}
 
 	return GitAuth{}
 }
 
-func (s *Server) configureGitAuth(opt *gitv2.ClientFactoryOpts, gConf GitConfig) error {
-	opt.Host = gConf.Host
-	switch gConf.Platform {
-	case config.GitHub:
-		return s.configureGitHubAuth(opt, gConf)
-	case config.GitLab:
-		return s.configureGitLabAuth(opt, gConf)
-	default:
-		return fmt.Errorf("unsupported platform: %s", gConf.Platform)
-	}
-}
-
-func (s *Server) configureGitHubAuth(opt *gitv2.ClientFactoryOpts, config GitConfig) error {
-	auth := config.Auth
-
+func (g *GitConfigBuilder) configureGitHubAuth(opt *gitv2.ClientFactoryOpts, auth GitAuth) error {
 	switch {
 	case auth.GitHubAppAuth != nil:
 		opt.UseSSH = github.Bool(false)
@@ -403,7 +313,7 @@ func (s *Server) configureGitHubAuth(opt *gitv2.ClientFactoryOpts, config GitCon
 		}
 		opt.Token = func(org string) (string, error) {
 			log.Debugf("get token for %s, installationID: %d", org, auth.GitHubAppAuth.InstallationID)
-			return s.githubAppTokenCache.getToken(org, auth.GitHubAppAuth.InstallationID)
+			return g.provider.GetToken()
 		}
 		return nil
 
@@ -423,9 +333,7 @@ func (s *Server) configureGitHubAuth(opt *gitv2.ClientFactoryOpts, config GitCon
 	return nil
 }
 
-func (s *Server) configureGitLabAuth(opt *gitv2.ClientFactoryOpts, config GitConfig) error {
-	auth := config.Auth
-
+func (g *GitConfigBuilder) configureGitLabAuth(opt *gitv2.ClientFactoryOpts, auth GitAuth) error {
 	switch {
 	case auth.GitLabPersonalAccessToken != "":
 		opt.UseSSH = github.Bool(false)
@@ -433,7 +341,8 @@ func (s *Server) configureGitLabAuth(opt *gitv2.ClientFactoryOpts, config GitCon
 			return "oauth2", nil
 		}
 		opt.Token = func(org string) (string, error) {
-			return auth.GitLabPersonalAccessToken, nil
+			log.Infof("get token for %s, personal access token: %s", org, auth.GitLabPersonalAccessToken)
+			return g.provider.GetToken()
 		}
 		return nil
 	default:

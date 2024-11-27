@@ -26,6 +26,7 @@ import (
 
 	"github.com/hashicorp/go-version"
 	"github.com/qiniu/reviewbot/config"
+	"github.com/qiniu/reviewbot/internal/cache"
 	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/reviewbot/internal/metric"
 	"github.com/qiniu/x/errors"
@@ -39,6 +40,7 @@ var (
 	errListComment   = errors.New("failed to list MR comment")
 	errDeleteComment = errors.New("failed to delete MR comment")
 	errListFile      = errors.New("failed to list MR file")
+	errRefreshToken  = errors.New("failed to refresh token")
 )
 
 type DiffSha struct {
@@ -172,6 +174,61 @@ func (g *GitlabProvider) GetCodeReviewInfo() CodeReview {
 		HeadSHA:   g.MergeRequestEvent.ObjectAttributes.LastCommit.ID,
 		UpdatedAt: updatetime,
 	}
+}
+
+func (g *GitlabProvider) GetToken() (string, error) {
+	// with platform and org for uniqueness
+	key := fmt.Sprintf("%s:%s", config.GitLab, g.MergeRequestEvent.Project.Namespace)
+	log.Infof("get token for %s", key)
+	token, ok := cache.DefaultTokenCache.GetToken(key)
+	if ok {
+		return token, nil
+	}
+
+	token, err := g.refreshToken()
+	if err != nil {
+		return "", err
+	}
+
+	// set the token with a little less than 6 hour expiration
+	exp := time.Now().Add(time.Hour*6 - time.Minute)
+	cache.DefaultTokenCache.SetToken(key, token, exp)
+
+	return token, nil
+}
+
+func (g *GitlabProvider) refreshToken() (string, error) {
+	user, resp, err := g.GitLabClient.Users.CurrentUser()
+	if err != nil {
+		return "", fmt.Errorf("failed to get current user: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		log.Errorf("failed to get current user: %+v", resp)
+		return "", errRefreshToken
+	}
+
+	serverTZ := user.CreatedAt.Location()
+	now := time.Now().In(serverTZ)
+	// NOTE(CarlJi): if server time is not correct, the token will expire earlier. so we set a long expiration time.
+	expiresAt := now.Add(time.Hour * 24)
+	token, resp, err := g.GitLabClient.Users.CreateImpersonationToken(
+		user.ID, // must be admin user
+		&gitlab.CreateImpersonationTokenOptions{
+			Name:      gitlab.Ptr("temp-token-" + now.Format("20060102")),
+			ExpiresAt: gitlab.Ptr(expiresAt),
+			Scopes:    &[]string{"api"},
+		},
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed to create impersonation token: %w", err)
+	}
+	if resp.StatusCode != http.StatusCreated {
+		log.Errorf("failed to create impersonation token: %+v", resp)
+		return "", errRefreshToken
+	}
+
+	return token.Token, nil
 }
 
 func NewGitlabProvider(ctx context.Context, gitlabClient *gitlab.Client, mergeRequestEvent gitlab.MergeEvent, options ...GitlabProviderOption) (*GitlabProvider, error) {
@@ -403,7 +460,6 @@ func CreateGitLabCommentsReport(ctx context.Context, gc *gitlab.Client, outputs 
 	var addedComments []*gitlab.Note
 	optd.Body = &message
 	err := RetryWithBackoff(ctx, func() error {
-		log.Infof("CREATE NOTE %v,%v", pid, number)
 		cm, resp, err := gc.Notes.CreateMergeRequestNote(pid, number, &optd)
 		if err != nil {
 			return err
@@ -413,6 +469,7 @@ func CreateGitLabCommentsReport(ctx context.Context, gc *gitlab.Client, outputs 
 			return errCreateComment
 		}
 		addedComments = append(addedComments, cm)
+		log.Infof("create comment success: %v", cm.ID)
 		return nil
 	})
 	if err != nil {
@@ -567,7 +624,7 @@ func DeleteMergeReviewCommentsForGitLab(ctx context.Context, gc *gitlab.Client, 
 			return err
 		}
 
-		log.Infof("delete comment success: %v", comment)
+		log.Infof("delete comment success: %v", comment.ID)
 	}
 	return nil
 }

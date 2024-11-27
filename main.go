@@ -252,8 +252,6 @@ func main() {
 			InstallationID: o.gitHubAppInstallationID,
 			PrivateKeyPath: o.gitHubAppPrivateKey,
 		}
-
-		s.githubAppTokenCache = newGitHubAppTokenCache(s.gitHubAppAuth.AppID, s.gitHubAppAuth.PrivateKeyPath)
 	}
 
 	go s.initDockerRunner()
