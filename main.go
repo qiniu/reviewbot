@@ -64,10 +64,10 @@ type options struct {
 	gitLabHost                string
 
 	// support github
-	gitHubAccessToken       string
-	gitHubAppID             int64
-	gitHubAppInstallationID int64
-	gitHubAppPrivateKey     string
+	gitHubPersonalAccessToken string
+	gitHubAppID               int64
+	gitHubAppInstallationID   int64
+	gitHubAppPrivateKey       string
 
 	// log storage dir for local storage
 	logDir string
@@ -112,7 +112,7 @@ func gatherOptions() options {
 	fs.StringVar(&o.kubeConfig, "kube-config", "", "kube config file")
 
 	// github related
-	fs.StringVar(&o.gitHubAccessToken, "github.access-token", "", "personal github access token")
+	fs.StringVar(&o.gitHubPersonalAccessToken, "github.personal-access-token", "", "personal github access token")
 	fs.Int64Var(&o.gitHubAppID, "github.app-id", 0, "github app id")
 	fs.Int64Var(&o.gitHubAppInstallationID, "github.app-installation-id", 0, "github app installation id")
 	fs.StringVar(&o.gitHubAppPrivateKey, "github.app-private-key", "", "github app private key")
@@ -242,7 +242,7 @@ func main() {
 		kubeConfig:                o.kubeConfig,
 		gitLabHost:                o.gitLabHost,
 		gitLabPersonalAccessToken: o.gitLabPersonalAccessToken,
-		gitHubAccessToken:         o.gitHubAccessToken,
+		gitHubPersonalAccessToken: o.gitHubPersonalAccessToken,
 	}
 
 	// github app

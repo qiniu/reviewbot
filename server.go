@@ -76,8 +76,8 @@ type Server struct {
 	// support github app model
 	// gitHubAppID         int64
 	// gitHubAppPrivateKey string
-	gitHubAppAuth     *GitHubAppAuth
-	gitHubAccessToken string
+	gitHubAppAuth             *GitHubAppAuth
+	gitHubPersonalAccessToken string
 
 	// token cache
 	githubAppTokenCache *githubAppTokenCache
@@ -253,7 +253,7 @@ func (s *Server) handleCodeRequestEvent(ctx context.Context, info *codeRequestIn
 	log := lintersutil.FromContext(ctx)
 
 	for name, fn := range linters.TotalPullRequestHandlers() {
-		linterConfig := s.config.GetLinterConfig(info.org, info.repo, name, config.GitHub)
+		linterConfig := s.config.GetLinterConfig(info.org, info.repo, name, info.platform)
 
 		// skip if linter is not enabled
 		if linterConfig.Enable != nil && !*linterConfig.Enable {
@@ -608,13 +608,13 @@ func (s *Server) githubAppClient(installationID int64) *github.Client {
 
 func (s *Server) githubAccessTokenClient() *github.Client {
 	gc := github.NewClient(httpcache.NewMemoryCacheTransport().Client())
-	gc.WithAuthToken(s.gitHubAccessToken)
+	gc.WithAuthToken(s.gitHubPersonalAccessToken)
 	return gc
 }
 
 // GithubClient returns a github client.
 func (s *Server) GithubClient(installationID int64) *github.Client {
-	if s.gitHubAccessToken != "" {
+	if s.gitHubPersonalAccessToken != "" {
 		return s.githubAccessTokenClient()
 	}
 	return s.githubAppClient(installationID)

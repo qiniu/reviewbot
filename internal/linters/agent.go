@@ -64,7 +64,7 @@ type Agent struct {
 // getMsgFormat returns the message format based on report type.
 func getMsgFormat(format config.ReportType) string {
 	switch format {
-	case config.GithubPRReview, config.GithubMixType:
+	case config.GitHubPRReview, config.GitHubMixType:
 		return "[%s](%s)"
 	default:
 		return "%s\nmore info: %s"
@@ -111,7 +111,7 @@ func (a *Agent) processOutput(ctx context.Context, output LinterOutput, ref conf
 	newOutput.TypedMessage = fmt.Sprintf(msgFormat, output.Message, ref.URL)
 
 	// Add issue content for PR review formats
-	if a.LinterConfig.ReportType == config.GithubPRReview || a.LinterConfig.ReportType == config.GithubMixType {
+	if a.LinterConfig.ReportType == config.GitHubPRReview || a.LinterConfig.ReportType == config.GitHubMixType {
 		if content, err := a.getIssueContent(ctx, ref); err == nil {
 			newOutput.TypedMessage += fmt.Sprintf(ReferenceFooter, content)
 		}

@@ -47,7 +47,7 @@ func gofmtHandler(ctx context.Context, a linters.Agent) error {
 
 	// Since GitHub's check run feature does not have the suggestion functionality, GitHub PR review is fixed used to display gofmt reports.
 	// Details: https://github.com/qiniu/reviewbot/issues/166
-	a.LinterConfig.ReportType = config.GithubPRReview
+	a.LinterConfig.ReportType = config.GitHubPRReview
 
 	executor, err := NewgofmtExecutor(a.LinterConfig.WorkDir)
 	if err != nil {

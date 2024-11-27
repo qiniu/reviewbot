@@ -75,10 +75,10 @@ type Refs struct {
 }
 
 type GlobalConfig struct {
-	// GithubReportType/GitlabReportType is the format of the report, will be used if linterConfig.ReportFormat is empty.
+	// GitHubReportType/GitlabReportType is the format of the report, will be used if linterConfig.ReportFormat is empty.
 	// e.g. "github_checks", "github_pr_review"
-	GithubReportType ReportType `json:"githubReportType,omitempty"`
-	GitlabReportType ReportType `json:"gitlabReportType,omitempty"`
+	GitHubReportType ReportType `json:"githubReportType,omitempty"`
+	GitLabReportType ReportType `json:"gitlabReportType,omitempty"`
 
 	// GolangciLintConfig is the path of golangci-lint config file to run golangci-lint globally.
 	// if not empty, use the config to run golangci-lint.
@@ -236,8 +236,8 @@ func NewConfig(conf string) (Config, error) {
 	}
 
 	// set default value
-	if c.GlobalDefaultConfig.GithubReportType == "" {
-		c.GlobalDefaultConfig.GithubReportType = GithubPRReview
+	if c.GlobalDefaultConfig.GitHubReportType == "" {
+		c.GlobalDefaultConfig.GitHubReportType = GitHubMixType
 	}
 
 	// check golangci-lint config path
@@ -279,10 +279,10 @@ func (c Config) GetLinterConfig(org, repo, ln string, repoType Platform) Linter 
 		Repo:     repo,
 	}
 	if repoType == GitLab {
-		linter.ReportType = c.GlobalDefaultConfig.GithubReportType
+		linter.ReportType = c.GlobalDefaultConfig.GitLabReportType
 	}
 	if repoType == GitHub {
-		linter.ReportType = c.GlobalDefaultConfig.GithubReportType
+		linter.ReportType = c.GlobalDefaultConfig.GitHubReportType
 	}
 
 	// set golangci-lint config path if exists
@@ -421,14 +421,23 @@ func applyCustomLintersConfig(legacy Linter, custom CustomLinter) Linter {
 type ReportType string
 
 const (
-	GithubCheckRuns            ReportType = "github_check_run"
-	GithubPRReview             ReportType = "github_pr_review"
-	GitlabComment              ReportType = "gitlab_mr_comment"
-	GitlabCommentAndDiscussion ReportType = "gitlab_mr_comment_discussion"
-	// GithubMixType is the type of the report that mix the github_check_run and github_pr_review.
+	// GitHubCheckRuns is the type of the report that use github check run to report the lint results.
+	// to use this report type, the auth must be github app since github_check_run is only supported on github app.
+	GitHubCheckRuns ReportType = "github_check_run"
+	// GitHubPRReview is the type of the report that use github pull request review to report the lint results.
+	GitHubPRReview ReportType = "github_pr_review"
+	// default report type for github
+	// GitHubMixType is the type of the report that mix the github_check_run and github_pr_review.
 	// which use the github_check_run to report all lint results as a check run summary,
 	// but use the github_pr_review to report top 10 lint results to pull request review comments at most.
-	GithubMixType ReportType = "github_mix"
+	// to use this report type, the auth must be github app since github_check_run is only supported on github app.
+	GitHubMixType ReportType = "github_mix"
+
+	// GitLabComment is the type of the report that use gitlab merge request comment to report the lint results.
+	GitLabComment ReportType = "gitlab_mr_comment"
+	// GitLabCommentAndDiscussion is the type of the report that use gitlab merge request comment and discussion to report the lint results.
+	GitLabCommentAndDiscussion ReportType = "gitlab_mr_comment_discussion"
+
 	// for debug and testing.
 	Quiet ReportType = "quiet"
 )

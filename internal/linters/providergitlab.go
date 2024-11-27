@@ -242,14 +242,14 @@ func reportFormatMatCheck(gc *gitlab.Client, reportFormat config.ReportType) (re
 	v2, _ := version.NewVersion("10.8")
 	if reportFormat != "" {
 		if v1.LessThan(v2) {
-			return config.GitlabComment
+			return config.GitLabComment
 		}
 		return reportFormat
 	}
 	if v1.LessThan(v2) {
-		return config.GitlabComment
+		return config.GitLabComment
 	}
-	return config.GitlabCommentAndDiscussion
+	return config.GitLabCommentAndDiscussion
 }
 
 func (g *GitlabProvider) HandleComments(ctx context.Context, outputs map[string][]LinterOutput) error {
@@ -268,7 +268,7 @@ func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[st
 	orgRepo := fmt.Sprintf("%s/%s", org, repo)
 	reportFormat := reportFormatMatCheck(g.GitLabClient, a.LinterConfig.ReportType)
 	switch reportFormat {
-	case config.GitlabCommentAndDiscussion:
+	case config.GitLabCommentAndDiscussion:
 		// list   MR  comments
 		var pid = g.MergeRequestEvent.ObjectAttributes.TargetProjectID
 		existedComments, err := g.ListMergeRequestsComments(ctx, g.GitLabClient, org, repo, num, pid)
@@ -329,7 +329,7 @@ func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[st
 		}
 		log.Infof("[%s] add %d comments for this PR %d (%s) \n", linterName, len(addedDis), num, orgRepo)
 		metric.NotifyWebhookByText(ConstructGotchaMsg(linterName, g.MergeRequestEvent.Project.WebURL, "", lintResults))
-	case config.GitlabComment:
+	case config.GitLabComment:
 		var pid = g.MergeRequestEvent.ObjectAttributes.TargetProjectID
 		existedComments, err := g.ListMergeRequestsComments(ctx, g.GitLabClient, org, repo, num, pid)
 		if err != nil {

@@ -361,9 +361,9 @@ func (b *GitConfigBuilder) buildGitHubAuth() GitAuth {
 		}
 	}
 
-	if b.server.gitHubAccessToken != "" {
+	if b.server.gitHubPersonalAccessToken != "" {
 		return GitAuth{
-			GitHubAccessToken: b.server.gitHubAccessToken,
+			GitHubAccessToken: b.server.gitHubPersonalAccessToken,
 		}
 	}
 
