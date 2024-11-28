@@ -3,6 +3,8 @@ package linters
 import (
 	"context"
 	"time"
+
+	"github.com/qiniu/reviewbot/config"
 )
 
 // Provider is the interface implemented by each git provider. such as github, gitlab, etc.
@@ -27,6 +29,8 @@ type Provider interface {
 	// Base on the provider, the token may be the impersonation token or the personal access token.
 	// the instance of a provider should know the necessary information to get the token. like platform, installationID, etc.
 	GetToken() (string, error)
+	// GetProviderInfo gets the provider information.
+	GetProviderInfo() ProviderInfo
 
 	// ListCommits lists the commits in the PR/MR.
 	ListCommits(ctx context.Context, org, repo string, number int) ([]Commit, error)
@@ -36,6 +40,11 @@ type Provider interface {
 	DeleteComment(ctx context.Context, org, repo string, commentID int64) error
 	// CreateComment creates a comment in the PR/MR.
 	CreateComment(ctx context.Context, org, repo string, number int, comment *Comment) (*Comment, error)
+}
+
+type ProviderInfo struct {
+	Host     string
+	Platform config.Platform
 }
 
 // Commit represents a Git commit.

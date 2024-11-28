@@ -454,6 +454,13 @@ func boolPtr(b bool) *bool {
 }
 
 // Modifier defines the interface for modifying the linter command.
+// The execution order of modifiers follows a stack-like behavior (LIFO - Last In First Out).
+// For example, if you add modifiers in this order:
+//  1. cfg.Modifier = modifierA(cfg.Modifier)
+//  2. cfg.Modifier = modifierB(cfg.Modifier)
+//  3. cfg.Modifier = modifierC(cfg.Modifier)
+//
+// The execution order will be: modifierC -> modifierB -> modifierA.
 type Modifier interface {
 	Modify(cfg *Linter) (*Linter, error)
 }

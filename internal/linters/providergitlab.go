@@ -105,6 +105,9 @@ type GitlabProvider struct {
 	MergeRequestChangedFiles []*gitlab.MergeRequestDiff
 	// PullRequestEvent is the event of a pull request.
 	MergeRequestEvent gitlab.MergeEvent
+
+	// ProviderInfo is the provider information.
+	ProviderInfo ProviderInfo
 }
 
 func (g *GitlabProvider) ListComments(ctx context.Context, org, repo string, number int) ([]Comment, error) {
@@ -197,6 +200,11 @@ func (g *GitlabProvider) GetToken() (string, error) {
 	return token, nil
 }
 
+// GetProviderInfo gets the provider information.
+func (g *GitlabProvider) GetProviderInfo() ProviderInfo {
+	return g.ProviderInfo
+}
+
 func (g *GitlabProvider) refreshToken() (string, error) {
 	user, resp, err := g.GitLabClient.Users.CurrentUser()
 	if err != nil {
@@ -280,6 +288,13 @@ type GitlabProviderOption func(*GitlabProvider)
 func WithMergeRequestChangedFiles(files []*gitlab.MergeRequestDiff) GitlabProviderOption {
 	return func(p *GitlabProvider) {
 		p.MergeRequestChangedFiles = files
+	}
+}
+
+// WithGitlabProviderInfo sets the provider information for the provider.
+func WithGitlabProviderInfo(info ProviderInfo) GitlabProviderOption {
+	return func(p *GitlabProvider) {
+		p.ProviderInfo = info
 	}
 }
 

@@ -234,6 +234,8 @@ type GithubProvider struct {
 	PullRequestChangedFiles []*github.CommitFile
 	// PullRequestEvent is the event of a pull request.
 	PullRequestEvent github.PullRequestEvent
+	// ProviderInfo is the provider information.
+	ProviderInfo ProviderInfo
 }
 
 func NewGithubProvider(ctx context.Context, githubClient *github.Client, pullRequestEvent github.PullRequestEvent, options ...GithubProviderOption) (*GithubProvider, error) {
@@ -283,6 +285,13 @@ func WithPullRequestChangedFiles(files []*github.CommitFile) GithubProviderOptio
 func WithHunkChecker(checker *FileHunkChecker) GithubProviderOption {
 	return func(p *GithubProvider) {
 		p.HunkChecker = checker
+	}
+}
+
+// WithGitHubProviderInfo sets the provider information for the provider.
+func WithGitHubProviderInfo(info ProviderInfo) GithubProviderOption {
+	return func(p *GithubProvider) {
+		p.ProviderInfo = info
 	}
 }
 
@@ -687,6 +696,10 @@ func (g *GithubProvider) GetToken() (string, error) {
 	cache.DefaultTokenCache.SetToken(key, token, exp)
 
 	return token, nil
+}
+
+func (g *GithubProvider) GetProviderInfo() ProviderInfo {
+	return g.ProviderInfo
 }
 
 // refreshToken refresh the GitHub App token.
