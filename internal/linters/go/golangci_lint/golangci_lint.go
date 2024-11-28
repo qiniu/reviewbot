@@ -69,7 +69,51 @@ func golangciLintHandler(ctx context.Context, a linters.Agent) error {
 	}
 
 	a.LinterConfig.Modifier = newGoModTidyBuilder(a.LinterConfig.Modifier, goModDirs)
+	a.LinterConfig.Modifier = newGitConfigModifier(a.LinterConfig.Modifier, a.Provider)
 	return linters.GeneralHandler(ctx, log, a, linters.ExecRun, parser)
+}
+
+type gitConfigModifier struct {
+	prev     config.Modifier
+	provider linters.Provider
+}
+
+func newGitConfigModifier(prev config.Modifier, provider linters.Provider) config.Modifier {
+	return &gitConfigModifier{
+		prev:     prev,
+		provider: provider,
+	}
+}
+
+func (g *gitConfigModifier) Modify(cfg *config.Linter) (*config.Linter, error) {
+	base, err := g.prev.Modify(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	var gitUsername string
+	info := g.provider.GetProviderInfo()
+	switch info.Platform {
+	case config.GitHub:
+		// see https://docs.github.com/zh/apps/creating-github-apps/writing-code-for-a-github-app/building-ci-checks-with-a-github-app#add-code-to-clone-a-repository
+		gitUsername = "x-access-token"
+	case config.GitLab:
+		// see https://docs.gitlab.com/ee/api/oauth2.html#access-git-over-https-with-access-token
+		gitUsername = "oauth2"
+	}
+
+	newCfg := base
+	args := []string{fmt.Sprintf("git config --local \"url.https://%s:${ACCESS_TOKEN}@%s/.insteadOf\" \"git@%s:\" \n", gitUsername, info.Host, info.Host)}
+	args = append(args, fmt.Sprintf("git config --local \"url.https://%s:${ACCESS_TOKEN}@%s/.insteadOf\" \"https://%s/\" \n", gitUsername, info.Host, info.Host))
+	newCfg.Args = append(args, base.Args...)
+
+	// set ACCESS_TOKEN in the environment variables
+	token, err := g.provider.GetToken()
+	if err != nil {
+		return nil, err
+	}
+	newCfg.Env = append(newCfg.Env, "ACCESS_TOKEN="+token)
+	return newCfg, nil
 }
 
 type goModTidyModifier struct {

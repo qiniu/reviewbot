@@ -188,7 +188,11 @@ func (s *Server) handleGitHubEvent(ctx context.Context, event *github.PullReques
 	return s.withCancel(ctx, info, func(ctx context.Context) error {
 		installationID := event.GetInstallation().GetID()
 
-		provider, err := linters.NewGithubProvider(ctx, s.GithubClient(installationID), *event)
+		platformInfo := linters.ProviderInfo{
+			Host:     "github.com",
+			Platform: config.GitHub,
+		}
+		provider, err := linters.NewGithubProvider(ctx, s.GithubClient(installationID), *event, linters.WithGitHubProviderInfo(platformInfo))
 		if err != nil {
 			return err
 		}
@@ -215,7 +219,15 @@ func (s *Server) handleGitLabEvent(ctx context.Context, event *gitlab.MergeEvent
 	}
 
 	return s.withCancel(ctx, info, func(ctx context.Context) error {
-		gitlabProvider, err := linters.NewGitlabProvider(ctx, s.GitLabClient(), *event)
+		platformInfo := linters.ProviderInfo{
+			Host:     s.gitLabHost,
+			Platform: config.GitLab,
+		}
+		if platformInfo.Host == "" {
+			platformInfo.Host = "gitlab.com"
+		}
+
+		gitlabProvider, err := linters.NewGitlabProvider(ctx, s.GitLabClient(), *event, linters.WithGitlabProviderInfo(platformInfo))
 		if err != nil {
 			log.Errorf("failed to create provider: %v", err)
 			return err
@@ -271,9 +283,10 @@ func (s *Server) handleCodeRequestEvent(ctx context.Context, info *codeRequestIn
 
 		agent := linters.Agent{
 			LinterConfig: linterConfig,
-			RepoDir:      info.repoDir,
-			ID:           lintersutil.GetEventGUID(ctx),
-			Provider:     info.provider,
+			// workspace is the root dir of the repo
+			RepoDir:  linterConfig.Workspace + "/" + info.repo,
+			ID:       lintersutil.GetEventGUID(ctx),
+			Provider: info.provider,
 		}
 
 		// skip if linter is not language related

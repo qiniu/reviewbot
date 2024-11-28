@@ -51,7 +51,7 @@ type Agent struct {
 	Provider Provider
 	// LinterConfig is the linter configuration.
 	LinterConfig config.Linter
-	// RepoDir is the repo directory.
+	// RepoDir is the main repo directory.
 	RepoDir string
 	// GenLogKey generates the log key.
 	GenLogKey func() string
