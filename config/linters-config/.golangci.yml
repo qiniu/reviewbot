@@ -48,6 +48,10 @@ linters-settings:
       - (net/http.ResponseWriter).Header
       - (*flag.FlagSet).Parse
 
+  gocritic:
+    disabled-checks:
+      - appendAssign
+
 issues:
   exclude-rules:
     - path: '(.+)_test\.go'
