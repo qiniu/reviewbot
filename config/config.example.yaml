@@ -151,9 +151,10 @@ issueReferences:
     - pattern: '\[SC2086\]$'
       url: "https://github.com/qiniu/reviewbot/issues/413"
 
-
-
 customLinters:
+  stylecheck:
+    # disable stylecheck since we already have p3cpmd
+    enable: false
   pylint:
     languages: [".py"]
     command:
@@ -162,12 +163,12 @@ customLinters:
       - "--"
     args:
       - |
-         pylint --recursive=y ./
+        pylint --recursive=y ./
     kubernetesAsRunner:
       namespace: "reviewbot"
       image: "aslan-spock-register.qiniu.io/reviewbot/base:go1.22.3-pylint3.3.1"
   p3cpmd:
-    languages: [ ".java" ]
+    languages: [".java"]
     command:
       - "/bin/sh"
       - "-c"

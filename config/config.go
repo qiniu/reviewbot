@@ -581,6 +581,10 @@ func (c *Config) parseAndUpdateCloneURL(re *regexp.Regexp, orgRepo string, k int
 
 func (c Config) validateCustomLinters() error {
 	for name, linter := range c.CustomLinters {
+		// skip if linter is disabled
+		if linter.Enable != nil && !*linter.Enable {
+			continue
+		}
 		if len(linter.Languages) == 0 {
 			log.Errorf("custom linter %s must specify at least one language", name)
 			return ErrCustomLinterConfig
