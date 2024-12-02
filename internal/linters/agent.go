@@ -27,8 +27,11 @@ import (
 	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/cache"
 	"github.com/qiniu/reviewbot/internal/lintersutil"
+	"github.com/qiniu/reviewbot/internal/llm"
 	"github.com/qiniu/reviewbot/internal/runner"
 	"github.com/qiniu/reviewbot/internal/storage"
+	"github.com/qiniu/x/log"
+	"github.com/tmc/langchaingo/llms"
 )
 
 // issueCache is the issue references cache.
@@ -59,6 +62,8 @@ type Agent struct {
 	GenLogViewURL func() string
 	// IssueReferences is the compiled issue references config for the linter.
 	IssueReferences []config.CompiledIssueReference
+	// ModelClient is the LLM model client.
+	ModelClient llms.Model
 }
 
 // getMsgFormat returns the message format based on report type.
@@ -140,6 +145,11 @@ func (a *Agent) ApplyTypedMessageByIssueReferences(ctx context.Context, lintResu
 				}
 			}
 			if !processed {
+				resp, err := llm.QueryForReference(ctx, a.ModelClient, output.Message)
+				if err != nil {
+					log.Errorf("failed to query LLM server: %v", err)
+				}
+				output.Message += fmt.Sprintf(ReferenceFooter, resp)
 				newOutputs = append(newOutputs, output)
 			}
 		}
@@ -155,5 +165,6 @@ func (a *Agent) ApplyTypedMessageByIssueReferences(ctx context.Context, lintResu
 const ReferenceFooter = `
 <details>
 <summary>Details</summary>
+
 %s
 </details>`

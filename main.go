@@ -31,6 +31,7 @@ import (
 	"github.com/google/go-github/v57/github"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/qiniu/reviewbot/config"
+	"github.com/qiniu/reviewbot/internal/llm"
 	"github.com/qiniu/reviewbot/internal/storage"
 	"github.com/qiniu/reviewbot/internal/version"
 	"github.com/qiniu/x/log"
@@ -78,11 +79,19 @@ type options struct {
 	serverAddr string
 	// kube config file
 	kubeConfig string
+
+	// llm related
+	llmProvider  string
+	llmModel     string
+	llmServerURL string
+	llmAPIKey    string
 }
 
 var (
-	errAppNotSet     = errors.New("app-private-key is required when using github app")
-	errWebHookNotSet = errors.New("webhook-secret is required")
+	errAppNotSet       = errors.New("app-private-key is required when using github app")
+	errWebHookNotSet   = errors.New("webhook-secret is required")
+	errLLMKeyNotSet    = errors.New("llm api key is not set")
+	errLLMServerNotSet = errors.New("llm model or server url is not set")
 )
 
 func (o options) Validate() error {
@@ -92,6 +101,19 @@ func (o options) Validate() error {
 
 	if o.webhookSecret == "" {
 		return errWebHookNotSet
+	}
+
+	if o.llmProvider != "" {
+		switch o.llmProvider {
+		case "openai":
+			if o.llmAPIKey == "" {
+				return errLLMKeyNotSet
+			}
+		case "ollama":
+			if o.llmModel == "" || o.llmServerURL == "" {
+				return errLLMServerNotSet
+			}
+		}
 	}
 	return nil
 }
@@ -119,6 +141,12 @@ func gatherOptions() options {
 	// gitlab related
 	fs.StringVar(&o.gitLabPersonalAccessToken, "gitlab.personal-access-token", "", "personal gitlab access token")
 	fs.StringVar(&o.gitLabHost, "gitlab.host", "", "gitlab server")
+
+	// llm related
+	fs.StringVar(&o.llmProvider, "llm.provider", "", "llm provider")
+	fs.StringVar(&o.llmModel, "llm.model", "", "llm model")
+	fs.StringVar(&o.llmServerURL, "llm.server-url", "", "llm server url")
+	fs.StringVar(&o.llmAPIKey, "llm.api-key", "", "llm api key")
 
 	err := fs.Parse(os.Args[1:])
 	if err != nil {
@@ -232,6 +260,13 @@ func main() {
 		}
 	}
 
+	modelConfig := llm.Config{
+		Provider:  o.llmProvider,
+		APIKey:    o.llmAPIKey,
+		Model:     o.llmModel,
+		ServerURL: o.llmServerURL,
+	}
+
 	s := &Server{
 		webhookSecret:             []byte(o.webhookSecret),
 		gitClientFactory:          v2,
@@ -243,6 +278,7 @@ func main() {
 		gitLabHost:                o.gitLabHost,
 		gitLabPersonalAccessToken: o.gitLabPersonalAccessToken,
 		gitHubPersonalAccessToken: o.gitHubPersonalAccessToken,
+		modelConfig:               modelConfig,
 	}
 
 	// github app
@@ -254,6 +290,7 @@ func main() {
 		}
 	}
 
+	s.initLLMModel()
 	go s.initDockerRunner()
 	go s.initKubernetesRunner()
 	s.initCustomLinters()
