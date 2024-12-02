@@ -24,8 +24,8 @@ spec:
             - -log-level=0
             - -webhook-secret=$(GITHUB_WEBHOOK_SECRET)
             - -config=/etc/config/config.yaml
-            - -app-id=$(GITHUB_APP_ID)
-            - -app-private-key=/secrets/github_app_key
+            - -github.app-id=$(GITHUB_APP_ID)
+            - -github.app-private-key=/secrets/github_app_key
             - -debug=true
             - -s3-credentials-file=/root/.aws/credentials.json
             - -server-addr=http://qiniu-x.jfcs-k8s-qa1.qiniu.io # this is an intranet domain of qiniu.

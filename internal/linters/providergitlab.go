@@ -182,7 +182,6 @@ func (g *GitlabProvider) GetCodeReviewInfo() CodeReview {
 func (g *GitlabProvider) GetToken() (string, error) {
 	// with platform and org for uniqueness
 	key := fmt.Sprintf("%s:%s", config.GitLab, g.MergeRequestEvent.Project.Namespace)
-	log.Infof("get token for %s", key)
 	token, ok := cache.DefaultTokenCache.GetToken(key)
 	if ok {
 		return token, nil
@@ -196,7 +195,7 @@ func (g *GitlabProvider) GetToken() (string, error) {
 	// set the token with a little less than 6 hour expiration
 	exp := time.Now().Add(time.Hour*6 - time.Minute)
 	cache.DefaultTokenCache.SetToken(key, token, exp)
-
+	log.Infof("set refreshed token for %s, key: %s, exp: %s", token, key, exp.Format(time.RFC3339))
 	return token, nil
 }
 

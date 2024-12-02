@@ -103,8 +103,11 @@ func (g *gitConfigModifier) Modify(cfg *config.Linter) (*config.Linter, error) {
 	}
 
 	newCfg := base
-	args := []string{fmt.Sprintf("git config --local \"url.https://%s:${ACCESS_TOKEN}@%s/.insteadOf\" \"git@%s:\" \n", gitUsername, info.Host, info.Host)}
-	args = append(args, fmt.Sprintf("git config --local \"url.https://%s:${ACCESS_TOKEN}@%s/.insteadOf\" \"https://%s/\" \n", gitUsername, info.Host, info.Host))
+
+	// must use global git config, otherwise it will be ignored by go mod tidy.
+	// see https://github.com/golang/go/issues/65041
+	args := []string{fmt.Sprintf("git config --global \"url.https://%s:${ACCESS_TOKEN}@%s/.insteadOf\" \"git@%s:\" \n", gitUsername, info.Host, info.Host)}
+	args = append(args, fmt.Sprintf("git config --global \"url.https://%s:${ACCESS_TOKEN}@%s/.insteadOf\" \"https://%s/\" \n", gitUsername, info.Host, info.Host))
 	newCfg.Args = append(args, base.Args...)
 
 	// set ACCESS_TOKEN in the environment variables

@@ -679,7 +679,6 @@ func (g *GithubProvider) ProcessComments(ctx context.Context, a Agent, lintResul
 func (g *GithubProvider) GetToken() (string, error) {
 	// with platform and org for uniqueness
 	key := fmt.Sprintf("%s:%s", config.GitHub, g.PullRequestEvent.Repo.GetOwner().GetLogin())
-	log.Infof("get token for %s, key: %s", config.GitHub, key)
 	token, ok := cache.DefaultTokenCache.GetToken(key)
 	if ok {
 		return token, nil
@@ -692,9 +691,9 @@ func (g *GithubProvider) GetToken() (string, error) {
 
 	// set the token with a little less than 1 hour expiration since github app token will expire in 1 hours
 	// see https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/authenticating-as-a-github-app-installation#about-installation-access-tokens
-	exp := time.Now().Add(time.Hour*1 - time.Minute)
+	exp := time.Now().Add(time.Hour - time.Minute*5)
 	cache.DefaultTokenCache.SetToken(key, token, exp)
-
+	log.Infof("set refreshed token for %s, key: %s, exp: %s", token, key, exp.Format(time.RFC3339))
 	return token, nil
 }
 
