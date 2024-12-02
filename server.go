@@ -39,9 +39,11 @@ import (
 	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/linters"
 	"github.com/qiniu/reviewbot/internal/lintersutil"
+	"github.com/qiniu/reviewbot/internal/llm"
 	"github.com/qiniu/reviewbot/internal/runner"
 	"github.com/qiniu/reviewbot/internal/storage"
 	"github.com/qiniu/x/log"
+	"github.com/tmc/langchaingo/llms"
 	"github.com/xanzy/go-gitlab"
 	gitv2 "sigs.k8s.io/prow/pkg/git/v2"
 )
@@ -78,6 +80,9 @@ type Server struct {
 	// gitHubAppPrivateKey string
 	gitHubAppAuth             *GitHubAppAuth
 	gitHubPersonalAccessToken string
+
+	modelConfig llm.Config
+	modelClient llms.Model
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -113,6 +118,18 @@ func (s *Server) serveGitHub(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "Event received. Have a nice day.")
 
 	switch event := event.(type) {
+	case *github.IssueCommentEvent:
+		go func() {
+			if err := s.processIssueCommentEvent(ctx, event); err != nil {
+				log.Errorf("process issue comment event: %v", err)
+			}
+		}()
+	case *github.PullRequestReviewCommentEvent:
+		go func() {
+			if err := s.processPullRequestReviewCommentEvent(ctx, event); err != nil {
+				log.Errorf("process pull request review comment event: %v", err)
+			}
+		}()
 	case *github.PullRequestEvent:
 		go func() {
 			if err := s.processPullRequestEvent(ctx, event); err != nil {
@@ -323,6 +340,9 @@ func (s *Server) handleCodeRequestEvent(ctx context.Context, info *codeRequestIn
 		// set issue references
 		agent.IssueReferences = s.config.GetCompiledIssueReferences(name)
 
+		// set model client
+		agent.ModelClient = s.modelClient
+
 		// run linter finally
 		if err := fn(ctx, agent); err != nil {
 			if errors.Is(err, context.Canceled) {
@@ -360,6 +380,14 @@ func (s *Server) withCancel(ctx context.Context, info *codeRequestInfo, fn func(
 	}()
 
 	return fn(ctx)
+}
+
+func (s *Server) initLLMModel() {
+	modelClient, err := llm.New(context.Background(), s.modelConfig)
+	if err != nil {
+		log.Fatalf("failed to init rag server: %v", err)
+	}
+	s.modelClient = modelClient
 }
 
 func (s *Server) initCustomLinters() {
@@ -493,6 +521,79 @@ func (s *Server) pullImageWithRetry(ctx context.Context, image string, dockerRun
 		log.Warnf("Failed to pull image %s: %v. Retrying in %v...", image, err, delay)
 		time.Sleep(delay)
 	}
+}
+
+func (s *Server) processIssueCommentEvent(ctx context.Context, event *github.IssueCommentEvent) error {
+	log := lintersutil.FromContext(ctx)
+	if event.GetAction() != "created" {
+		log.Debugf("skipping action %s\n", event.GetAction())
+		return nil
+	}
+	if !strings.Contains(*event.Comment.Body, "reviewbot") {
+		return nil
+	}
+
+	query := event.GetComment().GetBody()
+	resp, err := llm.Query(ctx, s.modelClient, query, "")
+	if err != nil {
+		return err
+	}
+	log.Infof("query success,got resp: %s", resp)
+
+	replyComment := &github.IssueComment{
+		Body: github.String(resp),
+	}
+	installationID := event.GetInstallation().GetID()
+	_, _, err = s.GithubClient(installationID).Issues.CreateComment(ctx, event.GetRepo().GetOwner().GetLogin(), event.GetRepo().GetName(), event.GetIssue().GetNumber(), replyComment)
+	if err != nil {
+		return err
+	}
+	log.Infof("create comment success: %v", replyComment)
+	return nil
+}
+
+func (s *Server) processPullRequestReviewCommentEvent(ctx context.Context, event *github.PullRequestReviewCommentEvent) error {
+	log := lintersutil.FromContext(ctx)
+	if event.GetAction() != "created" {
+		log.Debugf("skipping action %s\n", event.GetAction())
+		return nil
+	}
+
+	query := event.GetComment().GetBody()
+	path := event.GetComment().GetPath()
+	position := event.GetComment().GetPosition()
+	diffHunk := event.GetComment().GetDiffHunk()
+	inReplyTo := event.GetComment().GetInReplyTo()
+
+	if !strings.Contains(query, "reviewbot") {
+		log.Debugf("skipping reviewbot comment\n")
+		return nil
+	}
+
+	installationID := event.GetInstallation().GetID()
+	githubClient := s.GithubClient(installationID)
+	historyComments, err := prepareCommentContext(ctx, event, githubClient, path, position)
+	if err != nil {
+		return err
+	}
+	queryContext := "diffHunk: " + diffHunk + "\n" + "history comments: " + historyComments
+
+	// send query to llm model
+	resp, err := llm.Query(ctx, s.modelClient, query, queryContext)
+	if err != nil {
+		return err
+	}
+	log.Infof("query success,got resp: %s", resp)
+
+	// reply comment
+	comment, _, err := githubClient.PullRequests.CreateCommentInReplyTo(ctx, event.GetRepo().GetOwner().GetLogin(), event.GetRepo().GetName(), event.GetPullRequest().GetNumber(), resp, inReplyTo)
+	if err != nil {
+		log.Errorf("failed to create comment: %v", err)
+		return err
+	}
+
+	log.Infof("create comment success: %v", comment)
+	return nil
 }
 
 func (s *Server) processPullRequestEvent(ctx context.Context, event *github.PullRequestEvent) error {
@@ -658,4 +759,25 @@ func prepareRepoDir(org, repo string, num int) (string, error) {
 func checkKubectlInstalled() error {
 	cmd := exec.Command("kubectl", "version", "--client")
 	return cmd.Run()
+}
+
+func prepareCommentContext(ctx context.Context, event *github.PullRequestReviewCommentEvent, githubClient *github.Client, path string, position int) (string, error) {
+	// get all comments
+	prComments, _, err := githubClient.PullRequests.ListComments(ctx, event.GetRepo().GetOwner().GetLogin(), event.GetRepo().GetName(), event.GetPullRequest().GetNumber(), nil)
+	if err != nil {
+		return "", err
+	}
+
+	// filter comments by path and position
+	var comments []string
+	if path != "" && position != 0 {
+		for _, comment := range prComments {
+			if comment.GetPath() == path && comment.GetPosition() == position {
+				comments = append(comments, comment.GetBody())
+			}
+		}
+	}
+	log.Infof("filter comments success: %v", comments)
+
+	return strings.Join(comments, "\n"), nil
 }
