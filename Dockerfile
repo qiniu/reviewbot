@@ -52,15 +52,9 @@ RUN curl -fsSL -o kubectl https://dl.k8s.io/release/v1.28.3/bin/linux/amd64/kube
     && mv kubectl /usr/local/bin/
 
 # SSH config
-RUN mkdir -p /root/.ssh && chown -R root /root/.ssh/ &&  chgrp -R root /root/.ssh/ \
-    && git config --global url."git@github.com:".insteadOf https://github.com/ \
-    && git config --global url."git://".insteadOf https://
+RUN mkdir -p /root/.ssh && chown -R root /root/.ssh/ &&  chgrp -R root /root/.ssh/ 
 COPY deploy/config /root/.ssh/config
 COPY deploy/github-known-hosts /github_known_hosts
-
-# set go proxy and private repo
-RUN go env -w GOPROXY=https://goproxy.cn,direct \
-    && go env -w GOPRIVATE=github.com/qbox,qiniu.com
 
 EXPOSE 8888
 
