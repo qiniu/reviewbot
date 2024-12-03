@@ -170,9 +170,8 @@ func (s *Server) serveGitLab(w http.ResponseWriter, r *http.Request) {
 				log.Errorf("process merge request event: %v", err)
 			}
 		}()
-
 	default:
-		log.Debugf("skipping event type %s\n", github.WebHookType(r))
+		log.Debugf("skipping gitlab event %v\n", event)
 	}
 }
 
