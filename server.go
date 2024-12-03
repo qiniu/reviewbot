@@ -219,6 +219,7 @@ func (s *Server) handleGitLabEvent(ctx context.Context, event *gitlab.MergeEvent
 	}
 
 	return s.withCancel(ctx, info, func(ctx context.Context) error {
+		log := lintersutil.FromContext(ctx)
 		platformInfo := linters.ProviderInfo{
 			Host:     s.gitLabHost,
 			Platform: config.GitLab,

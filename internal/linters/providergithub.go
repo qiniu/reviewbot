@@ -447,8 +447,9 @@ func (g *GithubProvider) ListPullRequestsComments(ctx context.Context, owner str
 		if err != nil {
 			return err
 		}
-		if resp.StatusCode != 200 {
-			return fmt.Errorf("list comments failed: %v", resp)
+		if resp.StatusCode != http.StatusOK {
+			log.Errorf("list comments failed: %v", resp)
+			return ErrListComments
 		}
 
 		allComments = comments
@@ -748,7 +749,7 @@ func newBaseCheckRun(a Agent, lintErrs map[string][]LinterOutput) github.CreateC
 	if logURL == "" {
 		check.Output.Summary = github.String(Reference)
 	} else {
-		log.Debugf("Log view :%s", logURL)
+		log.Debugf("Log view URL: %s", logURL)
 		check.Output.Summary = github.String(fmt.Sprintf("This is [the detailed log](%s).\n\n%s", logURL, Reference))
 	}
 
