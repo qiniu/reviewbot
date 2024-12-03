@@ -120,13 +120,29 @@ func (g *gitConfigModifier) Modify(cfg *config.Linter) (*config.Linter, error) {
 
 	args := []string{
 		fmt.Sprintf(`
-		# delete the old git config
-		%s
-		currentConfig=$(%s)
-		if ! echo "$currentConfig" | grep -q "${ACCESS_TOKEN}" || [ -z "$currentConfig" ]; then
-			# add the new git config
-			%s
-		fi
+		configure_git() {
+			# delete the old git config
+			%s || return 1
+			currentConfig=$(%s) || return 1
+			if ! echo "$currentConfig" | grep -q "${ACCESS_TOKEN}" || [ -z "$currentConfig" ]; then
+				# add the new git config
+				%s || return 1
+			fi
+			return 0
+		}
+
+		max_retries=3
+		retry_delay=1
+
+		i=1
+		while [ $i -le $max_retries ]; do
+			if configure_git; then
+				break
+			else
+				sleep $retry_delay
+			fi
+			i=$((i+1))
+		done
 		`,
 			deleteOldConfigCmd,
 			currentConfigCmd,
