@@ -91,8 +91,14 @@ func (g *gitConfigModifier) Modify(cfg *config.Linter) (*config.Linter, error) {
 		return nil, err
 	}
 
-	var gitUsername string
+	newCfg := base
+	token, err := g.provider.GetToken()
+	if err != nil {
+		return nil, err
+	}
+
 	info := g.provider.GetProviderInfo()
+	var gitUsername string
 	switch info.Platform {
 	case config.GitHub:
 		// see https://docs.github.com/zh/apps/creating-github-apps/writing-code-for-a-github-app/building-ci-checks-with-a-github-app#add-code-to-clone-a-repository
@@ -102,19 +108,35 @@ func (g *gitConfigModifier) Modify(cfg *config.Linter) (*config.Linter, error) {
 		gitUsername = "oauth2"
 	}
 
-	newCfg := base
+	// delete the old git config
+	deleteOldConfigCmd := fmt.Sprintf(`git config --global -l | grep "url.*%s" | grep -v "${ACCESS_TOKEN}" | sed 's/=.*//' | while read key; do git config --global --unset "$key"; done`, gitUsername)
+	// get the current git config
+	currentConfigCmd := fmt.Sprintf("git config --global -l | grep \"url.*%s\" || true", gitUsername)
+	// add the new git config
+	addNewConfigCmd := fmt.Sprintf(`git config --global "url.https://%s:${ACCESS_TOKEN}@%s/.insteadOf" "git@%s:"
+		git config --global "url.https://%s:${ACCESS_TOKEN}@%s/.insteadOf" "https://%s/"`,
+		gitUsername, info.Host, info.Host,
+		gitUsername, info.Host, info.Host)
 
-	// must use global git config, otherwise it will be ignored by go mod tidy.
-	// see https://github.com/golang/go/issues/65041
-	args := []string{fmt.Sprintf("git config --global \"url.https://%s:${ACCESS_TOKEN}@%s/.insteadOf\" \"git@%s:\" \n", gitUsername, info.Host, info.Host)}
-	args = append(args, fmt.Sprintf("git config --global \"url.https://%s:${ACCESS_TOKEN}@%s/.insteadOf\" \"https://%s/\" \n", gitUsername, info.Host, info.Host))
-	newCfg.Args = append(args, base.Args...)
-
-	// set ACCESS_TOKEN in the environment variables
-	token, err := g.provider.GetToken()
-	if err != nil {
-		return nil, err
+	args := []string{
+		fmt.Sprintf(`
+		# delete the old git config
+		%s
+		currentConfig=$(%s)
+		if ! echo "$currentConfig" | grep -q "${ACCESS_TOKEN}" || [ -z "$currentConfig" ]; then
+			# add the new git config
+			%s
+		fi
+		`,
+			deleteOldConfigCmd,
+			currentConfigCmd,
+			addNewConfigCmd,
+		),
 	}
+	// add \n to the end of each command
+	args = append(args, "\n")
+
+	newCfg.Args = append(args, base.Args...)
 	newCfg.Env = append(newCfg.Env, "ACCESS_TOKEN="+token)
 	return newCfg, nil
 }
