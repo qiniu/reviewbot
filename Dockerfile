@@ -43,13 +43,14 @@ ENV StyleCheck_DOWNLOAD_SHA256 51c34d738520c1389d71998a9ab0e6dabe0d7cf262149f3e0
 RUN curl -fsSL "$StyleCheck_DOWNLOAD_URL" -o checkstyle.jar \
     && echo "$StyleCheck_DOWNLOAD_SHA256  checkstyle.jar" | sha256sum -c -
 RUN java -jar checkstyle.jar  --version
-COPY reviewbot /reviewbot
 
 # install kubectl
 ARG KUBECTL_VERSION=v1.28.3
 RUN curl -fsSL -o kubectl https://dl.k8s.io/release/v1.28.3/bin/linux/amd64/kubectl \
     && chmod +x kubectl \
     && mv kubectl /usr/local/bin/
+
+COPY reviewbot /reviewbot
 
 # SSH config
 RUN mkdir -p /root/.ssh && chown -R root /root/.ssh/ &&  chgrp -R root /root/.ssh/ 

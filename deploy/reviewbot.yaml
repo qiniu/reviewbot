@@ -26,6 +26,8 @@ spec:
             - -config=/etc/config/config.yaml
             - -github.app-id=$(GITHUB_APP_ID)
             - -github.app-private-key=/secrets/github_app_key
+            - -gitlab.host=$(GITLAB_HOST)
+            - -gitlab.personal-access-token=$(GITLAB_PERSONAL_ACCESS_TOKEN)
             - -debug=true
             - -s3-credentials-file=/root/.aws/credentials.json
             - -server-addr=http://qiniu-x.jfcs-k8s-qa1.qiniu.io # this is an intranet domain of qiniu.
@@ -48,6 +50,23 @@ spec:
                   name: wework
             - name: DOCKER_HOST
               value: tcp://localhost:2375
+            - name: GITLAB_HOST
+              valueFrom:
+                secretKeyRef:
+                  key: gitlab-host
+                  name: gitlab
+            - name: GITLAB_PERSONAL_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  key: gitlab-personal-access-token
+                  name: gitlab
+            - name: GOPROXY
+              value: https://goproxy.cn,direct
+            - name: GOPRIVATE
+              valueFrom:
+                configMapKeyRef:
+                  key: goprivate
+                  name: goprivate
           image: aslan-spock-register.qiniu.io/qa/reviewbot:latest # use your own built image instead
           imagePullPolicy: Always
           resources:
