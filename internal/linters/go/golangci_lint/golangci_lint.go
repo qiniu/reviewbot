@@ -131,7 +131,7 @@ func (g *gitConfigModifier) Modify(cfg *config.Linter) (*config.Linter, error) {
 			return 0
 		}
 
-		max_retries=3
+		max_retries=5
 		retry_delay=1
 
 		i=1
@@ -143,6 +143,10 @@ func (g *gitConfigModifier) Modify(cfg *config.Linter) (*config.Linter, error) {
 			fi
 			i=$((i+1))
 		done
+
+		if [ $i -gt $max_retries ]; then
+			echo "WARNING: failed to configure git globally after $max_retries retries"
+		fi
 		`,
 			deleteOldConfigCmd,
 			currentConfigCmd,
@@ -215,6 +219,11 @@ func parser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput,
 
 		// skip the docker artifact log flag
 		if strings.Contains(ex, "---artifacts-") {
+			continue
+		}
+
+		// skip the git config error since it will retry 5 times
+		if strings.Contains(ex, "unable to read config file '/root/.gitconfig'") {
 			continue
 		}
 
