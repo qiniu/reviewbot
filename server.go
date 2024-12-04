@@ -394,7 +394,6 @@ func (s *Server) initCustomLinters() {
 	for linterName, customLinter := range s.config.CustomLinters {
 		linters.RegisterPullRequestHandler(linterName, linters.GeneralLinterHandler)
 		linters.RegisterLinterLanguages(linterName, customLinter.Languages)
-		log.Infof("register linter handler and languages for %s , languages: %v", linterName, customLinter.Languages)
 	}
 }
 

@@ -113,6 +113,8 @@ func (o options) Validate() error {
 			if o.llmModel == "" || o.llmServerURL == "" {
 				return errLLMServerNotSet
 			}
+		default:
+			return llm.ErrUnsupportedProvider
 		}
 	}
 	return nil
@@ -290,10 +292,12 @@ func main() {
 		}
 	}
 
-	s.initLLMModel()
 	go s.initDockerRunner()
 	go s.initKubernetesRunner()
 	s.initCustomLinters()
+	if o.llmProvider != "" {
+		s.initLLMModel()
+	}
 
 	if o.S3CredentialsFile != "" {
 		s.storage, err = storage.NewS3Storage(o.S3CredentialsFile)

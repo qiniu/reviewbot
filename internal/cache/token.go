@@ -6,7 +6,7 @@ import (
 )
 
 // DefaultTokenCache uses to cache provider impersonation tokens.
-var DefaultTokenCache = NewGitHubAppTokenCache()
+var DefaultTokenCache = NewTokenCache()
 
 // TokenCache implements the cache for provider impersonation tokens.
 type TokenCache struct {
@@ -19,8 +19,8 @@ type tokenWithExp struct {
 	exp   time.Time
 }
 
-// NewGitHubAppTokenCache creates a new token cache.
-func NewGitHubAppTokenCache() *TokenCache {
+// NewTokenCache creates a new token cache.
+func NewTokenCache() *TokenCache {
 	return &TokenCache{
 		tokens: make(map[string]tokenWithExp),
 	}
