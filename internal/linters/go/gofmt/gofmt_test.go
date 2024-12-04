@@ -20,7 +20,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/qiniu/reviewbot/internal/linters"
+	"github.com/qiniu/reviewbot/internal/lint"
 )
 
 func TestGofmtOutput(t *testing.T) {
@@ -31,11 +31,11 @@ func TestGofmtOutput(t *testing.T) {
 	}
 	tc := []struct {
 		input    []byte
-		expected []linters.LinterOutput
+		expected []lint.LinterOutput
 	}{
 		{
 			content,
-			[]linters.LinterOutput{
+			[]lint.LinterOutput{
 				{
 					File:    "testfile/staticcheck.go",
 					Line:    7,

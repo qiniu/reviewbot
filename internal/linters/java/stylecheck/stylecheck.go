@@ -24,8 +24,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/qiniu/reviewbot/internal/linters"
-	"github.com/qiniu/reviewbot/internal/lintersutil"
+	"github.com/qiniu/reviewbot/internal/lint"
+	"github.com/qiniu/reviewbot/internal/util"
 	"github.com/qiniu/x/errors"
 	"github.com/qiniu/x/xlog"
 )
@@ -40,12 +40,12 @@ const (
 )
 
 func init() {
-	linters.RegisterPullRequestHandler(linterName, stylecheckHandler)
-	linters.RegisterLinterLanguages(linterName, []string{".java"})
+	lint.RegisterPullRequestHandler(linterName, stylecheckHandler)
+	lint.RegisterLinterLanguages(linterName, []string{".java"})
 }
 
-func stylecheckHandler(ctx context.Context, a linters.Agent) error {
-	slog := lintersutil.FromContext(ctx)
+func stylecheckHandler(ctx context.Context, a lint.Agent) error {
+	slog := util.FromContext(ctx)
 	var javaFiles []string
 	rulePath := a.LinterConfig.ConfigPath
 	for _, arg := range a.Provider.GetFiles(nil) {
@@ -66,16 +66,16 @@ func stylecheckHandler(ctx context.Context, a linters.Agent) error {
 	a.LinterConfig.Args = append(a.LinterConfig.Args, "-jar", localStyleJar, "-c", checkrulePath)
 	a.LinterConfig.Args = append(a.LinterConfig.Args, javaFiles...)
 
-	return linters.GeneralHandler(ctx, slog, a, linters.ExecRun, stylecheckParser(a.LinterConfig.WorkDir))
+	return lint.GeneralHandler(ctx, slog, a, lint.ExecRun, stylecheckParser(a.LinterConfig.WorkDir))
 }
 
-func argsApply(log *xlog.Logger, a linters.Agent) linters.Agent {
+func argsApply(log *xlog.Logger, a lint.Agent) lint.Agent {
 	config := a.LinterConfig
 	if len(a.LinterConfig.Command) == 1 && a.LinterConfig.Command[0] == linterName {
 		config.Command = []string{"java"}
 	}
 	log.Info("stylecheck comamnd:" + strings.Join(config.Command, " "))
-	if linters.IsEmpty(config.Args...) {
+	if lint.IsEmpty(config.Args...) {
 		args := append([]string{}, "")
 		config.Args = args
 	}
@@ -83,9 +83,9 @@ func argsApply(log *xlog.Logger, a linters.Agent) linters.Agent {
 	return a
 }
 
-func stylecheckParser(codedir string) func(slog *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, []string) {
-	return func(slog *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, []string) {
-		lineParse := func(line string) (*linters.LinterOutput, error) {
+func stylecheckParser(codedir string) func(slog *xlog.Logger, output []byte) (map[string][]lint.LinterOutput, []string) {
+	return func(slog *xlog.Logger, output []byte) (map[string][]lint.LinterOutput, []string) {
+		lineParse := func(line string) (*lint.LinterOutput, error) {
 			// stylecheck will output lines starting with ' 开始检查(Starting audit) ' or '检查结束(Audit done) ' or 'stylecheck result(Checkstyle ends with 20 errors.)'
 			// which are no meaningful for the reviewbot scenario, so we discard them Starting audit done.
 			if strings.Contains(strings.ToLower(line), "checkstyle") || strings.HasPrefix(line, "Starting audit") || strings.HasPrefix(line, "Audit done") || strings.HasPrefix(line, "检查") {
@@ -93,15 +93,15 @@ func stylecheckParser(codedir string) func(slog *xlog.Logger, output []byte) (ma
 			}
 			line = strings.ReplaceAll(line, "[ERROR]", "")
 			line = strings.ReplaceAll(line, codedir+"/", "")
-			return linters.GeneralLineParser(strings.TrimLeft(line, " "))
+			return lint.GeneralLineParser(strings.TrimLeft(line, " "))
 		}
-		return linters.Parse(slog, output, lineParse)
+		return lint.Parse(slog, output, lineParse)
 	}
 }
 
 func stylecheckJar(slog *xlog.Logger) (string, error) {
 	jarfilepath := filepath.Join(styleRuleDir, localStyleJar)
-	_, exist := lintersutil.FileExists(jarfilepath)
+	_, exist := util.FileExists(jarfilepath)
 	if !exist {
 		res, err := getFileFromURL(slog, styleJarURL)
 		if err != nil {
@@ -139,7 +139,7 @@ func styleRuleCheck(codedir string) func(slog *xlog.Logger, styleConf string) (s
 	return func(slog *xlog.Logger, styleConf string) (string, error) {
 		tmpnewfile := filepath.Join(styleRuleDir, "tmp", filepath.Base(styleRuleURL))
 		if styleConf == "" {
-			absfilepath, _ := lintersutil.FileExists(tmpnewfile)
+			absfilepath, _ := util.FileExists(tmpnewfile)
 			if absfilepath != "" {
 				return absfilepath, nil
 			}
@@ -158,12 +158,12 @@ func styleRuleCheck(codedir string) func(slog *xlog.Logger, styleConf string) (s
 			}
 			return downloadfilepath, nil
 		}
-		absfilepath, exist := lintersutil.FileExists(styleConf)
+		absfilepath, exist := util.FileExists(styleConf)
 		if exist {
 			return absfilepath, nil
 		}
 		rulefilepathcode := filepath.Join(codedir, styleConf)
-		absfilepathcode, existcode := lintersutil.FileExists(rulefilepathcode)
+		absfilepathcode, existcode := util.FileExists(rulefilepathcode)
 		if existcode {
 			return absfilepathcode, nil
 		}

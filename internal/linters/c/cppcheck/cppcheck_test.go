@@ -20,19 +20,19 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/qiniu/reviewbot/internal/linters"
+	"github.com/qiniu/reviewbot/internal/lint"
 	"github.com/qiniu/x/xlog"
 )
 
 func TestParser(t *testing.T) {
 	tc := []struct {
 		input      string
-		expected   map[string][]linters.LinterOutput
+		expected   map[string][]lint.LinterOutput
 		unexpected []string
 	}{
 		{
 			input: "'cppcheck_test.c:6:7: Array 'a[10]' accessed at index 10, which is out of bounds.'",
-			expected: map[string][]linters.LinterOutput{
+			expected: map[string][]lint.LinterOutput{
 				"cppcheck_test.c": {
 					{
 						File:    "cppcheck_test.c",
@@ -46,7 +46,7 @@ func TestParser(t *testing.T) {
 		},
 		{
 			input:      "''",
-			expected:   map[string][]linters.LinterOutput{},
+			expected:   map[string][]lint.LinterOutput{},
 			unexpected: nil,
 		},
 	}

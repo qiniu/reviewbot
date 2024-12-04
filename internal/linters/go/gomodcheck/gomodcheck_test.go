@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	"github.com/google/go-github/v57/github"
-	"github.com/qiniu/reviewbot/internal/linters"
+	"github.com/qiniu/reviewbot/internal/lint"
 	"github.com/qiniu/x/xlog"
 )
 
@@ -33,7 +33,7 @@ func TestGoModCheck(t *testing.T) {
 		id      string
 		content []byte
 		input   []*github.CommitFile
-		want    map[string][]linters.LinterOutput
+		want    map[string][]lint.LinterOutput
 	}{
 		{
 			id:      "case1 : cross-repository local replacement ",
@@ -43,7 +43,7 @@ func TestGoModCheck(t *testing.T) {
 					Filename: github.String("c/go.mod"),
 				},
 			},
-			want: map[string][]linters.LinterOutput{
+			want: map[string][]lint.LinterOutput{
 				"c/go.mod": {
 					{
 						File:    "c/go.mod",
@@ -62,7 +62,7 @@ func TestGoModCheck(t *testing.T) {
 					Filename: github.String("c/go.mod"),
 				},
 			},
-			want: map[string][]linters.LinterOutput{},
+			want: map[string][]lint.LinterOutput{},
 		},
 		{
 			id:      "case3 : valid non-local replacement ",
@@ -72,7 +72,7 @@ func TestGoModCheck(t *testing.T) {
 					Filename: github.String("c/go.mod"),
 				},
 			},
-			want: map[string][]linters.LinterOutput{},
+			want: map[string][]lint.LinterOutput{},
 		},
 		{
 			id:      "case4 : multiple go.mod files",
@@ -85,7 +85,7 @@ func TestGoModCheck(t *testing.T) {
 					Filename: github.String("d/go.mod"),
 				},
 			},
-			want: map[string][]linters.LinterOutput{
+			want: map[string][]lint.LinterOutput{
 				"c/go.mod": {
 					{
 						File:    "c/go.mod",
@@ -108,7 +108,7 @@ func TestGoModCheck(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.id, func(t *testing.T) {
-			p, err := linters.NewGithubProvider(context.TODO(), nil, github.PullRequestEvent{}, linters.WithPullRequestChangedFiles(tc.input))
+			p, err := lint.NewGithubProvider(context.TODO(), nil, github.PullRequestEvent{}, lint.WithPullRequestChangedFiles(tc.input))
 			if err != nil {
 				t.Errorf("Error creating github provider: %v", err)
 				return
@@ -131,7 +131,7 @@ func TestGoModCheck(t *testing.T) {
 				}
 			}
 
-			output, err := goModCheckOutput(&xlog.Logger{}, linters.Agent{
+			output, err := goModCheckOutput(&xlog.Logger{}, lint.Agent{
 				Provider: p,
 			})
 			if err != nil {

@@ -21,18 +21,18 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/qiniu/reviewbot/internal/linters"
+	"github.com/qiniu/reviewbot/internal/lint"
 )
 
 func TestRebaseCheckRule(t *testing.T) {
 	tcs := []struct {
 		title    string
-		commits  []linters.Commit
+		commits  []lint.Commit
 		expected string
 	}{
 		{
 			title: "filter merge commits",
-			commits: []linters.Commit{
+			commits: []lint.Commit{
 				{
 					Message: "feat: add feature 1",
 				},
@@ -50,7 +50,7 @@ func TestRebaseCheckRule(t *testing.T) {
 		},
 		{
 			title: "filter duplicate commits",
-			commits: []linters.Commit{
+			commits: []lint.Commit{
 				{
 					Message: "feat: add feature 1",
 				},
@@ -65,7 +65,7 @@ func TestRebaseCheckRule(t *testing.T) {
 		},
 		{
 			title: "filter duplicate and merge commits",
-			commits: []linters.Commit{
+			commits: []lint.Commit{
 				{
 					Message: "feat: add feature 1",
 				},
@@ -80,7 +80,7 @@ func TestRebaseCheckRule(t *testing.T) {
 		},
 		{
 			title: "filter duplicate and merge commits",
-			commits: []linters.Commit{
+			commits: []lint.Commit{
 				{
 					Message: "feat: add feature 1",
 				},

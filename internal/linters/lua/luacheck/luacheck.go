@@ -20,8 +20,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/qiniu/reviewbot/internal/linters"
-	"github.com/qiniu/reviewbot/internal/lintersutil"
+	"github.com/qiniu/reviewbot/internal/lint"
+	"github.com/qiniu/reviewbot/internal/util"
 	"github.com/qiniu/x/xlog"
 )
 
@@ -29,13 +29,13 @@ import (
 const linterName = "luacheck"
 
 func init() {
-	linters.RegisterPullRequestHandler(linterName, luacheckHandler)
-	linters.RegisterLinterLanguages(linterName, []string{".lua"})
+	lint.RegisterPullRequestHandler(linterName, luacheckHandler)
+	lint.RegisterLinterLanguages(linterName, []string{".lua"})
 }
 
-func luacheckHandler(ctx context.Context, a linters.Agent) error {
-	log := lintersutil.FromContext(ctx)
-	if linters.IsEmpty(a.LinterConfig.Args...) {
+func luacheckHandler(ctx context.Context, a lint.Agent) error {
+	log := util.FromContext(ctx)
+	if lint.IsEmpty(a.LinterConfig.Args...) {
 		// identify global variables for Redis and Nginx modules.
 		// disable the maximum line length check, which is no need.
 		// luacheck execute the command "--globals='ngx KEYS ARGV table redis cjson'", which does not take effect.
@@ -59,11 +59,11 @@ func luacheckHandler(ctx context.Context, a linters.Agent) error {
 	// checking on luacheck 0.26.1 Lua5.1, there is no problem even with multiple --no-color parameter,
 	// so we can add the parameter directly
 	a.LinterConfig.Args = append(a.LinterConfig.Args, "--no-color")
-	return linters.GeneralHandler(ctx, log, a, linters.ExecRun, parser)
+	return lint.GeneralHandler(ctx, log, a, lint.ExecRun, parser)
 }
 
-func parser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, []string) {
-	lineParse := func(line string) (*linters.LinterOutput, error) {
+func parser(log *xlog.Logger, output []byte) (map[string][]lint.LinterOutput, []string) {
+	lineParse := func(line string) (*lint.LinterOutput, error) {
 		// luacheck will output lines starting with 'Total ' or 'Checking '
 		// which are no meaningful for the reviewbot scenario, so we discard them
 		// such as:
@@ -73,7 +73,7 @@ func parser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput,
 		if strings.HasPrefix(line, "Total: ") || strings.HasPrefix(line, "Checking ") || line == "" {
 			return nil, nil
 		}
-		return linters.GeneralLineParser(strings.TrimLeft(line, " "))
+		return lint.GeneralLineParser(strings.TrimLeft(line, " "))
 	}
-	return linters.Parse(log, output, lineParse)
+	return lint.Parse(log, output, lineParse)
 }

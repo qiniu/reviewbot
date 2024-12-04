@@ -37,11 +37,11 @@ import (
 	"github.com/google/go-github/v57/github"
 	"github.com/gregjones/httpcache"
 	"github.com/qiniu/reviewbot/config"
-	"github.com/qiniu/reviewbot/internal/linters"
-	"github.com/qiniu/reviewbot/internal/lintersutil"
+	"github.com/qiniu/reviewbot/internal/lint"
 	"github.com/qiniu/reviewbot/internal/llm"
 	"github.com/qiniu/reviewbot/internal/runner"
 	"github.com/qiniu/reviewbot/internal/storage"
+	"github.com/qiniu/reviewbot/internal/util"
 	"github.com/qiniu/x/log"
 	"github.com/tmc/langchaingo/llms"
 	"github.com/xanzy/go-gitlab"
@@ -99,8 +99,8 @@ func (s *Server) serveGitHub(w http.ResponseWriter, r *http.Request) {
 		// limit the length of eventGUID to 12
 		eventGUID = eventGUID[len(eventGUID)-12:]
 	}
-	ctx := context.WithValue(context.Background(), lintersutil.EventGUIDKey, eventGUID)
-	log := lintersutil.FromContext(ctx)
+	ctx := context.WithValue(context.Background(), util.EventGUIDKey, eventGUID)
+	log := util.FromContext(ctx)
 
 	payload, err := github.ValidatePayload(r, s.webhookSecret)
 	if err != nil {
@@ -160,8 +160,8 @@ func (s *Server) serveGitLab(w http.ResponseWriter, r *http.Request) {
 		// limit the length of eventGUID to 12
 		eventGUID = eventGUID[len(eventGUID)-12:]
 	}
-	ctx := context.WithValue(context.Background(), lintersutil.EventGUIDKey, eventGUID)
-	log := lintersutil.FromContext(ctx)
+	ctx := context.WithValue(context.Background(), util.EventGUIDKey, eventGUID)
+	log := util.FromContext(ctx)
 
 	payload, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -204,11 +204,11 @@ func (s *Server) handleGitHubEvent(ctx context.Context, event *github.PullReques
 	return s.withCancel(ctx, info, func(ctx context.Context) error {
 		installationID := event.GetInstallation().GetID()
 
-		platformInfo := linters.ProviderInfo{
+		platformInfo := lint.ProviderInfo{
 			Host:     "github.com",
 			Platform: config.GitHub,
 		}
-		provider, err := linters.NewGithubProvider(ctx, s.GithubClient(installationID), *event, linters.WithGitHubProviderInfo(platformInfo))
+		provider, err := lint.NewGithubProvider(ctx, s.GithubClient(installationID), *event, lint.WithGitHubProviderInfo(platformInfo))
 		if err != nil {
 			return err
 		}
@@ -235,8 +235,8 @@ func (s *Server) handleGitLabEvent(ctx context.Context, event *gitlab.MergeEvent
 	}
 
 	return s.withCancel(ctx, info, func(ctx context.Context) error {
-		log := lintersutil.FromContext(ctx)
-		platformInfo := linters.ProviderInfo{
+		log := util.FromContext(ctx)
+		platformInfo := lint.ProviderInfo{
 			Host:     s.gitLabHost,
 			Platform: config.GitLab,
 		}
@@ -244,7 +244,7 @@ func (s *Server) handleGitLabEvent(ctx context.Context, event *gitlab.MergeEvent
 			platformInfo.Host = "gitlab.com"
 		}
 
-		gitlabProvider, err := linters.NewGitlabProvider(ctx, s.GitLabClient(), *event, linters.WithGitlabProviderInfo(platformInfo))
+		gitlabProvider, err := lint.NewGitlabProvider(ctx, s.GitLabClient(), *event, lint.WithGitlabProviderInfo(platformInfo))
 		if err != nil {
 			log.Errorf("failed to create provider: %v", err)
 			return err
@@ -272,13 +272,13 @@ type codeRequestInfo struct {
 	workDir  string
 	repoDir  string
 	// affectedFiles []string
-	provider linters.Provider
+	provider lint.Provider
 }
 
 func (s *Server) handleCodeRequestEvent(ctx context.Context, info *codeRequestInfo) error {
-	log := lintersutil.FromContext(ctx)
+	log := util.FromContext(ctx)
 
-	for name, fn := range linters.TotalPullRequestHandlers() {
+	for name, fn := range lint.TotalPullRequestHandlers() {
 		linterConfig := s.config.GetLinterConfig(info.org, info.repo, name, info.platform)
 
 		// skip if linter is not enabled
@@ -298,16 +298,16 @@ func (s *Server) handleCodeRequestEvent(ctx context.Context, info *codeRequestIn
 
 		log.Infof("[%s] config on repo %v: %+v", name, info.orgRepo, linterConfig)
 
-		agent := linters.Agent{
+		agent := lint.Agent{
 			LinterConfig: linterConfig,
 			// workspace is the root dir of the repo
 			RepoDir:  linterConfig.Workspace + "/" + info.repo,
-			ID:       lintersutil.GetEventGUID(ctx),
+			ID:       util.GetEventGUID(ctx),
 			Provider: info.provider,
 		}
 
 		// skip if linter is not language related
-		if !linters.LinterRelated(linterConfig.Name, agent) {
+		if !lint.LinterRelated(linterConfig.Name, agent) {
 			log.Debugf("linter %s is not related, skipping", linterConfig.Name)
 			continue
 		}
@@ -392,8 +392,8 @@ func (s *Server) initLLMModel() {
 
 func (s *Server) initCustomLinters() {
 	for linterName, customLinter := range s.config.CustomLinters {
-		linters.RegisterPullRequestHandler(linterName, linters.GeneralLinterHandler)
-		linters.RegisterLinterLanguages(linterName, customLinter.Languages)
+		lint.RegisterPullRequestHandler(linterName, lint.GeneralLinterHandler)
+		lint.RegisterLinterLanguages(linterName, customLinter.Languages)
 	}
 }
 
@@ -523,7 +523,7 @@ func (s *Server) pullImageWithRetry(ctx context.Context, image string, dockerRun
 }
 
 func (s *Server) processIssueCommentEvent(ctx context.Context, event *github.IssueCommentEvent) error {
-	log := lintersutil.FromContext(ctx)
+	log := util.FromContext(ctx)
 	if event.GetAction() != "created" {
 		log.Debugf("skipping action %s\n", event.GetAction())
 		return nil
@@ -552,7 +552,7 @@ func (s *Server) processIssueCommentEvent(ctx context.Context, event *github.Iss
 }
 
 func (s *Server) processPullRequestReviewCommentEvent(ctx context.Context, event *github.PullRequestReviewCommentEvent) error {
-	log := lintersutil.FromContext(ctx)
+	log := util.FromContext(ctx)
 	if event.GetAction() != "created" {
 		log.Debugf("skipping action %s\n", event.GetAction())
 		return nil
@@ -596,7 +596,7 @@ func (s *Server) processPullRequestReviewCommentEvent(ctx context.Context, event
 }
 
 func (s *Server) processPullRequestEvent(ctx context.Context, event *github.PullRequestEvent) error {
-	log := lintersutil.FromContext(ctx)
+	log := util.FromContext(ctx)
 	if event.GetAction() != "opened" && event.GetAction() != "reopened" && event.GetAction() != "synchronize" {
 		log.Debugf("skipping action %s\n", event.GetAction())
 		return nil
@@ -606,7 +606,7 @@ func (s *Server) processPullRequestEvent(ctx context.Context, event *github.Pull
 }
 
 func (s *Server) processCheckRunRequestEvent(ctx context.Context, event *github.CheckRunEvent) error {
-	log := lintersutil.FromContext(ctx)
+	log := util.FromContext(ctx)
 	if event.GetAction() != "rerequested" {
 		log.Debugf("Skipping action %s for check run event", event.GetAction())
 		return nil
@@ -619,7 +619,7 @@ func (s *Server) processCheckRunRequestEvent(ctx context.Context, event *github.
 	installationID := event.GetInstallation().GetID()
 
 	client := s.GithubClient(installationID)
-	prs, err := linters.FilterPullRequestsWithCommit(ctx, client, org, repoName, headSHA)
+	prs, err := lint.FilterPullRequestsWithCommit(ctx, client, org, repoName, headSHA)
 	if err != nil {
 		log.Errorf("failed to filter pull requests: %v", err)
 		return nil
@@ -649,7 +649,7 @@ func (s *Server) processCheckRunRequestEvent(ctx context.Context, event *github.
 }
 
 func (s *Server) processCheckSuiteEvent(ctx context.Context, event *github.CheckSuiteEvent) error {
-	log := lintersutil.FromContext(ctx)
+	log := util.FromContext(ctx)
 	if event.GetAction() != "rerequested" {
 		log.Debugf("skipping action %s\n", event.GetAction())
 		return nil
@@ -659,7 +659,7 @@ func (s *Server) processCheckSuiteEvent(ctx context.Context, event *github.Check
 	org := event.GetRepo().GetOwner().GetLogin()
 	repo := event.GetRepo().GetName()
 	installationID := event.GetInstallation().GetID()
-	plist, err := linters.FilterPullRequestsWithCommit(ctx, s.GithubClient(installationID), org, repo, headSha)
+	plist, err := lint.FilterPullRequestsWithCommit(ctx, s.GithubClient(installationID), org, repo, headSha)
 	if err != nil {
 		log.Errorf("failed to filter pull requests: %v", err)
 		return nil
@@ -686,7 +686,7 @@ func (s *Server) processCheckSuiteEvent(ctx context.Context, event *github.Check
 }
 
 func (s *Server) processMergeRequestEvent(ctx context.Context, event *gitlab.MergeEvent) error {
-	log := lintersutil.FromContext(ctx)
+	log := util.FromContext(ctx)
 	if event.ObjectAttributes.State != "opened" && event.ObjectAttributes.State != "reopened" {
 		log.Debugf("skipping action %s\n", event.ObjectAttributes.State)
 		return nil

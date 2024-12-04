@@ -31,7 +31,7 @@ import (
 	"github.com/docker/docker/api/types/network"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/qiniu/reviewbot/config"
-	"github.com/qiniu/reviewbot/internal/lintersutil"
+	"github.com/qiniu/reviewbot/internal/util"
 )
 
 // Runner defines the interface for executing linters.
@@ -71,7 +71,7 @@ func (l *LocalRunner) Prepare(ctx context.Context, cfg *config.Linter) error {
 }
 
 func (l *LocalRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadCloser, error) {
-	log := lintersutil.FromContext(ctx)
+	log := util.FromContext(ctx)
 	newCfg, err := cfg.Modifier.Modify(cfg)
 	if err != nil {
 		return nil, err

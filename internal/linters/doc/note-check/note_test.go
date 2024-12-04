@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/qiniu/reviewbot/internal/linters"
+	"github.com/qiniu/reviewbot/internal/lint"
 )
 
 func TestNoteCheckFile(t *testing.T) {
@@ -28,14 +28,14 @@ func TestNoteCheckFile(t *testing.T) {
 		name     string
 		workdir  string
 		filename string
-		expected map[string][]linters.LinterOutput
+		expected map[string][]lint.LinterOutput
 		error    error
 	}{
 		{
 			name:     "kinds_of_notes",
 			workdir:  "testdata",
 			filename: "note.go",
-			expected: map[string][]linters.LinterOutput{
+			expected: map[string][]lint.LinterOutput{
 				"note.go": {
 					{
 						File:    "note.go",

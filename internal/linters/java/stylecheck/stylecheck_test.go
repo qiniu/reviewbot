@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	"github.com/qiniu/reviewbot/config"
-	"github.com/qiniu/reviewbot/internal/linters"
+	"github.com/qiniu/reviewbot/internal/lint"
 	"github.com/qiniu/x/errors"
 	"github.com/qiniu/x/xlog"
 )
@@ -32,18 +32,18 @@ func TestArgs(t *testing.T) {
 	tp := true
 	tcs := []struct {
 		id    string
-		input linters.Agent
-		want  linters.Agent
+		input lint.Agent
+		want  lint.Agent
 	}{
 		{
 			id: "case1 - default command and args",
-			input: linters.Agent{
+			input: lint.Agent{
 				LinterConfig: config.Linter{
 					Enable:  &tp,
 					Command: []string{"stylecheck"},
 				},
 			},
-			want: linters.Agent{
+			want: lint.Agent{
 				LinterConfig: config.Linter{
 					Enable:  &tp,
 					Command: []string{"java"},
@@ -53,13 +53,13 @@ func TestArgs(t *testing.T) {
 		},
 		{
 			id: "case2 - custom command",
-			input: linters.Agent{
+			input: lint.Agent{
 				LinterConfig: config.Linter{
 					Enable:  &tp,
 					Command: []string{"/usr/java"},
 				},
 			},
-			want: linters.Agent{
+			want: lint.Agent{
 				LinterConfig: config.Linter{
 					Enable:  &tp,
 					Command: []string{"/usr/java"},
@@ -69,14 +69,14 @@ func TestArgs(t *testing.T) {
 		},
 		{
 			id: "case3 - custom args",
-			input: linters.Agent{
+			input: lint.Agent{
 				LinterConfig: config.Linter{
 					Enable:  &tp,
 					Command: []string{"stylecheck"},
 					Args:    []string{"-f", "xml"},
 				},
 			},
-			want: linters.Agent{
+			want: lint.Agent{
 				LinterConfig: config.Linter{
 					Enable:  &tp,
 					Command: []string{"java"},
@@ -169,7 +169,7 @@ func TestCheckJar(t *testing.T) {
 func TestFormatStyleCheckLine(t *testing.T) {
 	tc := []struct {
 		input      []byte
-		expected   map[string][]linters.LinterOutput
+		expected   map[string][]lint.LinterOutput
 		unexpected []string
 	}{
 		{
@@ -180,7 +180,7 @@ func TestFormatStyleCheckLine(t *testing.T) {
 [ERROR] /Users/zhouxiaoliang/Documents/qproject/prow/cmd/phony/examples/api/v1/admin/test.java:16:5: Missing a Javadoc comment. [MissingJavadocMethod]
 Audit done.
 Checkstyle ends with 20 errors.`),
-			expected: map[string][]linters.LinterOutput{
+			expected: map[string][]lint.LinterOutput{
 				"api/v1/admin/test.java": {
 					{
 						File:    "api/v1/admin/test.java",

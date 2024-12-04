@@ -24,8 +24,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/qiniu/reviewbot/internal/linters"
-	"github.com/qiniu/reviewbot/internal/lintersutil"
+	"github.com/qiniu/reviewbot/internal/lint"
+	"github.com/qiniu/reviewbot/internal/util"
 	"github.com/qiniu/x/errors"
 	"github.com/qiniu/x/xlog"
 )
@@ -38,12 +38,12 @@ const (
 )
 
 func init() {
-	linters.RegisterPullRequestHandler(linterName, pmdCheckHandler)
-	linters.RegisterLinterLanguages(linterName, []string{".java"})
+	lint.RegisterPullRequestHandler(linterName, pmdCheckHandler)
+	lint.RegisterLinterLanguages(linterName, []string{".java"})
 }
 
-func pmdCheckHandler(ctx context.Context, a linters.Agent) error {
-	plog := lintersutil.FromContext(ctx)
+func pmdCheckHandler(ctx context.Context, a lint.Agent) error {
+	plog := util.FromContext(ctx)
 	var javaFiles []string
 	rulePath := a.LinterConfig.ConfigPath
 	for _, arg := range a.Provider.GetFiles(nil) {
@@ -61,16 +61,16 @@ func pmdCheckHandler(ctx context.Context, a linters.Agent) error {
 	}
 	a = argsApply(plog, a)
 	a.LinterConfig.Args = append(append(a.LinterConfig.Args, javaFiles...), "-R", checkrulePath)
-	return linters.GeneralHandler(ctx, plog, a, linters.ExecRun, pmdcheckParser)
+	return lint.GeneralHandler(ctx, plog, a, lint.ExecRun, pmdcheckParser)
 }
 
-func argsApply(log *xlog.Logger, a linters.Agent) linters.Agent {
+func argsApply(log *xlog.Logger, a lint.Agent) lint.Agent {
 	config := a.LinterConfig
 	if len(config.Command) == 1 && config.Command[0] == linterName {
 		config.Command = []string{"pmd"}
 	}
 	log.Info("pmdcheck comamnd:" + strings.Join(config.Command, " "))
-	if linters.IsEmpty(config.Args...) {
+	if lint.IsEmpty(config.Args...) {
 		args := append([]string{}, "check")
 		args = append(args, "-f", "emacs")
 		config.Args = args
@@ -79,16 +79,16 @@ func argsApply(log *xlog.Logger, a linters.Agent) linters.Agent {
 	return a
 }
 
-func pmdcheckParser(plog *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, []string) {
-	lineParse := func(line string) (*linters.LinterOutput, error) {
+func pmdcheckParser(plog *xlog.Logger, output []byte) (map[string][]lint.LinterOutput, []string) {
+	lineParse := func(line string) (*lint.LinterOutput, error) {
 		// pmdcheck will output lines starting with ' [WARN]' or '[ERROR]'  warring/error information
 		// which are no meaningful for the reviewbot scenario, so we discard them
 		if strings.Contains(line, "[WARN]") || strings.Contains(line, "[ERROR]") {
 			return nil, nil
 		}
-		return linters.GeneralLineParser(strings.TrimLeft(line, " "))
+		return lint.GeneralLineParser(strings.TrimLeft(line, " "))
 	}
-	return linters.Parse(plog, output, lineParse)
+	return lint.Parse(plog, output, lineParse)
 }
 
 func getFileFromURL(plog *xlog.Logger, url string) (string, error) {
@@ -115,10 +115,10 @@ func getFileFromURL(plog *xlog.Logger, url string) (string, error) {
 	return newfile, nil
 }
 
-func pmdRuleCheck(plog *xlog.Logger, pmdConf string, a linters.Agent) (string, error) {
+func pmdRuleCheck(plog *xlog.Logger, pmdConf string, a lint.Agent) (string, error) {
 	tmpnewfile := filepath.Join(pmdRuleDir, filepath.Base(pmdRuleURL))
 	if pmdConf == "" {
-		absfilepath, _ := lintersutil.FileExists(tmpnewfile)
+		absfilepath, _ := util.FileExists(tmpnewfile)
 		if absfilepath != "" {
 			return absfilepath, nil
 		}
@@ -137,12 +137,12 @@ func pmdRuleCheck(plog *xlog.Logger, pmdConf string, a linters.Agent) (string, e
 		}
 		return downloadfilepath, nil
 	}
-	absfilepath, exist := lintersutil.FileExists(pmdConf)
+	absfilepath, exist := util.FileExists(pmdConf)
 	if exist {
 		return absfilepath, nil
 	}
 	pmdconfpath := filepath.Join(a.LinterConfig.WorkDir, pmdConf)
-	abspmdfilepath, _ := lintersutil.FileExists(pmdconfpath)
+	abspmdfilepath, _ := util.FileExists(pmdconfpath)
 	if absfilepath != "" {
 		return abspmdfilepath, nil
 	}

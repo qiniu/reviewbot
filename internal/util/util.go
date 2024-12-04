@@ -14,7 +14,7 @@
  limitations under the License.
 */
 
-package lintersutil
+package util
 
 import (
 	"context"
@@ -64,7 +64,7 @@ type contextKey string
 // EventGUIDKey is the key for the event GUID in the context.
 const EventGUIDKey contextKey = "event_guid"
 
-// FromContext returns a logger from the context.
+// util.FromContext returns a logger from the context.
 func FromContext(ctx context.Context) *xlog.Logger {
 	eventGUID, ok := ctx.Value(EventGUIDKey).(string)
 	if !ok {

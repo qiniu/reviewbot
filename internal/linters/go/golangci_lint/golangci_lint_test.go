@@ -27,7 +27,7 @@ import (
 
 	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/reviewbot/config"
-	"github.com/qiniu/reviewbot/internal/linters"
+	"github.com/qiniu/reviewbot/internal/lint"
 	"github.com/qiniu/x/xlog"
 )
 
@@ -35,7 +35,7 @@ func TestParser(t *testing.T) {
 	cases := []struct {
 		id         string
 		output     []byte
-		want       map[string][]linters.LinterOutput
+		want       map[string][]lint.LinterOutput
 		unexpected []string
 	}{
 		{
@@ -44,7 +44,7 @@ func TestParser(t *testing.T) {
 golangci_lint/golangci_lint.go:16:1: warning: (golint)
 golangci_lint.go:18:3: error: (golint)
 `),
-			want: map[string][]linters.LinterOutput{
+			want: map[string][]lint.LinterOutput{
 				"golangci_lint/golangci_lint.go": {
 					{
 						File:    "golangci_lint/golangci_lint.go",
@@ -70,7 +70,7 @@ golangci_lint.go:18:3: error: (golint)
 golangci_lint.go:16:1: error (typecheck)
 golangci_lint.go:16:1: error (gochecknoglobals)
 `),
-			want: map[string][]linters.LinterOutput{
+			want: map[string][]lint.LinterOutput{
 				"golangci_lint.go": {
 					{
 						File:    "golangci_lint.go",
@@ -89,7 +89,7 @@ level=warning msg="[linters_context] copyloopvar: this linter is disabled becaus
 golangci_lint.go:16:1: warning: (gochecknoglobals)
 `),
 
-			want: map[string][]linters.LinterOutput{
+			want: map[string][]lint.LinterOutput{
 				"golangci_lint.go": {
 					{
 						File:    "golangci_lint.go",
@@ -120,18 +120,18 @@ func TestArgs(t *testing.T) {
 	tp := true
 	tcs := []struct {
 		id    string
-		input linters.Agent
-		want  linters.Agent
+		input lint.Agent
+		want  lint.Agent
 	}{
 		{
 			id: "case1 - default args",
-			input: linters.Agent{
+			input: lint.Agent{
 				LinterConfig: config.Linter{
 					Enable:  &tp,
 					Command: []string{"golangci-lint"},
 				},
 			},
-			want: linters.Agent{
+			want: lint.Agent{
 				LinterConfig: config.Linter{
 					Enable:  &tp,
 					Command: []string{"golangci-lint"},
@@ -141,14 +141,14 @@ func TestArgs(t *testing.T) {
 		},
 		{
 			id: "case2 - custom args",
-			input: linters.Agent{
+			input: lint.Agent{
 				LinterConfig: config.Linter{
 					Enable:  &tp,
 					Command: []string{"golangci-lint"},
 					Args:    []string{"run", "--timeout=10m", "--out-format=tab", "--config", "golangci-lint.yml"},
 				},
 			},
-			want: linters.Agent{
+			want: lint.Agent{
 				LinterConfig: config.Linter{
 					Enable:  &tp,
 					Command: []string{"golangci-lint"},
@@ -158,13 +158,13 @@ func TestArgs(t *testing.T) {
 		},
 		{
 			id: "case3 - custom command",
-			input: linters.Agent{
+			input: lint.Agent{
 				LinterConfig: config.Linter{
 					Command: []string{"bash"},
 					Args:    []string{"run"},
 				},
 			},
-			want: linters.Agent{
+			want: lint.Agent{
 				LinterConfig: config.Linter{
 					Command: []string{"bash"},
 					Args:    []string{"run"},
@@ -173,13 +173,13 @@ func TestArgs(t *testing.T) {
 		},
 		{
 			id: "case4 - not run command",
-			input: linters.Agent{
+			input: lint.Agent{
 				LinterConfig: config.Linter{
 					Command: []string{"golangci-lint"},
 					Args:    []string{"linters"},
 				},
 			},
-			want: linters.Agent{
+			want: lint.Agent{
 				LinterConfig: config.Linter{
 					Command: []string{"golangci-lint"},
 					Args:    []string{"linters"},
@@ -188,13 +188,13 @@ func TestArgs(t *testing.T) {
 		},
 		{
 			id: "case5 - shell command",
-			input: linters.Agent{
+			input: lint.Agent{
 				LinterConfig: config.Linter{
 					Command: []string{"/bin/bash", "-c", "--"},
 					Args:    []string{"echo 'abc'", "golangci-lint run "},
 				},
 			},
-			want: linters.Agent{
+			want: lint.Agent{
 				LinterConfig: config.Linter{
 					Command: []string{"/bin/bash", "-c", "--"},
 					Args:    []string{"echo 'abc'", "golangci-lint run "},
@@ -203,7 +203,7 @@ func TestArgs(t *testing.T) {
 		},
 		{
 			id: "case6 - custom config path",
-			input: linters.Agent{
+			input: lint.Agent{
 				LinterConfig: config.Linter{
 					Enable:     &tp,
 					Command:    []string{"golangci-lint"},
@@ -211,7 +211,7 @@ func TestArgs(t *testing.T) {
 					ConfigPath: "config/golangci-lint.yml",
 				},
 			},
-			want: linters.Agent{
+			want: lint.Agent{
 				LinterConfig: config.Linter{
 					Enable:     &tp,
 					Command:    []string{"golangci-lint"},
@@ -235,12 +235,12 @@ func TestArgs(t *testing.T) {
 func TestGolangciConfigApply(t *testing.T) {
 	tcs := []struct {
 		id         string
-		input      linters.Agent
+		input      lint.Agent
 		wantSuffix string
 	}{
 		{
 			id: "case1 - default config path",
-			input: linters.Agent{
+			input: lint.Agent{
 				LinterConfig: config.Linter{
 					Command:    []string{"golangci-lint"},
 					Args:       []string{"run"},
@@ -251,7 +251,7 @@ func TestGolangciConfigApply(t *testing.T) {
 		},
 		{
 			id: "case2 - with workdir",
-			input: linters.Agent{
+			input: lint.Agent{
 				LinterConfig: config.Linter{
 					Command:    []string{"golangci-lint"},
 					Args:       []string{"run"},
@@ -263,7 +263,7 @@ func TestGolangciConfigApply(t *testing.T) {
 		},
 		{
 			id: "case3 - config outside repo",
-			input: linters.Agent{
+			input: lint.Agent{
 				LinterConfig: config.Linter{
 					Command:    []string{"golangci-lint"},
 					Args:       []string{"run"},
@@ -275,7 +275,7 @@ func TestGolangciConfigApply(t *testing.T) {
 		},
 		{
 			id: "case4 - empty config path",
-			input: linters.Agent{
+			input: lint.Agent{
 				LinterConfig: config.Linter{
 					Command: []string{"golangci-lint"},
 					Args:    []string{"run"},
@@ -309,7 +309,7 @@ func TestFindGoModsPaths(t *testing.T) {
 	tcs := []struct {
 		id            string
 		currentDir    string
-		input         linters.Agent
+		input         lint.Agent
 		changedFiles  []*github.CommitFile
 		wantDir       string
 		createModPath []string
@@ -318,7 +318,7 @@ func TestFindGoModsPaths(t *testing.T) {
 	}{
 		{
 			id: "1 gomod file ",
-			input: linters.Agent{
+			input: lint.Agent{
 				LinterConfig: config.Linter{
 					WorkDir: "repo1/",
 				},
@@ -344,7 +344,7 @@ func TestFindGoModsPaths(t *testing.T) {
 
 		{
 			id: "no gomod file",
-			input: linters.Agent{
+			input: lint.Agent{
 				LinterConfig: config.Linter{
 					WorkDir: "repo2/",
 				},
@@ -366,7 +366,7 @@ func TestFindGoModsPaths(t *testing.T) {
 		},
 		{
 			id: "3 go.mod files in different dir, 1 go.mod file is not in filepath",
-			input: linters.Agent{
+			input: lint.Agent{
 				LinterConfig: config.Linter{
 					WorkDir: "repo3/",
 				},
@@ -416,7 +416,7 @@ func TestFindGoModsPaths(t *testing.T) {
 					defer file.Close()
 				}
 			}
-			p, err := linters.NewGithubProvider(context.TODO(), nil, github.PullRequestEvent{}, linters.WithPullRequestChangedFiles(tc.changedFiles))
+			p, err := lint.NewGithubProvider(context.TODO(), nil, github.PullRequestEvent{}, lint.WithPullRequestChangedFiles(tc.changedFiles))
 			if err != nil {
 				t.Errorf("Error creating github provider: %v", err)
 			}
