@@ -11,16 +11,16 @@ import (
 
 	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/reviewbot/config"
-	"github.com/qiniu/reviewbot/internal/linters"
-	"github.com/qiniu/reviewbot/internal/lintersutil"
+	"github.com/qiniu/reviewbot/internal/lint"
+	"github.com/qiniu/reviewbot/internal/util"
 	"github.com/qiniu/x/log"
 	gitv2 "sigs.k8s.io/prow/pkg/git/v2"
 )
 
 var errUnsupportedPlatform = errors.New("unsupported platform")
 
-func (s *Server) prepareGitRepos(ctx context.Context, org, repo string, num int, platform config.Platform, installationID int64, provider linters.Provider) (workspace string, workDir string, err error) {
-	log := lintersutil.FromContext(ctx)
+func (s *Server) prepareGitRepos(ctx context.Context, org, repo string, num int, platform config.Platform, installationID int64, provider lint.Provider) (workspace string, workDir string, err error) {
+	log := util.FromContext(ctx)
 	workspace, err = prepareRepoDir(org, repo, num)
 	if err != nil {
 		log.Errorf("failed to prepare workspace: %v", err)
@@ -45,7 +45,7 @@ func (s *Server) prepareGitRepos(ctx context.Context, org, repo string, num int,
 	return workspace, workDir, nil
 }
 
-func (s *Server) handleSingleRef(ctx context.Context, ref config.Refs, org, repo string, platform config.Platform, installationID int64, num int, provider linters.Provider) error {
+func (s *Server) handleSingleRef(ctx context.Context, ref config.Refs, org, repo string, platform config.Platform, installationID int64, num int, provider lint.Provider) error {
 	opt := gitv2.ClientFactoryOpts{
 		CacheDirBase: github.String(s.repoCacheDir),
 		Persist:      github.Bool(true),
@@ -82,7 +82,7 @@ func (s *Server) handleSingleRef(ctx context.Context, ref config.Refs, org, repo
 }
 
 func (s *Server) checkoutAndUpdateRepo(ctx context.Context, r gitv2.RepoClient, platform config.Platform, num int, repo string) error {
-	log := lintersutil.FromContext(ctx)
+	log := util.FromContext(ctx)
 	if err := s.checkoutCode(ctx, r, platform, num); err != nil {
 		return err
 	}
@@ -97,7 +97,7 @@ func (s *Server) checkoutAndUpdateRepo(ctx context.Context, r gitv2.RepoClient, 
 }
 
 func (s *Server) checkoutCode(ctx context.Context, r gitv2.RepoClient, platform config.Platform, num int) error {
-	log := lintersutil.FromContext(ctx)
+	log := util.FromContext(ctx)
 	switch platform {
 	case config.GitHub:
 		if err := r.CheckoutPullRequest(num); err != nil {
@@ -123,7 +123,7 @@ func (s *Server) checkoutCode(ctx context.Context, r gitv2.RepoClient, platform 
 }
 
 func updateSubmodulesIfExisted(ctx context.Context, repoDir, repo string) error {
-	log := lintersutil.FromContext(ctx)
+	log := util.FromContext(ctx)
 	gitModulesFile := path.Join(repoDir, ".gitmodules")
 	if _, err := os.Stat(gitModulesFile); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -218,12 +218,12 @@ type GitConfigBuilder struct {
 	repo     string
 	host     string
 	platform config.Platform
-	provider linters.Provider
+	provider lint.Provider
 	// installationID is the installation ID for the GitHub App
 	installationID int64
 }
 
-func (s *Server) newGitConfigBuilder(org, repo string, platform config.Platform, installationID int64, provider linters.Provider) *GitConfigBuilder {
+func (s *Server) newGitConfigBuilder(org, repo string, platform config.Platform, installationID int64, provider lint.Provider) *GitConfigBuilder {
 	g := &GitConfigBuilder{
 		server:         s,
 		org:            org,

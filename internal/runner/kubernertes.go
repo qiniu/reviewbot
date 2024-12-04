@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/qiniu/reviewbot/config"
-	"github.com/qiniu/reviewbot/internal/lintersutil"
+	"github.com/qiniu/reviewbot/internal/util"
 	authorizationv1 "k8s.io/api/authorization/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -69,7 +69,7 @@ func NewKubernetesRunner(kubeConfig string) (Runner, error) {
 }
 
 func (k *KubernetesRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadCloser, error) {
-	log := lintersutil.FromContext(ctx)
+	log := util.FromContext(ctx)
 	newCfg, err := cfg.Modifier.Modify(cfg)
 	if err != nil {
 		return nil, err
@@ -160,7 +160,7 @@ func (k *KubernetesRunner) GetFinalScript() string {
 
 // check the permission to create pod in the namespace.
 func (k *KubernetesRunner) Prepare(ctx context.Context, cfg *config.Linter) error {
-	log := lintersutil.FromContext(ctx)
+	log := util.FromContext(ctx)
 	ssar := &authorizationv1.SelfSubjectAccessReview{
 		Spec: authorizationv1.SelfSubjectAccessReviewSpec{
 			ResourceAttributes: &authorizationv1.ResourceAttributes{
@@ -212,7 +212,7 @@ func int32Ptr(i int32) *int32 {
 	return &i
 }
 func (k *KubernetesRunner) copyCodeToPod(ctx context.Context, srcPath, namespace, podName, destPath string) error {
-	log := lintersutil.FromContext(ctx)
+	log := util.FromContext(ctx)
 	// ensure srcPath ends with "/" so that it copies the directory contents instead of the directory itself
 	if !strings.HasSuffix(srcPath, "/.") {
 		srcPath += "/."
@@ -236,7 +236,7 @@ func (k *KubernetesRunner) copyCodeToPod(ctx context.Context, srcPath, namespace
 }
 
 func copyToPod(ctx context.Context, namespace, podName, containerName, srcPath, dstPath string) error {
-	log := lintersutil.FromContext(ctx)
+	log := util.FromContext(ctx)
 	cmd := exec.CommandContext(ctx, "kubectl", "cp", srcPath, fmt.Sprintf("%s/%s:%s", namespace, podName, dstPath), "-c", containerName)
 	log.Infof("Executing command: %s\n", cmd.Args)
 	cmd.Stdout = os.Stdout
@@ -296,7 +296,7 @@ func (k *KubernetesRunner) getPodLogs(ctx context.Context, namespace, podName st
 }
 
 func (k *KubernetesRunner) getPodName(ctx context.Context, namespace string, jobName string) string {
-	log := lintersutil.FromContext(ctx)
+	log := util.FromContext(ctx)
 
 	labelSelector := "job-name=" + jobName
 	pods, err := k.client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
@@ -316,7 +316,7 @@ func (k *KubernetesRunner) getPodName(ctx context.Context, namespace string, job
 }
 
 func (k *KubernetesRunner) createOrRecreateJobAndWaitForPod(ctx context.Context, job *batchv1.Job, namespace string) (*batchv1.Job, error) {
-	log := lintersutil.FromContext(ctx)
+	log := util.FromContext(ctx)
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()

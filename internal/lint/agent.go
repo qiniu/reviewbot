@@ -14,7 +14,7 @@
  limitations under the License.
 */
 
-package linters
+package lint
 
 import (
 	"context"
@@ -26,10 +26,10 @@ import (
 	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/cache"
-	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/reviewbot/internal/llm"
 	"github.com/qiniu/reviewbot/internal/runner"
 	"github.com/qiniu/reviewbot/internal/storage"
+	"github.com/qiniu/reviewbot/internal/util"
 	"github.com/qiniu/x/log"
 	"github.com/tmc/langchaingo/llms"
 )
@@ -78,7 +78,7 @@ func getMsgFormat(format config.ReportType) string {
 
 // getIssueContent fetches issue content with cache support.
 func (a *Agent) getIssueContent(ctx context.Context, ref config.CompiledIssueReference) (string, error) {
-	log := lintersutil.FromContext(ctx)
+	log := util.FromContext(ctx)
 
 	// Try cache first
 	if content, ok := issueCache.Get(ref.URL); ok && !issueCache.IsExpired(ref.URL) {

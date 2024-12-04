@@ -20,24 +20,24 @@ package staticcheck
 import (
 	"context"
 
-	"github.com/qiniu/reviewbot/internal/linters"
-	"github.com/qiniu/reviewbot/internal/lintersutil"
+	"github.com/qiniu/reviewbot/internal/lint"
+	"github.com/qiniu/reviewbot/internal/util"
 )
 
 // refer to https://staticcheck.io/docs/
 const linterName = "staticcheck"
 
 func init() {
-	linters.RegisterPullRequestHandler(linterName, staticcheckHandler)
-	linters.RegisterLinterLanguages(linterName, []string{".go"})
+	lint.RegisterPullRequestHandler(linterName, staticcheckHandler)
+	lint.RegisterLinterLanguages(linterName, []string{".go"})
 }
 
-func staticcheckHandler(ctx context.Context, a linters.Agent) error {
-	log := lintersutil.FromContext(ctx)
-	if linters.IsEmpty(a.LinterConfig.Args...) {
+func staticcheckHandler(ctx context.Context, a lint.Agent) error {
+	log := util.FromContext(ctx)
+	if lint.IsEmpty(a.LinterConfig.Args...) {
 		// turn off compile errors by default
 		a.LinterConfig.Args = append([]string{}, "-debug.no-compile-errors=true", "./...")
 	}
 
-	return linters.GeneralHandler(ctx, log, a, linters.ExecRun, linters.GeneralParse)
+	return lint.GeneralHandler(ctx, log, a, lint.ExecRun, lint.GeneralParse)
 }

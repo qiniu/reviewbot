@@ -24,7 +24,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/qiniu/reviewbot/internal/linters"
+	"github.com/qiniu/reviewbot/internal/lint"
 	"github.com/qiniu/x/log"
 )
 
@@ -32,17 +32,17 @@ import (
 const linterName = "note-check"
 
 func init() {
-	linters.RegisterPullRequestHandler(linterName, noteCheckHandler)
+	lint.RegisterPullRequestHandler(linterName, noteCheckHandler)
 
 	// TODO(CarlJi): can we check other languages?
-	linters.RegisterLinterLanguages(linterName, []string{".go"})
+	lint.RegisterLinterLanguages(linterName, []string{".go"})
 }
 
 // noteCheckHandler is the handler of the linter
 // Check the notes in the code to see if they comply with the standard rules from
 // https://pkg.go.dev/go/doc#Note
-func noteCheckHandler(ctx context.Context, a linters.Agent) error {
-	outputs := make(map[string][]linters.LinterOutput)
+func noteCheckHandler(ctx context.Context, a lint.Agent) error {
+	outputs := make(map[string][]lint.LinterOutput)
 
 	for _, file := range a.Provider.GetFiles(nil) {
 		fileName := file
@@ -67,12 +67,12 @@ func noteCheckHandler(ctx context.Context, a linters.Agent) error {
 		}
 	}
 
-	return linters.Report(ctx, a, outputs)
+	return lint.Report(ctx, a, outputs)
 }
 
 const NoteSuggestion = "A Note is recommended to use \"MARKER(uid): note body\" format."
 
-func noteCheckFile(workdir, filename string) (map[string][]linters.LinterOutput, error) {
+func noteCheckFile(workdir, filename string) (map[string][]lint.LinterOutput, error) {
 	path := filepath.Join(workdir, filename)
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
@@ -80,7 +80,7 @@ func noteCheckFile(workdir, filename string) (map[string][]linters.LinterOutput,
 		return nil, err
 	}
 
-	output := make(map[string][]linters.LinterOutput)
+	output := make(map[string][]lint.LinterOutput)
 	for _, cmts := range file.Comments {
 		for _, cmt := range cmts.List {
 			// comments with "/*" may have multiple lines
@@ -94,7 +94,7 @@ func noteCheckFile(workdir, filename string) (map[string][]linters.LinterOutput,
 
 				v, ok := output[filename]
 				if !ok {
-					output[filename] = []linters.LinterOutput{
+					output[filename] = []lint.LinterOutput{
 						{
 							File:    filename,
 							Line:    fset.Position(cmt.Pos()).Line + i,
@@ -103,7 +103,7 @@ func noteCheckFile(workdir, filename string) (map[string][]linters.LinterOutput,
 						},
 					}
 				} else {
-					v = append(v, linters.LinterOutput{
+					v = append(v, lint.LinterOutput{
 						File:    filename,
 						Line:    fset.Position(cmt.Pos()).Line + i,
 						Column:  fset.Position(cmt.Pos()).Column,

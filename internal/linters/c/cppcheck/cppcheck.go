@@ -19,8 +19,8 @@ package cppcheck
 import (
 	"context"
 
-	"github.com/qiniu/reviewbot/internal/linters"
-	"github.com/qiniu/reviewbot/internal/lintersutil"
+	"github.com/qiniu/reviewbot/internal/lint"
+	"github.com/qiniu/reviewbot/internal/util"
 	"github.com/qiniu/x/xlog"
 )
 
@@ -28,22 +28,22 @@ import (
 var linterName = "cppcheck"
 
 func init() {
-	linters.RegisterPullRequestHandler(linterName, cppcheckHandler)
+	lint.RegisterPullRequestHandler(linterName, cppcheckHandler)
 	// see https://stackoverflow.com/a/3223792/5057547
-	linters.RegisterLinterLanguages(linterName, []string{".c", ".cpp", ".h", ".hpp", ".cc", ".cxx", ".hxx", ".c++"})
+	lint.RegisterLinterLanguages(linterName, []string{".c", ".cpp", ".h", ".hpp", ".cc", ".cxx", ".hxx", ".c++"})
 }
 
-func cppcheckHandler(ctx context.Context, a linters.Agent) error {
-	log := lintersutil.FromContext(ctx)
-	if linters.IsEmpty(a.LinterConfig.Args...) {
+func cppcheckHandler(ctx context.Context, a lint.Agent) error {
+	log := util.FromContext(ctx)
+	if lint.IsEmpty(a.LinterConfig.Args...) {
 		a.LinterConfig.Args = append([]string{}, "--quiet", "--template='{file}:{line}:{column}: {message}'", ".")
 	}
 
-	return linters.GeneralHandler(ctx, log, a, linters.ExecRun, parser)
+	return lint.GeneralHandler(ctx, log, a, lint.ExecRun, parser)
 }
 
-func parser(log *xlog.Logger, input []byte) (map[string][]linters.LinterOutput, []string) {
-	lineParser := func(line string) (*linters.LinterOutput, error) {
+func parser(log *xlog.Logger, input []byte) (map[string][]lint.LinterOutput, []string) {
+	lineParser := func(line string) (*lint.LinterOutput, error) {
 		if len(line) <= 2 {
 			return nil, nil
 		}
@@ -51,7 +51,7 @@ func parser(log *xlog.Logger, input []byte) (map[string][]linters.LinterOutput, 
 		// remove the first and last character of the line,
 		// which are the single quotes
 		line = line[1 : len(line)-1]
-		return linters.GeneralLineParser(line)
+		return lint.GeneralLineParser(line)
 	}
-	return linters.Parse(log, input, lineParser)
+	return lint.Parse(log, input, lineParser)
 }

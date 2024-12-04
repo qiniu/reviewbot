@@ -24,8 +24,8 @@ import (
 	"strings"
 
 	"github.com/qiniu/reviewbot/config"
-	"github.com/qiniu/reviewbot/internal/linters"
-	"github.com/qiniu/reviewbot/internal/lintersutil"
+	"github.com/qiniu/reviewbot/internal/lint"
+	"github.com/qiniu/reviewbot/internal/util"
 	"github.com/qiniu/x/log"
 	"github.com/qiniu/x/xlog"
 )
@@ -34,12 +34,12 @@ import (
 var lintName = "golangci-lint"
 
 func init() {
-	linters.RegisterPullRequestHandler(lintName, golangciLintHandler)
-	linters.RegisterLinterLanguages(lintName, []string{".go", ".mod", ".sum"})
+	lint.RegisterPullRequestHandler(lintName, golangciLintHandler)
+	lint.RegisterLinterLanguages(lintName, []string{".go", ".mod", ".sum"})
 }
 
-func golangciLintHandler(ctx context.Context, a linters.Agent) error {
-	log := lintersutil.FromContext(ctx)
+func golangciLintHandler(ctx context.Context, a lint.Agent) error {
+	log := util.FromContext(ctx)
 	var goModDirs []string
 	if len(a.LinterConfig.Command) == 0 || (len(a.LinterConfig.Command) == 1 && a.LinterConfig.Command[0] == lintName) {
 		// Default mode, automatically find the go.mod path in current repo
@@ -58,7 +58,7 @@ func golangciLintHandler(ctx context.Context, a linters.Agent) error {
 	// When the go.mod file is not found, set GO111MODULE=off, so that golangci does not run through gomod.
 	if len(goModDirs) == 0 {
 		a.LinterConfig.Env = append(a.LinterConfig.Env, "GO111MODULE=off")
-		return linters.GeneralHandler(ctx, log, a, linters.ExecRun, parser)
+		return lint.GeneralHandler(ctx, log, a, lint.ExecRun, parser)
 	}
 
 	// if the workDir is not specified, align it with the directory of the root-level go.mod file.
@@ -70,15 +70,15 @@ func golangciLintHandler(ctx context.Context, a linters.Agent) error {
 
 	a.LinterConfig.Modifier = newGoModTidyBuilder(a.LinterConfig.Modifier, goModDirs)
 	a.LinterConfig.Modifier = newGitConfigModifier(a.LinterConfig.Modifier, a.Provider)
-	return linters.GeneralHandler(ctx, log, a, linters.ExecRun, parser)
+	return lint.GeneralHandler(ctx, log, a, lint.ExecRun, parser)
 }
 
 type gitConfigModifier struct {
 	prev     config.Modifier
-	provider linters.Provider
+	provider lint.Provider
 }
 
-func newGitConfigModifier(prev config.Modifier, provider linters.Provider) config.Modifier {
+func newGitConfigModifier(prev config.Modifier, provider lint.Provider) config.Modifier {
 	return &gitConfigModifier{
 		prev:     prev,
 		provider: provider,
@@ -189,9 +189,9 @@ func (b *goModTidyModifier) Modify(cfg *config.Linter) (*config.Linter, error) {
 	return newCfg, nil
 }
 
-func parser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, []string) {
+func parser(log *xlog.Logger, output []byte) (map[string][]lint.LinterOutput, []string) {
 	log.Infof("golangci-lint output: %s", output)
-	trainer := func(o linters.LinterOutput) (*linters.LinterOutput, []string) {
+	trainer := func(o lint.LinterOutput) (*lint.LinterOutput, []string) {
 		// Perhaps it may not be precise enough？
 		// refer: https://golangci-lint.run/usage/linters/
 		if strings.Contains(o.Message, "(typecheck)") {
@@ -203,7 +203,7 @@ func parser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput,
 	}
 
 	unexpected := make([]string, 0)
-	rawResults, rawUnexpected := linters.ParseV2(log, output, trainer)
+	rawResults, rawUnexpected := lint.ParseV2(log, output, trainer)
 	for _, ex := range rawUnexpected {
 		// skip the warning level log
 		// example: level=warning msg="[linters_context] copyloopvar: this linter is disabled because the Go version (1.18) of your project is lower than Go 1.22"
@@ -235,7 +235,7 @@ func parser(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput,
 
 // argsApply is used to set the default parameters for golangci-lint
 // see: ./docs/website/docs/component/go/golangci-lint
-func argsApply(log *xlog.Logger, a linters.Agent) linters.Agent {
+func argsApply(log *xlog.Logger, a lint.Agent) lint.Agent {
 	config := a.LinterConfig
 	if len(config.Command) == 0 || len(config.Command) > 1 || config.Command[0] != lintName {
 		return a
@@ -313,14 +313,14 @@ func argsApply(log *xlog.Logger, a linters.Agent) linters.Agent {
 // 1. if the config file exists in current directory, return its absolute path.
 // 2. if the config file exists in the workDir directory, return its absolute path.
 // 3. if the config file exists in the repo linter ConfigPath.
-func golangciConfigApply(log *xlog.Logger, a linters.Agent) string {
+func golangciConfigApply(log *xlog.Logger, a lint.Agent) string {
 	// refer to https://golangci-lint.run/usage/configuration/
 	// the default config file name is .golangci.yml, .golangci.yaml, .golangci.json, .golangci.toml
 	golangciConfigFiles := []string{".golangci.yml", ".golangci.yaml", ".golangci.json", ".golangci.toml"}
 
 	// if the config file exists in the current directory, return its absolute path
 	for _, file := range golangciConfigFiles {
-		if path, exist := lintersutil.FileExists(file); exist {
+		if path, exist := util.FileExists(file); exist {
 			return path
 		}
 	}
@@ -328,7 +328,7 @@ func golangciConfigApply(log *xlog.Logger, a linters.Agent) string {
 	// if the config file exists in the workDir directory, return its absolute path
 	if a.LinterConfig.WorkDir != "" {
 		for _, file := range golangciConfigFiles {
-			if path, exist := lintersutil.FileExists(a.LinterConfig.WorkDir + "/" + file); exist {
+			if path, exist := util.FileExists(a.LinterConfig.WorkDir + "/" + file); exist {
 				return path
 			}
 		}
@@ -338,7 +338,7 @@ func golangciConfigApply(log *xlog.Logger, a linters.Agent) string {
 		return ""
 	}
 
-	path, exist := lintersutil.FileExists(a.LinterConfig.ConfigPath)
+	path, exist := util.FileExists(a.LinterConfig.ConfigPath)
 	if !exist {
 		// if the config file is not found, these probably not configured.
 		// here we still return the original config path which may let user know the config is wrong.
@@ -371,7 +371,7 @@ func golangciConfigApply(log *xlog.Logger, a linters.Agent) string {
 }
 
 // findGoModDirs aims to find the dirs where go.mod files exist in the current repo based on the changed files.
-func findGoModDirs(a linters.Agent) []string {
+func findGoModDirs(a lint.Agent) []string {
 	// it means WorkDir is specified via the config file probably, so we don't need to find go.mod
 	if a.LinterConfig.WorkDir != a.RepoDir {
 		log.Infof("WorkDir does not match the repo dir, so we don't need to find go.mod. WorkDir: %v, RepoDir: %v", a.LinterConfig.WorkDir, a.RepoDir)
@@ -382,7 +382,7 @@ func findGoModDirs(a linters.Agent) []string {
 	dirs := extractDirs(a.Provider.GetFiles(nil))
 	for _, dir := range dirs {
 		goModFile := filepath.Join(a.RepoDir, dir, "go.mod")
-		if _, exist := lintersutil.FileExists(goModFile); exist {
+		if _, exist := util.FileExists(goModFile); exist {
 			goModDirs = append(goModDirs, filepath.Join(a.RepoDir, dir))
 		}
 	}

@@ -20,21 +20,21 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/qiniu/reviewbot/internal/linters"
+	"github.com/qiniu/reviewbot/internal/lint"
 	"github.com/qiniu/x/xlog"
 )
 
 func TestParser(t *testing.T) {
 	tc := []struct {
 		input      []byte
-		expected   map[string][]linters.LinterOutput
+		expected   map[string][]lint.LinterOutput
 		unexpected []string
 	}{
 		{
 			input: []byte(`
 video/mp4/libs/mp4lib.lua:184:11: value assigned to variable mem_data is overwritten on line 202 before use
 `),
-			expected: map[string][]linters.LinterOutput{
+			expected: map[string][]lint.LinterOutput{
 				"video/mp4/libs/mp4lib.lua": {
 					{
 						File:    "video/mp4/libs/mp4lib.lua",
@@ -50,7 +50,7 @@ video/mp4/libs/mp4lib.lua:184:11: value assigned to variable mem_data is overwri
 			input: []byte(`
 utils/jsonschema.lua:723:121: line is too long (142 > 120)
 `),
-			expected: map[string][]linters.LinterOutput{
+			expected: map[string][]lint.LinterOutput{
 				"utils/jsonschema.lua": {
 					{
 						File:    "utils/jsonschema.lua",
@@ -66,19 +66,19 @@ utils/jsonschema.lua:723:121: line is too long (142 > 120)
 			input: []byte(`
 Total: 0 warnings / 0 errors in 0 files
 `),
-			expected:   map[string][]linters.LinterOutput{},
+			expected:   map[string][]lint.LinterOutput{},
 			unexpected: nil,
 		},
 		{
 			input: []byte(`
 Checking test/qtest_mgrconf.lua
 `),
-			expected:   map[string][]linters.LinterOutput{},
+			expected:   map[string][]lint.LinterOutput{},
 			unexpected: nil,
 		},
 		{
 			input:      []byte(``),
-			expected:   map[string][]linters.LinterOutput{},
+			expected:   map[string][]lint.LinterOutput{},
 			unexpected: nil,
 		},
 	}

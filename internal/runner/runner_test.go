@@ -33,8 +33,8 @@ import (
 	"github.com/docker/docker/pkg/archive"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/qiniu/reviewbot/config"
-	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/reviewbot/internal/runner"
+	"github.com/qiniu/reviewbot/internal/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -92,7 +92,7 @@ func TestLocalRunner(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			lr := runner.NewLocalRunner()
-			ctx := context.WithValue(context.Background(), lintersutil.EventGUIDKey, "test")
+			ctx := context.WithValue(context.Background(), util.EventGUIDKey, "test")
 			output, err := lr.Run(ctx, tt.cfg)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -266,7 +266,7 @@ func TestDockerRunner(t *testing.T) {
 				ArchiveWrapper: mockArchiveWrapper,
 			}
 
-			ctx := context.WithValue(context.Background(), lintersutil.EventGUIDKey, "test")
+			ctx := context.WithValue(context.Background(), util.EventGUIDKey, "test")
 			output, err := dr.Run(ctx, tc.cfg)
 			if tc.wantErr {
 				require.Error(t, err)

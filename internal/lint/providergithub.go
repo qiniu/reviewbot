@@ -14,7 +14,7 @@
  limitations under the License.
 */
 
-package linters
+package lint
 
 import (
 	"context"
@@ -28,8 +28,8 @@ import (
 	"github.com/google/go-github/v57/github"
 	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/cache"
-	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/reviewbot/internal/metric"
+	"github.com/qiniu/reviewbot/internal/util"
 	"github.com/qiniu/x/log"
 )
 
@@ -104,7 +104,7 @@ func FilterPullRequestsWithCommit(ctx context.Context, gc *github.Client, owner,
 
 // RetryWithBackoff retries the function with backoff.
 func RetryWithBackoff(ctx context.Context, f func() error) error {
-	log := lintersutil.FromContext(ctx)
+	log := util.FromContext(ctx)
 	backoff := time.Second
 	for i := 0; i < 5; i++ {
 		err := f()
@@ -300,7 +300,7 @@ func (g *GithubProvider) HandleComments(ctx context.Context, outputs map[string]
 }
 
 func (g *GithubProvider) Report(ctx context.Context, a Agent, lintResults map[string][]LinterOutput) error {
-	log := lintersutil.FromContext(ctx)
+	log := util.FromContext(ctx)
 	linterName := a.LinterConfig.Name
 	org := a.Provider.GetCodeReviewInfo().Org
 	repo := a.Provider.GetCodeReviewInfo().Repo
@@ -461,7 +461,7 @@ func (g *GithubProvider) ListPullRequestsComments(ctx context.Context, owner str
 
 // DeletePullReviewComments deletes the specified comments on the pull request.
 func (g *GithubProvider) DeletePullReviewComments(ctx context.Context, owner, repo string, comments []*github.PullRequestComment) error {
-	log := lintersutil.FromContext(ctx)
+	log := util.FromContext(ctx)
 	for _, comment := range comments {
 		cmt := comment
 		err := RetryWithBackoff(ctx, func() error {
@@ -487,7 +487,7 @@ func (g *GithubProvider) DeletePullReviewComments(ctx context.Context, owner, re
 
 // CreatePullReviewComments creates the specified comments on the pull request.
 func (g *GithubProvider) CreatePullReviewComments(ctx context.Context, owner string, repo string, number int, comments []*github.PullRequestComment) ([]*github.PullRequestComment, error) {
-	log := lintersutil.FromContext(ctx)
+	log := util.FromContext(ctx)
 	var addedComments []*github.PullRequestComment
 	for _, comment := range comments {
 		cmt := comment
@@ -538,7 +538,7 @@ func (g *GithubProvider) CreateCheckRun(ctx context.Context, owner string, repo 
 }
 
 func (g *GithubProvider) ListCommits(ctx context.Context, org, repo string, number int) ([]Commit, error) {
-	log := lintersutil.FromContext(ctx)
+	log := util.FromContext(ctx)
 	opts := &github.ListOptions{
 		PerPage: 100,
 	}
@@ -603,7 +603,7 @@ func (g *GithubProvider) DeleteComment(ctx context.Context, owner string, repo s
 }
 
 func (g *GithubProvider) CreateComment(ctx context.Context, owner string, repo string, number int, comment *Comment) (*Comment, error) {
-	log := lintersutil.FromContext(ctx)
+	log := util.FromContext(ctx)
 	c, resp, err := g.GithubClient.Issues.CreateComment(ctx, owner, repo, number, &github.IssueComment{
 		Body: &comment.Body,
 	})
@@ -645,7 +645,7 @@ func (g *GithubProvider) ProcessComments(ctx context.Context, a Agent, lintResul
 	repo := a.Provider.GetCodeReviewInfo().Repo
 	num := a.Provider.GetCodeReviewInfo().Number
 	linterName := a.LinterConfig.Name
-	log := lintersutil.FromContext(ctx)
+	log := util.FromContext(ctx)
 	orgRepo := org + "/" + repo
 
 	// List existing comments

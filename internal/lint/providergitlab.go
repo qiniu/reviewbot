@@ -14,7 +14,7 @@
  limitations under the License.
 */
 
-package linters
+package lint
 
 import (
 	"context"
@@ -27,8 +27,8 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/qiniu/reviewbot/config"
 	"github.com/qiniu/reviewbot/internal/cache"
-	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/reviewbot/internal/metric"
+	"github.com/qiniu/reviewbot/internal/util"
 	"github.com/qiniu/x/errors"
 	"github.com/qiniu/x/log"
 	gitlab "github.com/xanzy/go-gitlab"
@@ -60,7 +60,7 @@ func ListMergeRequestsFiles(ctx context.Context, gc *gitlab.Client, owner string
 }
 
 func (g *GitlabProvider) ListCommits(ctx context.Context, org, repo string, number int) ([]Commit, error) {
-	log := lintersutil.FromContext(ctx)
+	log := util.FromContext(ctx)
 	opts := &gitlab.GetMergeRequestCommitsOptions{
 		PerPage: 100,
 	}

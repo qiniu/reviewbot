@@ -20,21 +20,21 @@ import (
 	"context"
 	"strings"
 
-	"github.com/qiniu/reviewbot/internal/linters"
-	"github.com/qiniu/reviewbot/internal/lintersutil"
+	"github.com/qiniu/reviewbot/internal/lint"
 	"github.com/qiniu/reviewbot/internal/metric"
+	"github.com/qiniu/reviewbot/internal/util"
 )
 
 // refer to https://github.com/koalaman/shellcheck
 const linterName = "shellcheck"
 
 func init() {
-	linters.RegisterPullRequestHandler(linterName, shellcheck)
-	linters.RegisterLinterLanguages(linterName, []string{".sh"})
+	lint.RegisterPullRequestHandler(linterName, shellcheck)
+	lint.RegisterLinterLanguages(linterName, []string{".sh"})
 }
 
-func shellcheck(ctx context.Context, a linters.Agent) error {
-	log := lintersutil.FromContext(ctx)
+func shellcheck(ctx context.Context, a lint.Agent) error {
+	log := util.FromContext(ctx)
 	var shellFiles []string
 	for _, arg := range a.Provider.GetFiles(nil) {
 		if strings.HasSuffix(arg, ".sh") {
@@ -42,28 +42,28 @@ func shellcheck(ctx context.Context, a linters.Agent) error {
 		}
 	}
 
-	var lintResults map[string][]linters.LinterOutput
+	var lintResults map[string][]lint.LinterOutput
 	if len(shellFiles) > 0 {
 		cmd := a.LinterConfig.Command
 		// execute shellcheck with the following command
 		// shellcheck -f gcc xxx.sh...
-		if linters.IsEmpty(a.LinterConfig.Args...) {
+		if lint.IsEmpty(a.LinterConfig.Args...) {
 			// use gcc format to make the output more readable
 			args := append([]string{}, "-f", "gcc")
 			args = append(args, shellFiles...)
 			a.LinterConfig.Args = args
 		}
 
-		output, err := linters.ExecRun(ctx, a)
+		output, err := lint.ExecRun(ctx, a)
 		if err != nil {
 			log.Warnf("%s run with error: %v, mark and continue", cmd, err)
 		}
 
-		results, unexpected := linters.GeneralParse(log, output)
+		results, unexpected := lint.GeneralParse(log, output)
 		if len(unexpected) > 0 {
-			msg := lintersutil.LimitJoin(unexpected, 1000)
+			msg := util.LimitJoin(unexpected, 1000)
 			log.Warnf("unexpected output: %v", msg)
-			metric.NotifyWebhookByText(linters.ConstructUnknownMsg(linterName, a.Provider.GetCodeReviewInfo().Org+"/"+a.Provider.GetCodeReviewInfo().Repo, a.Provider.GetCodeReviewInfo().URL, log.ReqId, msg))
+			metric.NotifyWebhookByText(lint.ConstructUnknownMsg(linterName, a.Provider.GetCodeReviewInfo().Org+"/"+a.Provider.GetCodeReviewInfo().Repo, a.Provider.GetCodeReviewInfo().URL, log.ReqId, msg))
 		}
 
 		lintResults = results
@@ -71,5 +71,5 @@ func shellcheck(ctx context.Context, a linters.Agent) error {
 
 	// even if the lintResults is empty, we still need to report the result
 	// since we need delete the existed comments related to the linter
-	return linters.Report(ctx, a, lintResults)
+	return lint.Report(ctx, a, lintResults)
 }

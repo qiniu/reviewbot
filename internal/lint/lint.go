@@ -14,7 +14,7 @@
  limitations under the License.
 */
 
-package linters
+package lint
 
 import (
 	"context"
@@ -27,8 +27,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/reviewbot/internal/metric"
+	"github.com/qiniu/reviewbot/internal/util"
 	"github.com/qiniu/x/log"
 	"github.com/qiniu/x/xlog"
 )
@@ -126,7 +126,7 @@ func GeneralHandler(ctx context.Context, log *xlog.Logger, a Agent, execRun func
 
 	lintResults, unexpected := linterParser(log, output)
 	if len(unexpected) > 0 {
-		msg := lintersutil.LimitJoin(unexpected, 1000)
+		msg := util.LimitJoin(unexpected, 1000)
 		if msg != "" {
 			// just log the unexpected lines and notify the webhook, no need to return error
 			log.Warnf("unexpected lines: %v", msg)
@@ -139,7 +139,7 @@ func GeneralHandler(ctx context.Context, log *xlog.Logger, a Agent, execRun func
 
 // ExecRun executes a command.
 func ExecRun(ctx context.Context, a Agent) ([]byte, error) {
-	eventGuid := lintersutil.FromContext(ctx).ReqId
+	eventGuid := util.FromContext(ctx).ReqId
 	start := time.Now()
 	reader, err := a.Runner.Run(ctx, &a.LinterConfig)
 	if err != nil {
@@ -179,7 +179,7 @@ func GeneralParse(log *xlog.Logger, output []byte) (map[string][]LinterOutput, [
 // This function should be always called even in custom linter handler since it will filter out the lint errors that are not related to the PR.
 // and handle some special cases like auto-generated files.
 func Report(ctx context.Context, a Agent, lintResults map[string][]LinterOutput) error {
-	log := lintersutil.FromContext(ctx)
+	log := util.FromContext(ctx)
 	var (
 		num        = a.Provider.GetCodeReviewInfo().Number
 		orgRepo    = a.Provider.GetCodeReviewInfo().Org + "/" + a.Provider.GetCodeReviewInfo().Repo
@@ -377,7 +377,7 @@ func GeneralLineParser(line string) (*LinterOutput, error) {
 }
 
 func GeneralLinterHandler(ctx context.Context, a Agent) error {
-	log := lintersutil.FromContext(ctx)
+	log := util.FromContext(ctx)
 	return GeneralHandler(ctx, log, a, ExecRun, GeneralParse)
 }
 

@@ -35,7 +35,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/qiniu/reviewbot/config"
-	"github.com/qiniu/reviewbot/internal/lintersutil"
+	"github.com/qiniu/reviewbot/internal/util"
 )
 
 type DockerRunner struct {
@@ -87,7 +87,7 @@ func (d *DockerRunner) Prepare(ctx context.Context, cfg *config.Linter) error {
 }
 
 func (d *DockerRunner) Run(ctx context.Context, cfg *config.Linter) (io.ReadCloser, error) {
-	log := lintersutil.FromContext(ctx)
+	log := util.FromContext(ctx)
 	if cfg.DockerAsRunner.Image == "" {
 		return nil, fmt.Errorf("docker image is not set")
 	}
@@ -414,7 +414,7 @@ func (d *dockerArtifactModifier) Modify(cfg *config.Linter) (*config.Linter, err
 }
 
 func (d *DockerRunner) readArtifactContent(ctx context.Context, containerID, artifactPath string) (io.ReadCloser, error) {
-	log := lintersutil.FromContext(ctx)
+	log := util.FromContext(ctx)
 	reader, _, err := d.Cli.CopyFromContainer(ctx, containerID, artifactPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to copy from container: %w", err)

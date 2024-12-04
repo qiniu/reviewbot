@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"github.com/qiniu/reviewbot/config"
-	"github.com/qiniu/reviewbot/internal/linters"
+	"github.com/qiniu/reviewbot/internal/lint"
 	"github.com/qiniu/x/errors"
 	"github.com/qiniu/x/log"
 	"github.com/qiniu/x/xlog"
@@ -32,18 +32,18 @@ func TestArgs(t *testing.T) {
 	tp := true
 	tcs := []struct {
 		id    string
-		input linters.Agent
-		want  linters.Agent
+		input lint.Agent
+		want  lint.Agent
 	}{
 		{
 			id: "case1 - default command and args",
-			input: linters.Agent{
+			input: lint.Agent{
 				LinterConfig: config.Linter{
 					Enable:  &tp,
 					Command: []string{"pmdcheck"},
 				},
 			},
-			want: linters.Agent{
+			want: lint.Agent{
 				LinterConfig: config.Linter{
 					Enable:  &tp,
 					Command: []string{"pmd"},
@@ -53,13 +53,13 @@ func TestArgs(t *testing.T) {
 		},
 		{
 			id: "case2 - custom command",
-			input: linters.Agent{
+			input: lint.Agent{
 				LinterConfig: config.Linter{
 					Enable:  &tp,
 					Command: []string{"/usr/pmdcheck"},
 				},
 			},
-			want: linters.Agent{
+			want: lint.Agent{
 				LinterConfig: config.Linter{
 					Enable:  &tp,
 					Command: []string{"/usr/pmdcheck"},
@@ -69,14 +69,14 @@ func TestArgs(t *testing.T) {
 		},
 		{
 			id: "case3 - custom args",
-			input: linters.Agent{
+			input: lint.Agent{
 				LinterConfig: config.Linter{
 					Enable:  &tp,
 					Command: []string{"pmdcheck"},
 					Args:    []string{"check", "-f", "xml"},
 				},
 			},
-			want: linters.Agent{
+			want: lint.Agent{
 				LinterConfig: config.Linter{
 					Enable:  &tp,
 					Command: []string{"pmd"},
@@ -98,7 +98,7 @@ func TestArgs(t *testing.T) {
 
 func TestPmdRuleCheck(t *testing.T) {
 	dir := "/var/tmp/linters-config/"
-	a := linters.Agent{}
+	a := lint.Agent{}
 	a.LinterConfig.WorkDir = ""
 	tc := []struct {
 		input    string
@@ -140,7 +140,7 @@ func TestPmdRuleCheck(t *testing.T) {
 func TestFormatPmdCheckLine(t *testing.T) {
 	tc := []struct {
 		input      []byte
-		expected   map[string][]linters.LinterOutput
+		expected   map[string][]lint.LinterOutput
 		unexpected []string
 	}{
 		{
@@ -148,7 +148,7 @@ func TestFormatPmdCheckLine(t *testing.T) {
 [WARN] Progressbar rendering conflicts with reporting to STDOUT. No progressbar will be shown. Try running with argument -r <file> to output the report to a file instead.
 [WARN] This analysis could be faster, please consider using Incremental Analysis: https://docs.pmd-code.org/pmd-doc-7.4.0/pmd_userdocs_incremental_analysis.html
 ./test.java:8: Avoid unused local variables such as 'test'.`),
-			expected: map[string][]linters.LinterOutput{
+			expected: map[string][]lint.LinterOutput{
 				"./test.java": {
 					{
 						File:    "./test.java",

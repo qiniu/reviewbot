@@ -26,8 +26,8 @@ import (
 	"strings"
 
 	"github.com/qiniu/reviewbot/config"
-	"github.com/qiniu/reviewbot/internal/linters"
-	"github.com/qiniu/reviewbot/internal/lintersutil"
+	"github.com/qiniu/reviewbot/internal/lint"
+	"github.com/qiniu/reviewbot/internal/util"
 	"github.com/qiniu/x/log"
 	"github.com/qiniu/x/xlog"
 )
@@ -35,13 +35,13 @@ import (
 var lintName = "gofmt"
 
 func init() {
-	linters.RegisterPullRequestHandler(lintName, gofmtHandler)
-	linters.RegisterLinterLanguages(lintName, []string{".go"})
+	lint.RegisterPullRequestHandler(lintName, gofmtHandler)
+	lint.RegisterLinterLanguages(lintName, []string{".go"})
 }
 
-func gofmtHandler(ctx context.Context, a linters.Agent) error {
-	log := lintersutil.FromContext(ctx)
-	if linters.IsEmpty(a.LinterConfig.Args...) {
+func gofmtHandler(ctx context.Context, a lint.Agent) error {
+	log := util.FromContext(ctx)
+	if lint.IsEmpty(a.LinterConfig.Args...) {
 		a.LinterConfig.Args = append([]string{}, "-d", "./")
 	}
 
@@ -66,7 +66,7 @@ func gofmtHandler(ctx context.Context, a linters.Agent) error {
 		return err
 	}
 
-	return linters.Report(ctx, a, parsedOutput)
+	return lint.Report(ctx, a, parsedOutput)
 }
 
 type Gofmt struct {
@@ -75,7 +75,7 @@ type Gofmt struct {
 	execute func(dir, command string, args ...string) ([]byte, []byte, error)
 }
 
-func NewgofmtExecutor(dir string) (linters.Linter, error) {
+func NewgofmtExecutor(dir string) (lint.Linter, error) {
 	log.Infof("gofmt executor init")
 	g, err := exec.LookPath("gofmt")
 	if err != nil {
@@ -118,14 +118,14 @@ func (g *Gofmt) Run(log *xlog.Logger, args ...string) ([]byte, error) {
 	return stdoutput, nil
 }
 
-func (g *Gofmt) Parse(log *xlog.Logger, output []byte) (map[string][]linters.LinterOutput, error) {
+func (g *Gofmt) Parse(log *xlog.Logger, output []byte) (map[string][]lint.LinterOutput, error) {
 	log.Infof("gofmt output is being parsed")
 	return formatGofmtOutput(output)
 }
 
 // Go Doc Comments Info: https://tip.golang.org/doc/comment
-func formatGofmtOutput(output []byte) (map[string][]linters.LinterOutput, error) {
-	result := make(map[string][]linters.LinterOutput)
+func formatGofmtOutput(output []byte) (map[string][]lint.LinterOutput, error) {
+	result := make(map[string][]lint.LinterOutput)
 	lines := strings.Split(string(output), "\n")
 	// map[$filename]map[$diffname][]string
 	fileErr := make(map[string]map[string][]string)
@@ -203,18 +203,18 @@ func formatGofmtOutput(output []byte) (map[string][]linters.LinterOutput, error)
 	return result, nil
 }
 
-func addGofmtOutput(result map[string][]linters.LinterOutput, filename string, diffStartLine, firstDiffLine, diffLineCount int64, message string) {
-	var output *linters.LinterOutput
+func addGofmtOutput(result map[string][]lint.LinterOutput, filename string, diffStartLine, firstDiffLine, diffLineCount int64, message string) {
+	var output *lint.LinterOutput
 	// If diffLineCount==1, set a single-line comment on GitHub; otherwise, set a multi-line comment.
 	if diffLineCount == 1 {
-		output = &linters.LinterOutput{
+		output = &lint.LinterOutput{
 			File:    filename,
 			Line:    int(diffStartLine + firstDiffLine - 1),
 			Column:  int(diffLineCount),
 			Message: message,
 		}
 	} else {
-		output = &linters.LinterOutput{
+		output = &lint.LinterOutput{
 			File:      filename,
 			Line:      int(diffStartLine + firstDiffLine + diffLineCount - 2),
 			Column:    int(diffLineCount),
@@ -224,7 +224,7 @@ func addGofmtOutput(result map[string][]linters.LinterOutput, filename string, d
 	}
 
 	if outs, ok := result[output.File]; !ok {
-		result[output.File] = []linters.LinterOutput{*output}
+		result[output.File] = []lint.LinterOutput{*output}
 	} else {
 		// remove duplicate
 		var existed bool

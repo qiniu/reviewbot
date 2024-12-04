@@ -22,8 +22,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/qiniu/reviewbot/internal/linters"
-	"github.com/qiniu/reviewbot/internal/lintersutil"
+	"github.com/qiniu/reviewbot/internal/lint"
+	"github.com/qiniu/reviewbot/internal/util"
 	"github.com/qiniu/x/xlog"
 	"golang.org/x/mod/modfile"
 )
@@ -31,22 +31,22 @@ import (
 var lintName = "gomodcheck"
 
 func init() {
-	linters.RegisterPullRequestHandler(lintName, goModCheckHandler)
-	linters.RegisterLinterLanguages(lintName, []string{".go", ".mod"})
+	lint.RegisterPullRequestHandler(lintName, goModCheckHandler)
+	lint.RegisterLinterLanguages(lintName, []string{".go", ".mod"})
 }
 
-func goModCheckHandler(ctx context.Context, a linters.Agent) error {
-	log := lintersutil.FromContext(ctx)
+func goModCheckHandler(ctx context.Context, a lint.Agent) error {
+	log := util.FromContext(ctx)
 	parsedOutput, err := goModCheckOutput(log, a)
 	if err != nil {
 		log.Errorf("gomodchecks parse output failed: %v", err)
 		return err
 	}
-	return linters.Report(ctx, a, parsedOutput)
+	return lint.Report(ctx, a, parsedOutput)
 }
 
-func goModCheckOutput(log *xlog.Logger, a linters.Agent) (map[string][]linters.LinterOutput, error) {
-	output := make(map[string][]linters.LinterOutput)
+func goModCheckOutput(log *xlog.Logger, a lint.Agent) (map[string][]lint.LinterOutput, error) {
+	output := make(map[string][]lint.LinterOutput)
 	for _, file := range a.Provider.GetFiles(nil) {
 		fName := file
 		if !strings.HasSuffix(fName, "go.mod") {
@@ -76,7 +76,7 @@ func goModCheckOutput(log *xlog.Logger, a linters.Agent) (map[string][]linters.L
 				log.Errorf("failed to compare whether A is a subdirectory of B : %v", err)
 			}
 			if !isSub {
-				output[fName] = append(output[fName], linters.LinterOutput{
+				output[fName] = append(output[fName], lint.LinterOutput{
 					File:    fName,
 					Line:    replace.Syntax.Start.Line,
 					Column:  replace.Syntax.Start.LineRune,
