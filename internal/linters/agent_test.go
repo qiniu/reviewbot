@@ -2,7 +2,6 @@ package linters
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"regexp"
 	"testing"
@@ -127,7 +126,7 @@ func TestApplyTypedMessageByIssueReferences(t *testing.T) {
 			expectedOutput: map[string][]LinterOutput{
 				"file4.go": {
 					{
-						Message: "regular lint message without issue reference" + fmt.Sprintf(ReferenceFooter, ""),
+						Message: "regular lint message without issue reference",
 						Line:    40,
 					},
 				},
@@ -181,7 +180,7 @@ func TestApplyTypedMessageByIssueReferences(t *testing.T) {
 				},
 				"file6.go": {
 					{
-						Message: "no issue reference" + fmt.Sprintf(ReferenceFooter, ""),
+						Message: "no issue reference",
 						Line:    60,
 					},
 				},
