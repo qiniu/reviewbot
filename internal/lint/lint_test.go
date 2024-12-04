@@ -14,7 +14,7 @@
  limitations under the License.
 */
 
-package linters
+package lint
 
 import (
 	"context"
@@ -25,9 +25,9 @@ import (
 	"testing"
 
 	"github.com/qiniu/reviewbot/config"
-	"github.com/qiniu/reviewbot/internal/lintersutil"
 	"github.com/qiniu/reviewbot/internal/runner"
 	"github.com/qiniu/reviewbot/internal/storage"
+	"github.com/qiniu/reviewbot/internal/util"
 	"github.com/qiniu/x/xlog"
 )
 
@@ -235,7 +235,7 @@ func TestExecRun(t *testing.T) {
 			tc.input.GenLogKey = func() string { return "test" }
 			tc.input.Runner = runner.NewLocalRunner()
 			tc.input.LinterConfig.Modifier = config.NewBaseModifier()
-			ctx := context.WithValue(context.Background(), lintersutil.EventGUIDKey, "test")
+			ctx := context.WithValue(context.Background(), util.EventGUIDKey, "test")
 			output, err := ExecRun(ctx, tc.input)
 			if !errors.Is(err, tc.err) {
 				t.Errorf("expected: %v, got: %v", tc.err, err)

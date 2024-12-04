@@ -24,19 +24,19 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/qiniu/reviewbot/internal/linters"
-	"github.com/qiniu/reviewbot/internal/lintersutil"
+	"github.com/qiniu/reviewbot/internal/lint"
+	"github.com/qiniu/reviewbot/internal/util"
 )
 
 const lintName = "commit-check"
 
 func init() {
-	linters.RegisterPullRequestHandler(lintName, commitMessageCheckHandler)
+	lint.RegisterPullRequestHandler(lintName, commitMessageCheckHandler)
 	// support all languages
-	linters.RegisterLinterLanguages(lintName, []string{"*"})
+	lint.RegisterLinterLanguages(lintName, []string{"*"})
 }
 
-func commitMessageCheckHandler(ctx context.Context, a linters.Agent) error {
+func commitMessageCheckHandler(ctx context.Context, a lint.Agent) error {
 	info := a.Provider.GetCodeReviewInfo()
 	var (
 		org    = info.Org
@@ -93,8 +93,8 @@ type RebaseSuggestion struct {
 	TargetCommits []string
 }
 
-func handle(ctx context.Context, agent linters.Agent, org, repo, author string, number int, comments []string, existedComments []linters.Comment) error {
-	log := lintersutil.FromContext(ctx)
+func handle(ctx context.Context, agent lint.Agent, org, repo, author string, number int, comments []string, existedComments []lint.Comment) error {
+	log := util.FromContext(ctx)
 	data := struct {
 		Flag     string
 		Author   string
@@ -104,7 +104,7 @@ func handle(ctx context.Context, agent linters.Agent, org, repo, author string, 
 		Flag:     commitCheckFlag,
 		Author:   author,
 		Comments: comments,
-		Footer:   linters.CommentFooter,
+		Footer:   lint.CommentFooter,
 	}
 
 	tmpl, err := template.New("").Parse(commentTmpl)
@@ -140,7 +140,7 @@ func handle(ctx context.Context, agent linters.Agent, org, repo, author string, 
 
 	// add new comment
 	if len(comments) > 0 {
-		c, err := agent.Provider.CreateComment(ctx, org, repo, number, &linters.Comment{
+		c, err := agent.Provider.CreateComment(ctx, org, repo, number, &lint.Comment{
 			Body: expectedComment,
 		})
 		if err != nil {
@@ -155,7 +155,7 @@ func handle(ctx context.Context, agent linters.Agent, org, repo, author string, 
 // Ruler is a function to check if commit messages match some rules.
 // The message returned via Ruler will be added as part of the comment.
 // So, It's recommended to use template rulerTmpl to generate a unified format message.
-type Ruler func(ctx context.Context, commits []linters.Commit) (string, error)
+type Ruler func(ctx context.Context, commits []lint.Commit) (string, error)
 
 const rulerTmpl = `
 ### {{.Header}}
@@ -174,7 +174,7 @@ var mergeMsgRegex = regexp.MustCompile(pattern)
 
 // RebaseCheckRule checks if there are merge commit messages or duplicate messages in the PR.
 // If there are, it will return a suggestion message to do git rebase.
-func rebaseCheck(ctx context.Context, commits []linters.Commit) (string, error) {
+func rebaseCheck(ctx context.Context, commits []lint.Commit) (string, error) {
 	var mergeTypeCommits []string
 	// filter out duplicated commit messages
 	msgs := make(map[string]int, 0)

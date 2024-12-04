@@ -1,0 +1,10 @@
+name: "reviewbot"
+author: "qiniu"
+description: "for code analysis"
+runs:
+  using: "docker"
+  image: "docker://ghcr.io/never/reviewbot:v1"
+branding:
+  icon: "check-square"
+  color: "white"
+
