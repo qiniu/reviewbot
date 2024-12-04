@@ -279,8 +279,14 @@ func main() {
 		kubeConfig:                o.kubeConfig,
 		gitLabHost:                o.gitLabHost,
 		gitLabPersonalAccessToken: o.gitLabPersonalAccessToken,
-		gitHubPersonalAccessToken: o.gitHubPersonalAccessToken,
 		modelConfig:               modelConfig,
+	}
+
+	// github access token
+	if o.gitHubPersonalAccessToken != "" {
+		s.gitHubAccessTokenAuth = &GitHubAccessTokenAuth{
+			AccessToken: o.gitHubPersonalAccessToken,
+		}
 	}
 
 	// github app

@@ -188,9 +188,15 @@ func (s *Server) fixRefs(workspace string, org, repo string) ([]config.Refs, str
 // GitHubAppAuth stores the authentication information for GitHub App.
 // See https://docs.github.com/en/apps/creating-github-apps/about-creating-github-apps
 type GitHubAppAuth struct {
+	AppName        string
 	AppID          int64
 	InstallationID int64
 	PrivateKeyPath string
+}
+
+type GitHubAccessTokenAuth struct {
+	AccessToken string
+	User        string
 }
 
 // GitLabOAuthAppAuth stores the authentication information for GitLab OAuth App.
@@ -285,9 +291,9 @@ func (g *GitConfigBuilder) buildGitHubAuth() GitAuth {
 		}
 	}
 
-	if g.server.gitHubPersonalAccessToken != "" {
+	if g.server.gitHubAccessTokenAuth != nil {
 		return GitAuth{
-			GitHubAccessToken: g.server.gitHubPersonalAccessToken,
+			GitHubAccessToken: g.server.gitHubAccessTokenAuth.AccessToken,
 		}
 	}
 

@@ -42,7 +42,25 @@ var (
 	ErrListComments            = errors.New("list comments failed")
 	ErrListCommits             = errors.New("list commits failed")
 	ErrUnexpectedTransportType = errors.New("unexpected transport type")
+	ErrGetInstallation         = errors.New("get installation failed")
 )
+
+// GetAppUsername returns the slug of the GitHub app.
+func GetAppUsername(ctx context.Context, githubClient *github.Client) (string, error) {
+	log := util.FromContext(ctx)
+	app, resp, err := githubClient.Apps.Get(ctx, "")
+	if err != nil {
+		log.Errorf("failed to get app info: %v", err)
+		return "", ErrGetInstallation
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		log.Errorf("failed to get app info: %v", resp)
+		return "", ErrGetInstallation
+	}
+	name := app.GetName() + "[bot]"
+	return name, nil
+}
 
 // ListFiles lists all files for the specified pull request.
 func ListPullRequestsFiles(ctx context.Context, gc *github.Client, owner string, repo string, number int) ([]*github.CommitFile, *github.Response, error) {
@@ -128,8 +146,12 @@ func RetryWithBackoff(ctx context.Context, f func() error) error {
 	return ErrAfterTry
 }
 
-func linterNamePrefix(linterName string) string {
+func linterNamePrefixV1(linterName string) string {
 	return fmt.Sprintf("**[%s]** <sub>reported by [reviewbot](https://github.com/qiniu/reviewbot):cow:</sub>\n", linterName)
+}
+
+func linterNamePrefixV2(linterName string) string {
+	return fmt.Sprintf("<!--from:%s|linter:%s-->\n", "https://github.com/qiniu/reviewbot", linterName)
 }
 
 func constructPullRequestComments(linterOutputs map[string][]LinterOutput, linterName, commitID string) []*github.PullRequestComment {
@@ -656,12 +678,23 @@ func (g *GithubProvider) ProcessComments(ctx context.Context, a Agent, lintResul
 		}
 		return nil, err
 	}
+	log.Infof("total found %d existed comments for this PR %d (%s) \n", len(existedComments), num, orgRepo)
 
 	// filter out the comments that are not related to the linter
 	var existedCommentsToKeep []*github.PullRequestComment
-	linterFlag := linterNamePrefix(linterName)
+	appName := g.ProviderInfo.GitHubAppName
+
+	prefixFlagV1 := linterNamePrefixV1(linterName)
+	prefixFlagV2 := linterNamePrefixV2(linterName)
+	log.Infof("prefixFlagV1: %s, prefixFlagV2: %s", prefixFlagV1, prefixFlagV2)
 	for _, comment := range existedComments {
-		if strings.HasPrefix(comment.GetBody(), linterFlag) {
+		// FIXME(CarlJi): to keep consistent with old format, remove it after a while
+		if strings.HasPrefix(comment.GetBody(), prefixFlagV1) {
+			existedCommentsToKeep = append(existedCommentsToKeep, comment)
+			continue
+		}
+		// v2 format
+		if comment.GetUser().GetLogin() == appName && strings.HasPrefix(comment.GetBody(), prefixFlagV2) {
 			existedCommentsToKeep = append(existedCommentsToKeep, comment)
 		}
 	}
@@ -673,7 +706,7 @@ func (g *GithubProvider) ProcessComments(ctx context.Context, a Agent, lintResul
 		return nil, err
 	}
 	log.Infof("[%s] delete %d comments for this PR %d (%s) \n", linterName, len(toDeletes), num, orgRepo)
-	comments := constructPullRequestComments(toAdds, linterNamePrefix(linterName), a.Provider.GetCodeReviewInfo().HeadSHA)
+	comments := constructPullRequestComments(toAdds, linterNamePrefixV2(linterName), a.Provider.GetCodeReviewInfo().HeadSHA)
 	return comments, nil
 }
 

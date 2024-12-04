@@ -34,6 +34,7 @@ import (
 	"time"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
+	"github.com/golang-jwt/jwt"
 	"github.com/google/go-github/v57/github"
 	"github.com/gregjones/httpcache"
 	"github.com/qiniu/reviewbot/config"
@@ -45,6 +46,7 @@ import (
 	"github.com/qiniu/x/log"
 	"github.com/tmc/langchaingo/llms"
 	"github.com/xanzy/go-gitlab"
+	"golang.org/x/oauth2"
 	gitv2 "sigs.k8s.io/prow/pkg/git/v2"
 )
 
@@ -76,11 +78,10 @@ type Server struct {
 	gitLabPersonalAccessToken string
 
 	// support github app model
-	// gitHubAppID         int64
-	// gitHubAppPrivateKey string
-	gitHubAppAuth             *GitHubAppAuth
-	gitHubPersonalAccessToken string
+	gitHubAppAuth         *GitHubAppAuth
+	gitHubAccessTokenAuth *GitHubAccessTokenAuth
 
+	// llm model related
 	modelConfig llm.Config
 	modelClient llms.Model
 }
@@ -208,6 +209,13 @@ func (s *Server) handleGitHubEvent(ctx context.Context, event *github.PullReques
 			Host:     "github.com",
 			Platform: config.GitHub,
 		}
+
+		appName, err := s.getAccountName(ctx)
+		if err != nil {
+			return err
+		}
+		platformInfo.GitHubAppName = appName
+
 		provider, err := lint.NewGithubProvider(ctx, s.GithubClient(installationID), *event, lint.WithGitHubProviderInfo(platformInfo))
 		if err != nil {
 			return err
@@ -223,6 +231,70 @@ func (s *Server) handleGitHubEvent(ctx context.Context, event *github.PullReques
 
 		return s.handleCodeRequestEvent(ctx, info)
 	})
+}
+
+func (s *Server) getAccountName(ctx context.Context) (string, error) {
+	log := util.FromContext(ctx)
+	if s.gitHubAccessTokenAuth != nil {
+		if s.gitHubAccessTokenAuth.User != "" {
+			return s.gitHubAccessTokenAuth.User, nil
+		}
+
+		client := s.GithubAccessTokenClient()
+		user, resp, err := client.Users.Get(ctx, "")
+		if err != nil {
+			log.Errorf("failed to get authenticated user: %v", err)
+			return "", err
+		}
+		if resp.StatusCode != http.StatusOK {
+			log.Errorf("failed to get authenticated user: %v", resp)
+			return "", err
+		}
+		log.Infof("authenticated user name: %s", user.GetLogin())
+		s.gitHubAccessTokenAuth.User = user.GetLogin()
+		return user.GetLogin(), nil
+	}
+
+	if s.gitHubAppAuth.AppName != "" {
+		return s.gitHubAppAuth.AppName, nil
+	}
+
+	privateKey, err := os.ReadFile(s.gitHubAppAuth.PrivateKeyPath)
+	if err != nil {
+		log.Errorf("failed to read private key: %v", err)
+		return "", err
+	}
+
+	parsedKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKey)
+	if err != nil {
+		log.Errorf("failed to parse private key: %v", err)
+		return "", err
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
+		"iat": time.Now().Unix(),
+		"exp": time.Now().Add(10 * time.Minute).Unix(),
+		"iss": s.gitHubAppAuth.AppID,
+	})
+
+	signedToken, err := token.SignedString(parsedKey)
+	if err != nil {
+		log.Errorf("failed to sign token: %v", err)
+		return "", err
+	}
+
+	ts := oauth2.StaticTokenSource(
+		&oauth2.Token{AccessToken: signedToken},
+	)
+	tc := oauth2.NewClient(ctx, ts)
+	client := github.NewClient(tc)
+	appName, err := lint.GetAppUsername(ctx, client)
+	if err != nil {
+		return "", err
+	}
+	log.Infof("app name: %s", appName)
+	s.gitHubAppAuth.AppName = appName
+	return s.gitHubAppAuth.AppName, nil
 }
 
 func (s *Server) handleGitLabEvent(ctx context.Context, event *gitlab.MergeEvent) error {
@@ -716,16 +788,16 @@ func (s *Server) githubAppClient(installationID int64) *github.Client {
 	return github.NewClient(&http.Client{Transport: tr})
 }
 
-func (s *Server) githubAccessTokenClient() *github.Client {
+func (s *Server) GithubAccessTokenClient() *github.Client {
 	gc := github.NewClient(httpcache.NewMemoryCacheTransport().Client())
-	gc.WithAuthToken(s.gitHubPersonalAccessToken)
+	gc.WithAuthToken(s.gitHubAccessTokenAuth.AccessToken)
 	return gc
 }
 
 // GithubClient returns a github client.
 func (s *Server) GithubClient(installationID int64) *github.Client {
-	if s.gitHubPersonalAccessToken != "" {
-		return s.githubAccessTokenClient()
+	if s.gitHubAccessTokenAuth != nil {
+		return s.GithubAccessTokenClient()
 	}
 	return s.githubAppClient(installationID)
 }
