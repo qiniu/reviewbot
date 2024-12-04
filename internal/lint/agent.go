@@ -30,7 +30,6 @@ import (
 	"github.com/qiniu/reviewbot/internal/runner"
 	"github.com/qiniu/reviewbot/internal/storage"
 	"github.com/qiniu/reviewbot/internal/util"
-	"github.com/qiniu/x/log"
 	"github.com/tmc/langchaingo/llms"
 )
 
@@ -127,6 +126,7 @@ func (a *Agent) processOutput(ctx context.Context, output LinterOutput, ref conf
 
 // ApplyTypedMessageByIssueReferences applies the issue references to the lint results with the typed message.
 func (a *Agent) ApplyTypedMessageByIssueReferences(ctx context.Context, lintResults map[string][]LinterOutput) map[string][]LinterOutput {
+	log := util.FromContext(ctx)
 	msgFormat := getMsgFormat(a.LinterConfig.ReportType)
 	newLintResults := make(map[string][]LinterOutput, len(lintResults))
 
@@ -169,5 +169,6 @@ const ReferenceFooter = `
 
 %s
 
-以上内容由AI生成，如有问题，请联系[reviewbot](https://github.com/qiniu/reviewbot)。
+---
+> 💡 以上内容由 AI 辅助生成，如有疑问欢迎反馈交流
 </details>`

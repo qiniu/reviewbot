@@ -142,6 +142,8 @@ type IssueReference struct {
 	Pattern string `json:"pattern"`
 	// URL is the url of the issue reference.
 	URL string `json:"url"`
+	// Severity is the severity of the issue reference.
+	Severity Severity `json:"severity"`
 }
 
 type CompiledIssueReference struct {
@@ -149,6 +151,15 @@ type CompiledIssueReference struct {
 	URL         string
 	IssueNumber int
 }
+
+type Severity string
+
+const (
+	SeverityError   Severity = "error"
+	SeverityWarning Severity = "warning"
+	SeverityInfo    Severity = "info"
+	SeveritySuggest Severity = "suggestion"
+)
 
 type Linter struct {
 	// Name is the linter name.

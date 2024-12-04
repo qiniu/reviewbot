@@ -9,6 +9,7 @@ require (
 	github.com/aws/smithy-go v1.20.4
 	github.com/bradleyfalzon/ghinstallation/v2 v2.8.0
 	github.com/docker/docker v27.2.0+incompatible
+	github.com/golang-jwt/jwt v3.2.1+incompatible
 	github.com/google/go-github/v57 v57.0.0
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79
 	github.com/hashicorp/go-version v1.7.0
@@ -20,6 +21,7 @@ require (
 	github.com/tmc/langchaingo v0.1.12
 	github.com/xanzy/go-gitlab v0.109.0
 	golang.org/x/mod v0.21.0
+	golang.org/x/oauth2 v0.20.0
 	k8s.io/api v0.28.3
 	k8s.io/apimachinery v0.28.3
 	k8s.io/client-go v0.28.3
@@ -93,7 +95,6 @@ require (
 	go.opentelemetry.io/otel/sdk v1.29.0 // indirect
 	go.opentelemetry.io/otel/trace v1.29.0 // indirect
 	golang.org/x/net v0.28.0 // indirect
-	golang.org/x/oauth2 v0.20.0 // indirect
 	golang.org/x/sync v0.8.0 // indirect
 	golang.org/x/sys v0.25.0 // indirect
 	golang.org/x/term v0.23.0 // indirect

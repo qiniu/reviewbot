@@ -45,6 +45,9 @@ type Provider interface {
 type ProviderInfo struct {
 	Host     string
 	Platform config.Platform
+
+	// GitHubAppName is the name of the GitHub app.
+	GitHubAppName string
 }
 
 // Commit represents a Git commit.
