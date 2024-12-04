@@ -163,7 +163,7 @@ customLinters:
       - "--"
     args:
       - |
-        pylint --recursive=y ./
+        pylint --output-format=text --msg-template='{path}:{line}:{column}: {msg} ({symbol})' --reports=n --score=n --recursive=y ./ | grep -E '^[^=].*:[0-9]+:[0-9]+:'
     kubernetesAsRunner:
       namespace: "reviewbot"
       image: "aslan-spock-register.qiniu.io/reviewbot/base:go1.22.3-pylint3.3.1"
