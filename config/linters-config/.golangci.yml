@@ -93,3 +93,4 @@ linters:
     - gosmopolitan # see too many false positives
     - gosec # it was used by customizedExtraLinter, see config.yaml
     - canonicalheader # see https://github.com/qiniu/reviewbot/issues/457
+    - gomoddirectives # superseded by gomodcheck
