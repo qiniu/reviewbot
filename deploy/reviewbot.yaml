@@ -32,6 +32,9 @@ spec:
             - -s3-credentials-file=/root/.aws/credentials.json
             - -server-addr=http://qiniu-x.jfcs-k8s-qa1.qiniu.io # this is an intranet domain of qiniu.
             - -kube-config=/root/.kube/config
+            - -llm.provider=ollama
+            - -llm.server-url=$(LLM_SERVER_URL)
+            - -llm.model=qwen2.5-coder:7
           env:
             - name: GITHUB_WEBHOOK_SECRET
               valueFrom:
@@ -67,6 +70,11 @@ spec:
                 configMapKeyRef:
                   key: goprivate
                   name: goprivate
+            - name: LLM_SERVER_URL
+              valueFrom:
+                secretKeyRef:
+                  key: llm-server-url
+                  name: llm
           image: aslan-spock-register.qiniu.io/qa/reviewbot:latest # use your own built image instead
           imagePullPolicy: Always
           resources:

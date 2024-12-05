@@ -168,4 +168,6 @@ const ReferenceFooter = `
 <summary>Details</summary>
 
 %s
+
+以上内容由AI生成，如有问题，请联系[reviewbot](https://github.com/qiniu/reviewbot)。
 </details>`
