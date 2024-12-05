@@ -149,7 +149,7 @@ func (a *Agent) ApplyTypedMessageByIssueReferences(ctx context.Context, lintResu
 				if err != nil {
 					log.Errorf("failed to query LLM server: %v", err)
 				} else {
-					output.Message += fmt.Sprintf(ReferenceFooter, resp)
+					output.TypedMessage = output.Message + fmt.Sprintf(ReferenceFooter, resp)
 				}
 				newOutputs = append(newOutputs, output)
 			}
