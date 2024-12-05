@@ -528,7 +528,7 @@ func (s *Server) processIssueCommentEvent(ctx context.Context, event *github.Iss
 		log.Debugf("skipping action %s\n", event.GetAction())
 		return nil
 	}
-	if !strings.Contains(*event.Comment.Body, "reviewbot") {
+	if !strings.Contains(*event.Comment.Body, "@reviewbot") {
 		return nil
 	}
 
@@ -564,7 +564,7 @@ func (s *Server) processPullRequestReviewCommentEvent(ctx context.Context, event
 	diffHunk := event.GetComment().GetDiffHunk()
 	inReplyTo := event.GetComment().GetInReplyTo()
 
-	if !strings.Contains(query, "reviewbot") {
+	if !strings.Contains(query, "@reviewbot") {
 		log.Debugf("skipping reviewbot comment\n")
 		return nil
 	}
