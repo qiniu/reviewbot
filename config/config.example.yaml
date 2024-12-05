@@ -6,7 +6,7 @@
 # 3. Conducting specific gray testing for a particular feature.
 
 globalDefaultConfig: # global default settings, will be overridden by qbox org and repo specific settings if they exist
-  githubReportType: "github_check_run" # github_pr_review, github_check_run
+  #githubReportType: "github_check_run" # github_pr_review, github_check_run
   gitlabReportType: "gitlab_mr_comment_discussion" # gitlab_mr_comment, gitlab_mr_discussion,gitlab_mr_comment_discussion
   golangcilintConfig: "config/linters-config/.golangci.yml" # golangci-lint config file to use
   copySSHKeyToContainer: "/root/.ssh/id_rsa"
@@ -155,6 +155,16 @@ customLinters:
   stylecheck:
     # disable stylecheck since we already have p3cpmd
     enable: false
+  shellcheck:
+    enable: true
+    languages: [".sh", ".bash"]
+    command:
+      - "/bin/sh"
+      - "-c"
+      - "--"
+    args:
+      - |
+        find . \( -name "*.sh" -o -name "*.bash" -o -name "*.ksh" -o -name "*.zsh" \) -type f -exec shellcheck -f gcc -e SC2086,SC2046 {} + | sed 's|^\./||'
   pylint:
     languages: [".py"]
     command:
@@ -163,7 +173,7 @@ customLinters:
       - "--"
     args:
       - |
-        pylint --output-format=text --msg-template='{path}:{line}:{column}: {msg} ({symbol})' --reports=n --score=n --recursive=y ./ | grep -E '^[^=].*:[0-9]+:[0-9]+:'
+        pylint --disable=line-too-long --output-format=text --msg-template='{path}:{line}:{column}: {msg} ({symbol})' --reports=n --score=n --recursive=y ./ | grep -E '^[^=].*:[0-9]+:[0-9]+:'
     kubernetesAsRunner:
       namespace: "reviewbot"
       image: "aslan-spock-register.qiniu.io/reviewbot/base:go1.22.3-pylint3.3.1"
