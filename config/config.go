@@ -401,6 +401,7 @@ func applyCustomConfig(legacy Linter, custom Linter) Linter {
 func applyCustomLintersConfig(legacy Linter, custom CustomLinter) Linter {
 	// Convert CustomizedExtraLinter to Linter for reuse
 	tempLinter := Linter{
+		Enable:             custom.Enable,
 		Command:            custom.Command,
 		Args:               custom.Args,
 		ReportType:         custom.ReportType,
