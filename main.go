@@ -25,7 +25,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/pprof"
-	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -288,72 +287,71 @@ var viewTemplate = template.Must(template.New("view").Parse(`
 `))
 
 func (s *Server) HandleView(w http.ResponseWriter, r *http.Request) {
-	path, err := url.PathUnescape(r.URL.Path[len("/view/"):])
-	if err != nil {
-		http.Error(w, "Invalid URL", http.StatusBadRequest)
+	logID := strings.TrimPrefix(r.URL.Path, "/view/")
+	if logID == "" {
+		http.Error(w, "log ID is required", http.StatusBadRequest)
 		return
 	}
 
-	contents, err := s.storage.Read(r.Context(), path)
+	// get log content from storage
+	content, err := s.storage.Read(r.Context(), logID)
 	if err != nil {
 		if errors.Is(err, storage.ErrObjectNotFound) {
 			http.Error(w, "empty log", http.StatusNotFound)
 		} else {
-			log.Errorf("Error reading file: %v", err)
+			log.Errorf("failed to read log content: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 		}
-		return
 	}
 
-	script, output, scriptTimestamp, outputTimestamp := parseContent(string(contents))
+	// parse log content
+	logContent := parseContent(string(content))
 
-	data := struct {
-		Script          string
-		Output          string
-		ScriptTimestamp string
-		OutputTimestamp string
-	}{
-		Script:          script,
-		Output:          output,
-		ScriptTimestamp: scriptTimestamp,
-		OutputTimestamp: outputTimestamp,
-	}
-
+	// render page with template
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := viewTemplate.Execute(w, data); err != nil {
-		log.Printf("Error executing template: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	if err := viewTemplate.Execute(w, logContent); err != nil {
+		log.Errorf("failed to execute template: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
 	}
 }
 
-func parseContent(content string) (script string, output string, scriptTimestamp string, outputTimestamp string) {
+type LogContent struct {
+	Script          string
+	Output          string
+	ScriptTimestamp string
+	OutputTimestamp string
+}
+
+func parseContent(content string) LogContent {
 	lines := strings.Split(content, "\n")
+	var result LogContent
 	var currentSection string
 
 	for _, line := range lines {
 		if strings.Contains(line, "run script:") {
 			currentSection = "script"
 			if timestamp := extractTimestamp(line); timestamp != "" {
-				scriptTimestamp = timestamp
+				result.ScriptTimestamp = timestamp
 			}
 			continue
 		}
 		if strings.Contains(line, "output:") {
 			currentSection = "output"
 			if timestamp := extractTimestamp(line); timestamp != "" {
-				outputTimestamp = timestamp
+				result.OutputTimestamp = timestamp
 			}
 			continue
 		}
 
 		if currentSection == "script" {
-			script += line + "\n"
+			result.Script += line + "\n"
 		} else if currentSection == "output" {
-			output += line + "\n"
+			result.Output += line + "\n"
 		}
 	}
 
-	return
+	return result
 }
 
 func extractTimestamp(line string) string {

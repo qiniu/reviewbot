@@ -37,6 +37,7 @@ func init() {
 }
 
 func commitMessageCheckHandler(ctx context.Context, a lint.Agent) error {
+	log := util.FromContext(ctx)
 	info := a.Provider.GetCodeReviewInfo()
 	var (
 		org    = info.Org
@@ -54,7 +55,7 @@ func commitMessageCheckHandler(ctx context.Context, a lint.Agent) error {
 	if err != nil {
 		return err
 	}
-
+	log.Infof("existedComments: %d", len(existedComments))
 	var toComments []string
 	for _, rule := range rulers {
 		var cmt string
@@ -67,7 +68,6 @@ func commitMessageCheckHandler(ctx context.Context, a lint.Agent) error {
 			toComments = append(toComments, cmt)
 		}
 	}
-
 	return handle(ctx, a, org, repo, author, number, toComments, existedComments)
 }
 
@@ -119,16 +119,14 @@ func handle(ctx context.Context, agent lint.Agent, org, repo, author string, num
 
 	expectedComment := buf.String()
 
-	// check if comment already existed
+	var commentsExist bool
 	for _, comment := range existedComments {
-		if comment.Body == expectedComment {
-			// comment already existed, no need to create again
-			return nil
+		if !commentsExist && comment.Body == expectedComment {
+			commentsExist = true
+			continue
 		}
-	}
 
-	// remove old comments
-	for _, comment := range existedComments {
+		// remove old comments
 		if strings.Contains(comment.Body, commitCheckFlag) {
 			err := agent.Provider.DeleteComment(ctx, org, repo, comment.ID)
 			if err != nil {
@@ -136,6 +134,10 @@ func handle(ctx context.Context, agent lint.Agent, org, repo, author string, num
 				continue
 			}
 		}
+	}
+
+	if commentsExist {
+		return nil
 	}
 
 	// add new comment
