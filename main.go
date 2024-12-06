@@ -27,6 +27,8 @@ import (
 	"net/http/pprof"
 	"net/url"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/google/go-github/v57/github"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -163,29 +165,123 @@ var viewTemplate = template.Must(template.New("view").Parse(`
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LOG VIEW</title>
     <style>
         body {
-            font-family: monospace;
-            line-height: 1.4;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
             margin: 0;
-            padding: 0;
+            padding: 20px;
+            background: #f5f7f9;
         }
-        pre {
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .panel {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .panel-header {
+            padding: 12px 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+        .panel-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #2d3748;
             margin: 0;
-            padding: 0;
+            display: flex;
+            align-items: center;
+        }
+        .toggle-icon {
+            display: inline-block;
+            margin-right: 8px;
+            transition: transform 0.2s;
+        }
+        .toggle-icon::before {
+            content: "▼";
+            font-size: 12px;
+        }
+        .panel-header.collapsed .toggle-icon::before {
+            content: "▶";
+        }
+        .panel-header.collapsed + .panel-content {
+            display: none;
+        }
+        .panel-timestamp {
+            margin-left: auto;
+            color: #718096;
+            font-size: 14px;
+        }
+        .panel-content {
+            padding: 20px;
+            overflow-x: auto;
+        }
+        .script-content {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            background: #282c34;
+            color: #abb2bf;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .log-content {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            margin: 0;
             white-space: pre-wrap;
             word-wrap: break-word;
         }
-        .container {
-            max-width: 100%;
-            margin: 0;
-            padding: 0 20px;
-        }
     </style>
+    <script>
+        function togglePanel(header) {
+            header.classList.toggle('collapsed');
+        }
+    </script>
 </head>
 <body>
     <div class="container">
-        <pre>{{.Content}}</pre>
+        <!-- script panel -->
+        <div class="panel">
+            <div class="panel-header" onclick="togglePanel(this)">
+                <h2 class="panel-title">
+                    <span class="toggle-icon"></span>
+                    script
+                </h2>
+                <span class="panel-timestamp">{{.ScriptTimestamp}}</span>
+            </div>
+            <div class="panel-content">
+                <pre class="script-content">{{.Script}}</pre>
+            </div>
+        </div>
+
+        <!-- output panel -->
+        <div class="panel">
+            <div class="panel-header">
+                <h2 class="panel-title">
+                    <span class="toggle-icon"></span>
+                    output
+                </h2>
+                <span class="panel-timestamp">{{.OutputTimestamp}}</span>
+            </div>
+            <div class="panel-content">
+                <pre class="log-content">{{.Output}}</pre>
+            </div>
+        </div>
     </div>
 </body>
 </html>
@@ -209,18 +305,68 @@ func (s *Server) HandleView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	script, output, scriptTimestamp, outputTimestamp := parseContent(string(contents))
 
 	data := struct {
-		Content string
+		Script          string
+		Output          string
+		ScriptTimestamp string
+		OutputTimestamp string
 	}{
-		Content: string(contents),
+		Script:          script,
+		Output:          output,
+		ScriptTimestamp: scriptTimestamp,
+		OutputTimestamp: outputTimestamp,
 	}
 
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := viewTemplate.Execute(w, data); err != nil {
 		log.Printf("Error executing template: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
+}
+
+func parseContent(content string) (script string, output string, scriptTimestamp string, outputTimestamp string) {
+	lines := strings.Split(content, "\n")
+	var currentSection string
+
+	for _, line := range lines {
+		if strings.Contains(line, "run script:") {
+			currentSection = "script"
+			if timestamp := extractTimestamp(line); timestamp != "" {
+				scriptTimestamp = timestamp
+			}
+			continue
+		}
+		if strings.Contains(line, "output:") {
+			currentSection = "output"
+			if timestamp := extractTimestamp(line); timestamp != "" {
+				outputTimestamp = timestamp
+			}
+			continue
+		}
+
+		if currentSection == "script" {
+			script += line + "\n"
+		} else if currentSection == "output" {
+			output += line + "\n"
+		}
+	}
+
+	return
+}
+
+func extractTimestamp(line string) string {
+	// format: [2024-12-06T17:04:35+08:00]
+	start := strings.Index(line, "[")
+	end := strings.Index(line, "]")
+	if start >= 0 && end > start {
+		timestamp := line[start+1 : end]
+		if t, err := time.Parse(time.RFC3339, timestamp); err == nil {
+			return t.Format("2006-01-02 15:04:05")
+		}
+	}
+	return ""
 }
 
 func main() {
