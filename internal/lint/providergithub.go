@@ -593,27 +593,40 @@ func (g *GithubProvider) ListCommits(ctx context.Context, org, repo string, numb
 }
 
 func (g *GithubProvider) ListComments(ctx context.Context, owner string, repo string, number int) ([]Comment, error) {
-	comments, resp, err := g.GithubClient.Issues.ListComments(ctx, owner, repo, number, &github.IssueListCommentsOptions{})
-	if err != nil {
-		return nil, err
+	var allComments []Comment
+	opts := &github.IssueListCommentsOptions{
+		ListOptions: github.ListOptions{
+			PerPage: 100,
+		},
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		log.Errorf("list comments failed: %v", resp)
-		return nil, ErrListComments
-	}
+	for {
+		comments, resp, err := g.GithubClient.Issues.ListComments(ctx, owner, repo, number, opts)
+		if err != nil {
+			return nil, err
+		}
 
-	var allComments = make([]Comment, 0, len(comments))
-	for _, comment := range comments {
-		allComments = append(allComments, Comment{
-			ID:        comment.GetID(),
-			Body:      comment.GetBody(),
-			CreatedAt: comment.GetCreatedAt().Time,
-			UpdatedAt: comment.GetUpdatedAt().Time,
-			URL:       comment.GetURL(),
-			HTMLURL:   comment.GetHTMLURL(),
-			IssueURL:  comment.GetIssueURL(),
-		})
+		if resp.StatusCode != http.StatusOK {
+			log.Errorf("list comments failed: %v", resp)
+			return nil, ErrListComments
+		}
+
+		for _, comment := range comments {
+			allComments = append(allComments, Comment{
+				ID:        comment.GetID(),
+				Body:      comment.GetBody(),
+				CreatedAt: comment.GetCreatedAt().Time,
+				UpdatedAt: comment.GetUpdatedAt().Time,
+				URL:       comment.GetURL(),
+				HTMLURL:   comment.GetHTMLURL(),
+				IssueURL:  comment.GetIssueURL(),
+			})
+		}
+
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
 	}
 
 	return allComments, nil
