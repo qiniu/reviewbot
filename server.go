@@ -241,7 +241,7 @@ func (s *Server) handleGitHubEventCli(ctx context.Context, prid int, org string,
 		repo:     repo,
 		orgRepo:  org + "/" + repo,
 	}
-	s.gitHubPersonalAccessToken = "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"
+	s.gitHubPersonalAccessToken = ""
 	platformInfo := lint.ProviderInfo{
 		Host:     "github.com",
 		Platform: config.GitHub,
