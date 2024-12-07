@@ -85,6 +85,7 @@ type options struct {
 	llmModel     string
 	llmServerURL string
 	llmAPIKey    string
+	cliMode      bool
 }
 
 var (
@@ -125,6 +126,7 @@ func gatherOptions() options {
 	fs := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	fs.IntVar(&o.port, "port", 8888, "port to listen on")
 	fs.BoolVar(&o.dryRun, "dry-run", false, "dry run")
+	fs.BoolVar(&o.cliMode, "cli-mode", false, "cli run mode")
 	fs.BoolVar(&o.debug, "debug", false, "debug mode")
 	fs.IntVar(&o.logLevel, "log-level", 0, "log level")
 	fs.StringVar(&o.webhookSecret, "webhook-secret", "", "webhook secret file")
@@ -310,6 +312,9 @@ func main() {
 		if err != nil {
 			log.Fatalf("failed to create local storage: %v", err)
 		}
+	}
+	if o.cliMode {
+		s.reviewbotGithubExe("test", "werew", 3)
 	}
 
 	mux := http.NewServeMux()

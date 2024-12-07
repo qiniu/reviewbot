@@ -152,6 +152,15 @@ func (s *Server) serveGitHub(w http.ResponseWriter, r *http.Request) {
 		log.Debugf("skipping event type %s\n", github.WebHookType(r))
 	}
 }
+func (s *Server) reviewbotGithubExe(codespace string, githubtoken string, prid int) {
+	ctx := context.WithValue(context.Background(), util.EventGUIDKey, "climode")
+	//GITHUB_API_URL := "https://api.github.com/"
+	//GITHUB_REF := "refs/pull/3/merge"
+	//GITHUB_WORKFLOW_REF := "never112/hellogolang/.github/workflows/go.yml@refs/pull/3/merge"
+	s.handleGitHubEventCli(ctx, 3, "never112", "hellogolang", "D:\\CodeProject\\hellogolang")
+	fmt.Println(codespace)
+	fmt.Println(githubtoken)
+}
 
 func (s *Server) serveGitLab(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
@@ -223,6 +232,35 @@ func (s *Server) handleGitHubEvent(ctx context.Context, event *github.PullReques
 
 		return s.handleCodeRequestEvent(ctx, info)
 	})
+}
+func (s *Server) handleGitHubEventCli(ctx context.Context, prid int, org string, repo string, repodir string) error {
+	info := &codeRequestInfo{
+		platform: config.GitHub,
+		num:      prid,
+		org:      org,
+		repo:     repo,
+		orgRepo:  org + "/" + repo,
+	}
+	s.gitHubPersonalAccessToken = "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"
+	platformInfo := lint.ProviderInfo{
+		Host:     "github.com",
+		Platform: config.GitHub,
+	}
+	provider, err := lint.NewGithubProviderCli(ctx, s.githubAccessTokenClient(), org, repo, prid, lint.WithGitHubProviderInfo(platformInfo))
+	if err != nil {
+		return err
+	}
+	info.provider = provider
+
+	//workspace, workDir, err := s.prepareGitRepos(ctx, info.org, info.repo, info.num, config.GitHub, installationID, provider)
+	if err != nil {
+		return err
+	}
+	info.workDir = repodir
+	info.repoDir = repodir
+
+	return s.handleCodeRequestEvent(ctx, info)
+
 }
 
 func (s *Server) handleGitLabEvent(ctx context.Context, event *gitlab.MergeEvent) error {

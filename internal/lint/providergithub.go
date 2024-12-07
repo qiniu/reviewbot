@@ -44,6 +44,15 @@ var (
 	ErrUnexpectedTransportType = errors.New("unexpected transport type")
 )
 
+func GetPullRequstInfo(ctx context.Context, gc *github.Client, owner string, repo string, number int) (*github.PullRequest, error) {
+	a, _, c := gc.PullRequests.Get(ctx, owner, repo, number)
+	return a, c
+}
+func GetRepo(ctx context.Context, gc *github.Client, owner string, repo string) (*github.Repository, error) {
+	a, _, c := gc.Repositories.Get(ctx, owner, repo)
+	return a, c
+}
+
 // ListFiles lists all files for the specified pull request.
 func ListPullRequestsFiles(ctx context.Context, gc *github.Client, owner string, repo string, number int) ([]*github.CommitFile, *github.Response, error) {
 	opts := github.ListOptions{
@@ -267,6 +276,43 @@ func NewGithubProvider(ctx context.Context, githubClient *github.Client, pullReq
 		}
 		p.HunkChecker = checker
 	}
+
+	return p, nil
+}
+
+func NewGithubProviderCli(ctx context.Context, githubClient *github.Client, org string, repo string, prid int, options ...GithubProviderOption) (*GithubProvider, error) {
+	p := &GithubProvider{
+		GithubClient: githubClient,
+		//PullRequestEvent: pullRequestEvent,
+	}
+
+	for _, option := range options {
+		option(p)
+	}
+
+	if p.PullRequestChangedFiles == nil {
+		files, resp, err := ListPullRequestsFiles(ctx, p.GithubClient, org, repo, prid)
+		if err != nil {
+			return nil, err
+		}
+		if resp.StatusCode != http.StatusOK {
+			log.Errorf("failed to list pull request files, status code: %d", resp.StatusCode)
+			return nil, errListFile
+		}
+		p.PullRequestChangedFiles = files
+	}
+
+	if p.HunkChecker == nil {
+		checker, err := newGithubHunkChecker(p.PullRequestChangedFiles)
+		if err != nil {
+			return nil, err
+		}
+		p.HunkChecker = checker
+	}
+	a, _ := GetPullRequstInfo(ctx, p.GithubClient, org, repo, prid)
+	f, _ := GetRepo(ctx, p.GithubClient, org, repo)
+	p.PullRequestEvent.PullRequest = a
+	p.PullRequestEvent.Repo = f
 
 	return p, nil
 }
