@@ -114,14 +114,14 @@ customRepos: # custom config for specific orgs or repos
         dockerAsRunner:
           image: "aslan-spock-register.qiniu.io/reviewbot/base:go1.22.3-gocilint.1.59.1"
 
-  qiniu/reviewbot:
-    linters:
-      golangci-lint:
-        enable: true
-        reportType: "github_mix"
-        kubernetesAsRunner:
-          image: "aslan-spock-register.qiniu.io/reviewbot/base:go1.23.2-gocilint.1.61.0"
-          namespace: "reviewbot"
+#  qiniu/reviewbot:
+#    linters:
+#      golangci-lint:
+#        enable: true
+#        reportType: "github_mix"
+#        kubernetesAsRunner:
+#          image: "aslan-spock-register.qiniu.io/reviewbot/base:go1.23.2-gocilint.1.61.0"
+#          namespace: "reviewbot"
 
   qbox/ffmpeg:
     refs:
@@ -155,27 +155,27 @@ customLinters:
   stylecheck:
     # disable stylecheck since we already have p3cpmd
     enable: false
-  pylint:
-    languages: [".py"]
-    command:
-      - "/bin/sh"
-      - "-c"
-      - "--"
-    args:
-      - |
-        pylint --output-format=text --msg-template='{path}:{line}:{column}: {msg} ({symbol})' --reports=n --score=n --recursive=y ./ | grep -E '^[^=].*:[0-9]+:[0-9]+:'
-    kubernetesAsRunner:
-      namespace: "reviewbot"
-      image: "aslan-spock-register.qiniu.io/reviewbot/base:go1.22.3-pylint3.3.1"
-  p3cpmd:
-    languages: [".java"]
-    command:
-      - "/bin/sh"
-      - "-c"
-      - "--"
-    args:
-      - |
-        java -cp /source/p3c/p3c-pmd/target/p3c-pmd-2.1.1-jar-with-dependencies.jar net.sourceforge.pmd.PMD -f emacs -R rulesets/java/ali-comment.xml,rulesets/java/ali-concurrent.xml,rulesets/java/ali-constant.xml,rulesets/java/ali-exception.xml,rulesets/java/ali-flowcontrol.xml,rulesets/java/ali-naming.xml,rulesets/java/ali-oop.xml,rulesets/java/ali-orm.xml,rulesets/java/ali-other.xml,rulesets/java/ali-set.xml -d ./
-    kubernetesAsRunner:
-      namespace: "reviewbot"
-      image: "aslan-spock-register.qiniu.io/reviewbot/base:go1.22.3-java11-p3cpmd2.1.1"
+#  pylint:
+#    languages: [".py"]
+#    command:
+#      - "/bin/sh"
+#      - "-c"
+#      - "--"
+#    args:
+#      - |
+#        pylint --output-format=text --msg-template='{path}:{line}:{column}: {msg} ({symbol})' --reports=n --score=n --recursive=y ./ | grep -E '^[^=].*:[0-9]+:[0-9]+:'
+#    kubernetesAsRunner:
+#      namespace: "reviewbot"
+#      image: "aslan-spock-register.qiniu.io/reviewbot/base:go1.22.3-pylint3.3.1"
+#  p3cpmd:
+#    languages: [".java"]
+#    command:
+#      - "/bin/sh"
+#      - "-c"
+#      - "--"
+#    args:
+#      - |
+#        java -cp /source/p3c/p3c-pmd/target/p3c-pmd-2.1.1-jar-with-dependencies.jar net.sourceforge.pmd.PMD -f emacs -R rulesets/java/ali-comment.xml,rulesets/java/ali-concurrent.xml,rulesets/java/ali-constant.xml,rulesets/java/ali-exception.xml,rulesets/java/ali-flowcontrol.xml,rulesets/java/ali-naming.xml,rulesets/java/ali-oop.xml,rulesets/java/ali-orm.xml,rulesets/java/ali-other.xml,rulesets/java/ali-set.xml -d ./
+#    kubernetesAsRunner:
+#      namespace: "reviewbot"
+#      image: "aslan-spock-register.qiniu.io/reviewbot/base:go1.22.3-java11-p3cpmd2.1.1"
