@@ -302,6 +302,7 @@ func (s *Server) HandleView(w http.ResponseWriter, r *http.Request) {
 			log.Errorf("failed to read log content: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 		}
+		return
 	}
 
 	// parse log content
