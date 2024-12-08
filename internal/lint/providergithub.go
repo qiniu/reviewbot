@@ -800,7 +800,7 @@ func newBaseCheckRun(a Agent, lintErrs map[string][]LinterOutput) github.CreateC
 	}
 
 	if len(annotations) > 0 {
-		check.Conclusion = github.String("failure")
+		check.Conclusion = github.String("neutral")
 	} else {
 		check.Conclusion = github.String("success")
 	}
