@@ -54,6 +54,9 @@ linters-settings:
     disabled-checks:
       - appendAssign
 
+  exhaustive:
+    default-signifies-exhaustive: true
+
 issues:
   exclude-rules:
     - path: '(.+)_test\.go'
