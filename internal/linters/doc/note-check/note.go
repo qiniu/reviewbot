@@ -67,7 +67,7 @@ func noteCheckHandler(ctx context.Context, a lint.Agent) error {
 		}
 	}
 
-	return lint.Report(ctx, a, outputs)
+	return lint.Report(ctx, a, outputs, nil)
 }
 
 const NoteSuggestion = "A Note is recommended to use \"MARKER(uid): note body\" format."

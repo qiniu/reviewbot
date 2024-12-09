@@ -331,7 +331,7 @@ func linterNamePrefixGitLab(linterName string) string {
 	return fmt.Sprintf("[**%s**]", linterName)
 }
 
-func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[string][]LinterOutput) error {
+func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[string][]LinterOutput, unexpected []string) error {
 	linterName := a.LinterConfig.Name
 	org := a.Provider.GetCodeReviewInfo().Org
 	repo := a.Provider.GetCodeReviewInfo().Repo
