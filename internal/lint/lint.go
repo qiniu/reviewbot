@@ -134,7 +134,7 @@ func GeneralHandler(ctx context.Context, log *xlog.Logger, a Agent, execRun func
 		}
 	}
 
-	return Report(ctx, a, lintResults)
+	return Report(ctx, a, lintResults, unexpected)
 }
 
 // ExecRun executes a command.
@@ -178,7 +178,7 @@ func GeneralParse(log *xlog.Logger, output []byte) (map[string][]LinterOutput, [
 // Report reports the lint results.
 // This function should be always called even in custom linter handler since it will filter out the lint errors that are not related to the PR.
 // and handle some special cases like auto-generated files.
-func Report(ctx context.Context, a Agent, lintResults map[string][]LinterOutput) error {
+func Report(ctx context.Context, a Agent, lintResults map[string][]LinterOutput, unexpected []string) error {
 	log := util.FromContext(ctx)
 	var (
 		num        = a.Provider.GetCodeReviewInfo().Number
@@ -200,7 +200,7 @@ func Report(ctx context.Context, a Agent, lintResults map[string][]LinterOutput)
 		metric.IncIssueCounter(orgRepo, linterName, a.Provider.GetCodeReviewInfo().URL, a.Provider.GetCodeReviewInfo().HeadSHA, float64(countLinterErrors(lintResults)))
 	}
 
-	return a.Provider.Report(ctx, a, lintResults)
+	return a.Provider.Report(ctx, a, lintResults, unexpected)
 }
 
 // LineParser is a function that parses a line of linter output.
