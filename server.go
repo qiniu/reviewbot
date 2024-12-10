@@ -157,7 +157,7 @@ func (s *Server) reviewbotGithubExe(codespace string, githubtoken string, prid i
 	//GITHUB_API_URL := "https://api.github.com/"
 	//GITHUB_REF := "refs/pull/3/merge"
 	//GITHUB_WORKFLOW_REF := "never112/hellogolang/.github/workflows/go.yml@refs/pull/3/merge"
-	s.handleGitHubEventCli(ctx, 3, "never112", "hellogolang", "D:\\CodeProject\\hellogolang")
+	s.handleGitHubEventCli(ctx, 3, "never112", "hellogolang", "/Users/mac/Documents/project/qproject/temp4/temp6/hellogolang")
 	fmt.Println(codespace)
 	fmt.Println(githubtoken)
 }
@@ -241,12 +241,15 @@ func (s *Server) handleGitHubEventCli(ctx context.Context, prid int, org string,
 		repo:     repo,
 		orgRepo:  org + "/" + repo,
 	}
+
 	s.gitHubPersonalAccessToken = ""
 	platformInfo := lint.ProviderInfo{
 		Host:     "github.com",
 		Platform: config.GitHub,
 	}
-	provider, err := lint.NewGithubProviderCli(ctx, s.githubAccessTokenClient(), org, repo, prid, lint.WithGitHubProviderInfo(platformInfo))
+	//s.GithubClient(53342102)
+	//s.githubAccessTokenClient()
+	provider, err := lint.NewGithubProviderCli(ctx, s.GithubClient(53342102), org, repo, prid, lint.WithGitHubProviderInfo(platformInfo))
 	if err != nil {
 		return err
 	}
@@ -748,6 +751,7 @@ func (s *Server) GitLabClient() *gitlab.Client {
 
 func (s *Server) githubAppClient(installationID int64) *github.Client {
 	tr, err := ghinstallation.NewKeyFromFile(httpcache.NewMemoryCacheTransport(), s.gitHubAppAuth.AppID, installationID, s.gitHubAppAuth.PrivateKeyPath)
+
 	if err != nil {
 		log.Fatalf("failed to create github app transport: %v", err)
 	}
