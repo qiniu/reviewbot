@@ -699,7 +699,6 @@ func (g *GithubProvider) ProcessComments(ctx context.Context, a Agent, lintResul
 
 	prefixFlagV1 := linterNamePrefixV1(linterName)
 	prefixFlagV2 := linterNamePrefixV2(linterName)
-	log.Infof("prefixFlagV1: %s, prefixFlagV2: %s", prefixFlagV1, prefixFlagV2)
 	for _, comment := range existedComments {
 		// FIXME(CarlJi): to keep consistent with old format, remove it after a while
 		if strings.HasPrefix(comment.GetBody(), prefixFlagV1) {
