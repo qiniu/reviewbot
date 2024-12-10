@@ -99,4 +99,5 @@ linters:
     - canonicalheader # see https://github.com/qiniu/reviewbot/issues/457
     - gomoddirectives # superseded by gomodcheck
     - tagalign # see too many false positives
+    - interfacebloat # seems too arbitrary
 
