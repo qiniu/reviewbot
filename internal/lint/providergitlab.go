@@ -399,7 +399,7 @@ func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[st
 			return err
 		}
 		log.Infof("[%s] add %d comments for this PR %d (%s) \n", linterName, len(addedDis), num, orgRepo)
-		metric.NotifyWebhookByText(ConstructGotchaMsg(linterName, g.MergeRequestEvent.Project.WebURL, "", lintResults))
+		metric.NotifyWebhookByText(ConstructGotchaMsg(linterName, g.MergeRequestEvent.ObjectAttributes.URL, logURL, lintResults))
 	case config.GitLabComment:
 		var pid = g.MergeRequestEvent.ObjectAttributes.TargetProjectID
 		existedComments, err := g.ListMergeRequestsComments(ctx, g.GitLabClient, org, repo, num, pid)
@@ -427,7 +427,7 @@ func (g *GitlabProvider) Report(ctx context.Context, a Agent, lintResults map[st
 		if cmtErr != nil {
 			log.Errorf("failed to post comments: %v", cmtErr)
 		}
-		metric.NotifyWebhookByText(ConstructGotchaMsg(linterName, g.MergeRequestEvent.Project.WebURL, "", lintResults))
+		metric.NotifyWebhookByText(ConstructGotchaMsg(linterName, g.MergeRequestEvent.ObjectAttributes.URL, logURL, lintResults))
 	case config.Quiet:
 		return nil
 	default:
