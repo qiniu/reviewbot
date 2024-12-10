@@ -124,43 +124,56 @@ func (a *Agent) processOutput(ctx context.Context, output LinterOutput, ref conf
 	return newOutput, true
 }
 
-// ApplyTypedMessageByIssueReferences applies the issue references to the lint results with the typed message.
-func (a *Agent) ApplyTypedMessageByIssueReferences(ctx context.Context, lintResults map[string][]LinterOutput) map[string][]LinterOutput {
-	log := util.FromContext(ctx)
+// EnrichWithIssueReferences applies the issue references to the lint results with the typed message.
+func (a *Agent) EnrichWithIssueReferences(ctx context.Context, lintResults map[string][]LinterOutput) map[string][]LinterOutput {
 	msgFormat := getMsgFormat(a.LinterConfig.ReportType)
-	newLintResults := make(map[string][]LinterOutput, len(lintResults))
+	enriched := make(map[string][]LinterOutput, len(lintResults))
 
 	// Process each file's outputs
 	for file, outputs := range lintResults {
-		newOutputs := make([]LinterOutput, 0, len(outputs))
+		newOutputs := append([]LinterOutput(nil), outputs...)
 
 		// Apply each reference pattern
-		for _, output := range outputs {
-			processed := false
+		for i, output := range outputs {
 			for _, ref := range a.IssueReferences {
 				if newOutput, ok := a.processOutput(ctx, output, ref, msgFormat); ok {
-					newOutputs = append(newOutputs, newOutput)
-					processed = true
+					newOutputs[i] = newOutput
 					break
 				}
-			}
-			if !processed {
-				resp, err := llm.QueryForReference(ctx, a.ModelClient, output.Message)
-				if err != nil {
-					log.Errorf("failed to query LLM server: %v", err)
-				} else {
-					output.TypedMessage = output.Message + fmt.Sprintf(ReferenceFooter, resp)
-				}
-				newOutputs = append(newOutputs, output)
 			}
 		}
 
 		if len(newOutputs) > 0 {
-			newLintResults[file] = newOutputs
+			enriched[file] = newOutputs
 		}
 	}
+	return enriched
+}
 
-	return newLintResults
+// EnrichWithLLM enriches the lint results with LLM generated content.
+func (a *Agent) EnrichWithLLM(ctx context.Context, lintResults map[string][]LinterOutput) map[string][]LinterOutput {
+	log := util.FromContext(ctx)
+	enriched := make(map[string][]LinterOutput, len(lintResults))
+
+	for file, outputs := range lintResults {
+		newOutputs := append([]LinterOutput(nil), outputs...)
+
+		for i, output := range outputs {
+			// only enrich the output that is not typed
+			if output.TypedMessage == "" {
+				resp, err := llm.QueryForReference(ctx, a.ModelClient, output.Message)
+				if err != nil {
+					log.Errorf("failed to query LLM server: %v", err)
+				} else {
+					newOutputs[i].TypedMessage = newOutputs[i].Message + fmt.Sprintf(ReferenceFooter, resp)
+				}
+			}
+		}
+		if len(newOutputs) > 0 {
+			enriched[file] = newOutputs
+		}
+	}
+	return enriched
 }
 
 const ReferenceFooter = `
