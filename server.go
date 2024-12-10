@@ -174,7 +174,7 @@ func (s *Server) serveGitLab(w http.ResponseWriter, r *http.Request) {
 
 	event, err := gitlab.ParseHook(v, payload)
 	if err != nil {
-		log.Errorf("parse webhook failed: %v", err)
+		log.Errorf("parse gitlab webhook failed: %v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
