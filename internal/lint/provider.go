@@ -17,7 +17,7 @@ type Provider interface {
 	// Base on the linter outputs, the provider will create or update or delete the comments for the PR/MR.
 	HandleComments(ctx context.Context, outputs map[string][]LinterOutput) error
 	// Report reports the lint results to the provider.
-	Report(ctx context.Context, agent Agent, lintResults map[string][]LinterOutput) error
+	Report(ctx context.Context, agent Agent, lintResults map[string][]LinterOutput, unexpected []string) error
 	// GetFiles returns the files that match the given predicate in the PR/MR.
 	// if predicate is nil, it returns all the files except removed files in the PR/MR.
 	// NOTE(CarlJi): this is a simplified definition since only the file path is returned.

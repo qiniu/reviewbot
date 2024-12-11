@@ -224,7 +224,7 @@ func filterLinterOutputs(outputs map[string][]LinterOutput, comments []*github.P
 	return toAdds, toDeletes
 }
 
-const Reference = "If you have any questions about this comment, feel free to [raise an issue here](https://github.com/qiniu/reviewbot)."
+const Reference = "If you have any questions about this comment, feel free to [raise an issue here](https://github.com/qiniu/reviewbot) or contact the administrator."
 
 func toGithubCheckRunAnnotations(linterOutputs map[string][]LinterOutput) []*github.CheckRunAnnotation {
 	var annotations []*github.CheckRunAnnotation
@@ -321,7 +321,7 @@ func (g *GithubProvider) HandleComments(ctx context.Context, outputs map[string]
 	return nil
 }
 
-func (g *GithubProvider) Report(ctx context.Context, a Agent, lintResults map[string][]LinterOutput) error {
+func (g *GithubProvider) Report(ctx context.Context, a Agent, lintResults map[string][]LinterOutput, unexpectResults []string) error {
 	log := util.FromContext(ctx)
 	linterName := a.LinterConfig.Name
 	org := a.Provider.GetCodeReviewInfo().Org
@@ -331,7 +331,7 @@ func (g *GithubProvider) Report(ctx context.Context, a Agent, lintResults map[st
 
 	switch a.LinterConfig.ReportType {
 	case config.GitHubCheckRuns:
-		check := newBaseCheckRun(a, lintResults)
+		check := newBaseCheckRun(a, lintResults, unexpectResults)
 		ch, err := g.CreateCheckRun(ctx, org, repo, check)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
@@ -363,7 +363,7 @@ func (g *GithubProvider) Report(ctx context.Context, a Agent, lintResults map[st
 		metric.NotifyWebhookByText(ConstructGotchaMsg(linterName, a.Provider.GetCodeReviewInfo().URL, addedCmts[0].GetHTMLURL(), lintResults))
 	case config.GitHubMixType:
 		// report all lint results as a check run summary, but not annotations
-		check := newMixCheckRun(a, lintResults)
+		check := newMixCheckRun(a, lintResults, unexpectResults)
 		ch, err := g.CreateCheckRun(ctx, org, repo, check)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
@@ -764,7 +764,7 @@ func (g *GithubProvider) refreshToken() (string, error) {
 }
 
 // newBaseCheckRun creates the base check run options.
-func newBaseCheckRun(a Agent, lintErrs map[string][]LinterOutput) github.CreateCheckRunOptions {
+func newBaseCheckRun(a Agent, lintErrs map[string][]LinterOutput, unexpected []string) github.CreateCheckRunOptions {
 	var (
 		headSha    = a.Provider.GetCodeReviewInfo().HeadSHA
 		startTime  = a.Provider.GetCodeReviewInfo().UpdatedAt
@@ -806,12 +806,17 @@ func newBaseCheckRun(a Agent, lintErrs map[string][]LinterOutput) github.CreateC
 		check.Conclusion = github.String("success")
 	}
 
+	if len(unexpected) > 0 {
+		check.Conclusion = github.String("failure")
+		check.Output.Title = github.String(fmt.Sprintf("%s failed to execute, please check it", linterName))
+		check.Output.Summary = github.String(fmt.Sprintf(":information_source: %s's execution scripts and output are in the [log](%s).\n :recycle: You can check to see if the script is working in your repository.\n :busts_in_silhouette: If it's missing something critical, contact reviewbot administrator to add it.", linterName, logURL))
+	}
 	return check
 }
 
-func newMixCheckRun(a Agent, lintErrs map[string][]LinterOutput) github.CreateCheckRunOptions {
-	check := newBaseCheckRun(a, lintErrs)
-	if len(lintErrs) == 0 {
+func newMixCheckRun(a Agent, lintErrs map[string][]LinterOutput, unexpected []string) github.CreateCheckRunOptions {
+	check := newBaseCheckRun(a, lintErrs, unexpected)
+	if len(lintErrs) == 0 && len(unexpected) != 0 {
 		// if no lint errors, just return the base check run
 		return check
 	}
