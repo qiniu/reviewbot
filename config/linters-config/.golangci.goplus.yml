@@ -100,4 +100,5 @@ linters:
     - gomoddirectives # superseded by gomodcheck
     - tagalign # see too many false positives
     - interfacebloat # seems too arbitrary
+    - forbidigo # no requirement or necessity to prohibit the use of fmt
 

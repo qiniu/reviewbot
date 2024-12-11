@@ -89,8 +89,8 @@ func QueryForReference(ctx context.Context, model llms.Model, linterOutput strin
 		}
 		return "", err
 	}
-	log.Infof("promote linter output:%s, response:%s", linterOutput, respText)
 
+	log.Infof("promote linter output:%s, length of response:%d", linterOutput, len(respText))
 	return respText, nil
 }
 
