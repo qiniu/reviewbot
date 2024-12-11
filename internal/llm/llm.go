@@ -71,12 +71,12 @@ Context:
 %s
 `
 
-func QueryForReference(ctx context.Context, model llms.Model, linterOutput string) (string, error) {
+func QueryForReference(ctx context.Context, model llms.Model, linterOutput string, codeLanguage string) (string, error) {
 	log := util.FromContext(ctx)
 	if model == nil {
 		return "", ErrModelIsNil
 	}
-	ragQuery := fmt.Sprintf(referenceTemplateStr, linterOutput)
+	ragQuery := fmt.Sprintf(referenceTemplateStr, linterOutput, codeLanguage)
 
 	timeout := 5 * time.Minute
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, timeout)
@@ -95,30 +95,38 @@ func QueryForReference(ctx context.Context, model llms.Model, linterOutput strin
 }
 
 const referenceTemplateStr = `
-You are a lint expert, you can explain in detail the meaning of the lint result according to the content of the given context.
-You will follow the format of the example in <format> to answer in Chinese, firstly, you will explain the lint, secondly, you will give the incorrect usage (it can be a code example or text description), and finally, you will give the correct usage (it can be a code example or a text description), and finally add a blank line before the result.
-Please make sure that the output must not exceed 10,000 characters.
+You are a lint expert who can explain in detail the meaning of lint results based on the provided <context>. 
+
+Please follow the format in <format> to respond in Chinese:
+
+1. **Lint 解释**:
+   - 首先，解释该 lint 的含义。
+   
+2. **错误用法**:
+   - 提供一个代码示例或文本描述，展示不正确的用法。若给出代码,代码语言请遵循<codeLanguage>
+   
+3. **正确用法**:
+   - 给出一个代码示例或文本描述，展示正确的用法。若给出代码,代码语言请遵循<codeLanguage>
+
+以上三块内容有且仅输出一次, 即一次“Lint 解释”，一次“错误用法”, 一次“正确用法”。保证输出不多不少
+请确保输出不超过 5000 个字符
+
 
 <format>
 
 ### lint 解释
-- 该 lint 出现表示一个变量被赋值后又被重新赋值，但在此过程中没有使用其原始值。这种情况通常表明代码中可能存在冗余，或者可能是逻辑错误，因为原始值在此期间没有被实际使用。
+
 ### 错误用法
-	// 
-	func main() {
-		x := 10
-		x = 20 // 重新赋值，但未使用原始值
-
-		fmt.Println("x =", x) // 仅打印新值20
-	}
-
-
+     
 ### 正确用法
-- 方案一：使用赋值变量
-- 方案二 ：移除冗余赋值
 
 </format>
-Context:
-%s
 
+<codeLanguage>
+%s
+</codeLanguage>
+
+<context>
+%s
+</context>
 `

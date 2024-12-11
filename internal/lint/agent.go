@@ -161,7 +161,7 @@ func (a *Agent) EnrichWithLLM(ctx context.Context, lintResults map[string][]Lint
 		for i, output := range outputs {
 			// only enrich the output that is not typed
 			if output.TypedMessage == "" {
-				resp, err := llm.QueryForReference(ctx, a.ModelClient, output.Message)
+				resp, err := llm.QueryForReference(ctx, a.ModelClient, output.Message, output.File)
 				if err != nil {
 					log.Errorf("failed to query LLM server: %v", err)
 				} else {
