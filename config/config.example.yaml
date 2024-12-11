@@ -189,3 +189,15 @@ customLinters:
     kubernetesAsRunner:
       namespace: "reviewbot"
       image: "aslan-spock-register.qiniu.io/reviewbot/base:go1.22.3-java11-p3cpmd2.1.1"
+  yamllint:
+    languages: [ ".yaml" ]
+    command:
+      - "/bin/sh"
+      - "-c"
+      - "--"
+    args:
+      - |
+        yamllint  -d ./
+    kubernetesAsRunner:
+      namespace: "reviewbot"
+      image: "aslan-spock-register.qiniu.io/reviewbot/base:go1.22.3-confcheck"
