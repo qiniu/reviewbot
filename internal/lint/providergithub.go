@@ -343,6 +343,7 @@ func (g *GithubProvider) Report(ctx context.Context, a Agent, lintResults map[st
 
 		metric.NotifyWebhookByText(ConstructGotchaMsg(linterName, a.Provider.GetCodeReviewInfo().URL, ch.GetHTMLURL(), lintResults))
 	case config.GitHubPRReview:
+		lintResults = a.EnrichWithLLM(ctx, lintResults)
 		comments, err := g.ProcessComments(ctx, a, lintResults)
 		if err != nil {
 			log.Errorf("failed to process need to add comments: %v", err)
@@ -374,6 +375,7 @@ func (g *GithubProvider) Report(ctx context.Context, a Agent, lintResults map[st
 
 		// report top 10 lint results to pull request review comments at most
 		top10LintResults := listTop10LintResults(lintResults)
+		top10LintResults = a.EnrichWithLLM(ctx, top10LintResults)
 		comments, err := g.ProcessComments(ctx, a, top10LintResults)
 		if err != nil {
 			log.Errorf("failed to process need to add comments: %v", err)
@@ -699,7 +701,6 @@ func (g *GithubProvider) ProcessComments(ctx context.Context, a Agent, lintResul
 
 	prefixFlagV1 := linterNamePrefixV1(linterName)
 	prefixFlagV2 := linterNamePrefixV2(linterName)
-	log.Infof("prefixFlagV1: %s, prefixFlagV2: %s", prefixFlagV1, prefixFlagV2)
 	for _, comment := range existedComments {
 		// FIXME(CarlJi): to keep consistent with old format, remove it after a while
 		if strings.HasPrefix(comment.GetBody(), prefixFlagV1) {

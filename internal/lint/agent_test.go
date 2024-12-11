@@ -200,7 +200,7 @@ func TestApplyTypedMessageByIssueReferences(t *testing.T) {
 			ctx := context.Background()
 
 			// Call the method
-			result := agent.ApplyTypedMessageByIssueReferences(ctx, tc.lintResults)
+			result := agent.EnrichWithIssueReferences(ctx, tc.lintResults)
 
 			// Compare results
 			if !reflect.DeepEqual(result, tc.expectedOutput) {

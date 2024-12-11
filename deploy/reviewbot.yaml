@@ -34,7 +34,7 @@ spec:
             - -kube-config=/root/.kube/config
             - -llm.provider=ollama
             - -llm.server-url=$(LLM_SERVER_URL)
-            - -llm.model=qwen2.5-coder:7
+            - -llm.model=qwen2.5-coder:7b
           env:
             - name: GITHUB_WEBHOOK_SECRET
               valueFrom:

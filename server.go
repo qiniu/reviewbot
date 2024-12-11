@@ -429,6 +429,7 @@ func (s *Server) handleCodeRequestEvent(ctx context.Context, info *codeRequestIn
 }
 
 func (s *Server) withCancel(ctx context.Context, info *codeRequestInfo, fn func(context.Context) error) error {
+	log := util.FromContext(ctx)
 	prID := fmt.Sprintf("%s-%s-%s-%d", info.platform, info.org, info.repo, info.num)
 	if cancel, exists := prMap[prID]; exists {
 		log.Infof("Cancelling processing for Pull Request : %s\n", prID)

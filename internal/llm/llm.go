@@ -85,11 +85,11 @@ func QueryForReference(ctx context.Context, model llms.Model, linterOutput strin
 	respText, err := llms.GenerateFromSinglePrompt(ctxWithTimeout, model, ragQuery)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			log.Warnf("LLM query operation timed out after %s", timeout)
+			log.Errorf("LLM query operation timed out after %s", timeout)
 		}
 		return "", err
 	}
-	log.Debugf("length of LLM respText: %d", len(respText))
+	log.Infof("promote linter output:%s, response:%s", linterOutput, respText)
 
 	return respText, nil
 }
