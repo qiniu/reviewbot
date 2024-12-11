@@ -76,7 +76,7 @@ func QueryForReference(ctx context.Context, model llms.Model, linterOutput strin
 	if model == nil {
 		return "", ErrModelIsNil
 	}
-	ragQuery := fmt.Sprintf(referenceTemplateStr, linterOutput, codeLanguage)
+	ragQuery := fmt.Sprintf(referenceTemplateStr, codeLanguage, linterOutput)
 
 	timeout := 5 * time.Minute
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, timeout)
@@ -99,8 +99,8 @@ You are a lint expert who can explain in detail the meaning of lint results base
 
 Please follow the format in <format> to respond in Chinese:
 
-1. **Lint 解释**:
-   - 首先，解释该 lint 的含义。
+1. **lint 解释**:
+   - 请仔细查看<context>内容, 其内容为某个具体的lint结果, 请用简短的语言对该lint结果进行解释。
    
 2. **错误用法**:
    - 提供一个代码示例或文本描述，展示不正确的用法。若给出代码,代码语言请遵循<codeLanguage>
@@ -108,7 +108,7 @@ Please follow the format in <format> to respond in Chinese:
 3. **正确用法**:
    - 给出一个代码示例或文本描述，展示正确的用法。若给出代码,代码语言请遵循<codeLanguage>
 
-以上三块内容有且仅输出一次, 即一次“Lint 解释”，一次“错误用法”, 一次“正确用法”。保证输出不多不少
+以上三块内容有且仅输出一次, 即一次“lint 解释”，一次“错误用法”, 一次“正确用法”。保证输出不多不少
 请确保输出不超过 5000 个字符
 
 
