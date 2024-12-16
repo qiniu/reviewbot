@@ -197,7 +197,7 @@ customLinters:
       - "--"
     args:
       - |
-        yamllint  -d ./
+        yamllint  ./ -f parsable -s --no-warnings  -d "{extends: relaxed, rules: {line-length: {max: 120}}}"
     kubernetesAsRunner:
       namespace: "reviewbot"
       image: "aslan-spock-register.qiniu.io/reviewbot/base:go1.22.3-confcheck"
