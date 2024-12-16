@@ -63,6 +63,8 @@ type Agent struct {
 	IssueReferences []config.CompiledIssueReference
 	// ModelClient is the LLM model client.
 	ModelClient llms.Model
+	// cliMode is true if the linter is running in cli mode.
+	CLIMode bool
 }
 
 // getMsgFormat returns the message format based on report type.
@@ -172,3 +174,18 @@ const ReferenceFooter = `
 ---
 > 💡 以上内容由 AI 辅助生成，如有疑问欢迎反馈交流
 </details>`
+
+func (a *Agent) CLIOutput(ctx context.Context, linterName string, lintResults map[string][]LinterOutput) error {
+	if !a.CLIMode || len(lintResults) == 0 {
+		return nil
+	}
+	fmt.Println()
+	fmt.Printf("---------- %s output -----------------\n\n", linterName)
+	for _, outputs := range lintResults {
+		for _, output := range outputs {
+			fmt.Printf("%s:%d\t%s \n\n", output.File, output.Line, output.Message)
+		}
+	}
+	fmt.Printf("---------- %s end----------------------\n\n", linterName)
+	return nil
+}

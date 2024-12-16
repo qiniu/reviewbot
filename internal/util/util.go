@@ -81,3 +81,27 @@ func GetEventGUID(ctx context.Context) string {
 	}
 	return eventGUID
 }
+
+func FindFileWithExt(dir string, ext []string) ([]string, error) {
+	var files []string
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		for _, ext := range ext {
+			if strings.HasSuffix(info.Name(), ext) {
+				absPath, err := filepath.Abs(path)
+				if err != nil {
+					return err
+				}
+				files = append(files, absPath)
+				break
+			}
+		}
+		return nil
+	})
+	return files, err
+}

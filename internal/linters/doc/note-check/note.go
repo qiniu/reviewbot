@@ -18,6 +18,7 @@ package notecheck
 
 import (
 	"context"
+	"fmt"
 	"go/parser"
 	"go/token"
 	"path/filepath"
@@ -25,6 +26,7 @@ import (
 	"strings"
 
 	"github.com/qiniu/reviewbot/internal/lint"
+	"github.com/qiniu/reviewbot/internal/util"
 	"github.com/qiniu/x/log"
 )
 
@@ -43,8 +45,14 @@ func init() {
 // https://pkg.go.dev/go/doc#Note
 func noteCheckHandler(ctx context.Context, a lint.Agent) error {
 	outputs := make(map[string][]lint.LinterOutput)
+	extensions := []string{".go"}
+	goFiles, err := util.FindFileWithExt(".", extensions)
+	if err != nil {
+		fmt.Println("Error walking the path:", err)
+		return err
+	}
 
-	for _, file := range a.Provider.GetFiles(nil) {
+	for _, file := range goFiles {
 		fileName := file
 		// Only check go files
 		if filepath.Ext(fileName) != ".go" {

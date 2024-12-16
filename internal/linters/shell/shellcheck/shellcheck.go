@@ -18,10 +18,8 @@ package shellcheck
 
 import (
 	"context"
-	"strings"
 
 	"github.com/qiniu/reviewbot/internal/lint"
-	"github.com/qiniu/reviewbot/internal/metric"
 	"github.com/qiniu/reviewbot/internal/util"
 )
 
@@ -36,15 +34,19 @@ func init() {
 func shellcheck(ctx context.Context, a lint.Agent) error {
 	log := util.FromContext(ctx)
 	var shellFiles []string
-	for _, arg := range a.Provider.GetFiles(nil) {
-		if strings.HasSuffix(arg, ".sh") {
-			shellFiles = append(shellFiles, arg)
-		}
+	extensions := []string{".sh", ".bash", ".ksh", ".zsh"}
+	shellFiles, err := util.FindFileWithExt(".", extensions)
+	if err != nil {
+		log.Errorf("Error walking the path: %v", err)
+		return err
 	}
 
-	var lintResults map[string][]lint.LinterOutput
+	if a.CLIMode && len(shellFiles) == 0 {
+		log.Infof("CLI-info:skip to run shellcheck")
+		return nil
+	}
+
 	if len(shellFiles) > 0 {
-		cmd := a.LinterConfig.Command
 		// execute shellcheck with the following command
 		// shellcheck -f gcc xxx.sh...
 		if lint.IsEmpty(a.LinterConfig.Args...) {
@@ -53,23 +55,6 @@ func shellcheck(ctx context.Context, a lint.Agent) error {
 			args = append(args, shellFiles...)
 			a.LinterConfig.Args = args
 		}
-
-		output, err := lint.ExecRun(ctx, a)
-		if err != nil {
-			log.Warnf("%s run with error: %v, mark and continue", cmd, err)
-		}
-
-		results, unexpected := lint.GeneralParse(log, output)
-		if len(unexpected) > 0 {
-			msg := util.LimitJoin(unexpected, 1000)
-			log.Warnf("unexpected output: %v", msg)
-			metric.NotifyWebhookByText(lint.ConstructUnknownMsg(linterName, a.Provider.GetCodeReviewInfo().Org+"/"+a.Provider.GetCodeReviewInfo().Repo, a.Provider.GetCodeReviewInfo().URL, log.ReqId, msg))
-		}
-
-		lintResults = results
 	}
-
-	// even if the lintResults is empty, we still need to report the result
-	// since we need delete the existed comments related to the linter
-	return lint.Report(ctx, a, lintResults)
+	return lint.GeneralHandler(ctx, log, a, lint.ExecRun, lint.GeneralParse)
 }

@@ -47,13 +47,18 @@ func goModCheckHandler(ctx context.Context, a lint.Agent) error {
 
 func goModCheckOutput(log *xlog.Logger, a lint.Agent) (map[string][]lint.LinterOutput, error) {
 	output := make(map[string][]lint.LinterOutput)
-	for _, file := range a.Provider.GetFiles(nil) {
+	extensions := []string{".mod"}
+	modFiles, err := util.FindFileWithExt(".", extensions)
+	if err != nil {
+		return output, err
+	}
+	for _, file := range modFiles {
 		fName := file
 		if !strings.HasSuffix(fName, "go.mod") {
 			continue
 		}
 
-		goModPath := filepath.Join(a.RepoDir, fName)
+		goModPath := fName
 		file, err := os.ReadFile(goModPath)
 		if err != nil {
 			log.Errorf("Error opening %s: %s", goModPath, err)

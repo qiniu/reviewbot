@@ -428,6 +428,50 @@ func (s *Server) handleCodeRequestEvent(ctx context.Context, info *codeRequestIn
 	return nil
 }
 
+func processForCLI(ctx context.Context, path string, o cliOptions) error {
+	log := util.FromContext(ctx)
+	for name, fn := range lint.TotalPullRequestHandlers() {
+		// check if linter is installed
+		_, err := exec.LookPath(name)
+		if err != nil {
+			log.Infof("%s not found in environment, skipping", name)
+			continue
+		}
+		log.Infof("%s is started", name)
+		linterConfig := config.GetCLILinterConfig(name)
+		linterConfig.WorkDir = path
+		if o.logDir == "" {
+			o.logDir = "/tmp"
+		}
+		storage, err := storage.NewLocalStorage(o.logDir)
+		if err != nil {
+			return err
+		}
+
+		agent := lint.Agent{
+			LinterConfig: linterConfig,
+			RepoDir:      path,
+			CLIMode:      true,
+			Runner:       runner.NewLocalRunner(),
+			Storage:      storage,
+			GenLogKey: func() string {
+				return fmt.Sprintf("log/%s", name)
+			},
+		}
+
+		if err := fn(ctx, agent); err != nil {
+			if errors.Is(err, context.Canceled) {
+				return nil
+			}
+			log.Errorf("failed to run linter: %v", err)
+			continue
+		}
+		log.Infof("%s is finished", name)
+	}
+
+	return nil
+}
+
 func (s *Server) withCancel(ctx context.Context, info *codeRequestInfo, fn func(context.Context) error) error {
 	prID := fmt.Sprintf("%s-%s-%s-%d", info.platform, info.org, info.repo, info.num)
 	if cancel, exists := prMap[prID]; exists {
