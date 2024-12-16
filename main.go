@@ -315,6 +315,7 @@ func main() {
 	}
 	if o.cliMode {
 		s.reviewbotGithubExe("test", "werew", 3)
+		return
 	}
 
 	mux := http.NewServeMux()
