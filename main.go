@@ -151,7 +151,7 @@ func gatherSeverOptions(fs *flag.FlagSet) serverOptions {
 	fs.StringVar(&o.llmServerURL, "llm.server-url", "", "llm server url")
 	fs.StringVar(&o.llmAPIKey, "llm.api-key", "", "llm api key")
 
-	err := fs.Parse(os.Args[3:])
+	err := fs.Parse(os.Args[2:])
 	if err != nil {
 		log.Fatalf("failed to parse flags: %v", err)
 	}
@@ -408,7 +408,6 @@ func main() {
 	default:
 		fmt.Println("Usage: reviewbot [command] [flags]")
 	}
-
 }
 
 func serverMode(o serverOptions) {
@@ -534,6 +533,9 @@ func cliMode(o cliOptions) {
 	log.SetFlags(log.LstdFlags | log.Lshortfile | log.Llevel)
 	log.SetOutputLevel(2)
 	inputPath := os.Args[2]
-	processForCLI(context.Background(), inputPath, o)
+	err := processForCLI(context.Background(), inputPath, o)
+	if err != nil {
+		log.Fatalf("failed to process for cli: %v", err)
+	}
 
 }

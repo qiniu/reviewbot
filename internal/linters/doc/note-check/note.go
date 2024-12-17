@@ -46,7 +46,7 @@ func init() {
 func noteCheckHandler(ctx context.Context, a lint.Agent) error {
 	outputs := make(map[string][]lint.LinterOutput)
 	extensions := []string{".go"}
-	goFiles, err := util.FindFileWithExt(".", extensions)
+	goFiles, err := util.FindFileWithExt(a.RepoDir, extensions)
 	if err != nil {
 		fmt.Println("Error walking the path:", err)
 		return err

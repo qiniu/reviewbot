@@ -439,7 +439,11 @@ func processForCLI(ctx context.Context, path string, o cliOptions) error {
 		}
 		log.Infof("%s is started", name)
 		linterConfig := config.GetCLILinterConfig(name)
+
 		linterConfig.WorkDir = path
+		if info, err := os.Stat(path); err == nil && !info.IsDir() {
+			linterConfig.WorkDir = filepath.Dir(path)
+		}
 		if o.logDir == "" {
 			o.logDir = "/tmp"
 		}
@@ -450,12 +454,13 @@ func processForCLI(ctx context.Context, path string, o cliOptions) error {
 
 		agent := lint.Agent{
 			LinterConfig: linterConfig,
-			RepoDir:      path,
-			CLIMode:      true,
-			Runner:       runner.NewLocalRunner(),
-			Storage:      storage,
+			// actually, the repoDir is the inputPath in cli mode, maybe it is a dir or a file path
+			RepoDir: path,
+			CLIMode: true,
+			Runner:  runner.NewLocalRunner(),
+			Storage: storage,
 			GenLogKey: func() string {
-				return fmt.Sprintf("log/%s", name)
+				return "log/" + name
 			},
 		}
 

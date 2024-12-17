@@ -46,7 +46,7 @@ func pmdCheckHandler(ctx context.Context, a lint.Agent) error {
 	plog := util.FromContext(ctx)
 	var javaFiles []string
 	rulePath := a.LinterConfig.ConfigPath
-	javaFiles, err := util.FindFileWithExt(".", []string{".java"})
+	javaFiles, err := util.FindFileWithExt(a.RepoDir, []string{".java"})
 	if err != nil {
 		return err
 	}

@@ -35,7 +35,7 @@ func shellcheck(ctx context.Context, a lint.Agent) error {
 	log := util.FromContext(ctx)
 	var shellFiles []string
 	extensions := []string{".sh", ".bash", ".ksh", ".zsh"}
-	shellFiles, err := util.FindFileWithExt(".", extensions)
+	shellFiles, err := util.FindFileWithExt(a.RepoDir, extensions)
 	if err != nil {
 		log.Errorf("Error walking the path: %v", err)
 		return err
