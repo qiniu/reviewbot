@@ -6,32 +6,31 @@
 
 [中文](./README_zh.md)
 
-Reviewbot assists you in rapidly establishing a self-hosted code analysis and review service, supporting multiple languages and coding standards. It is particularly suitable for organizations with numerous private repositories.
+Reviewbot assists you in rapidly establishing a self-hosted code analysis and review service, supporting multiple languages and coding standards. Its main features include:
 
-All issues are reported during the Pull Request stage, either as `Review Comments` or `Github Annotations`, precisely pinpointing the relevant code lines.
+- **Universal Compatibility** - Provides a universal way to integrate and execute Linters without coding
+- **Multi-Platform Support** - Currently supports both GitHub and GitLab
+- **AI-Powered** - Detected issues are analyzed by AI to provide detailed explanations and improvement suggestions
+- **Precise Feedback** - All issues are reported during the Pull/Merge Request stage as comments, precisely pinpointing the relevant code lines
+- **Self-Hosted Deployment** - Recommended self-hosting for better data security and control
 
-- Github Check Run (Annotations)
+See practical examples:
 
-  <div style="display: flex; justify-content: flex-start; gap: 10px;">
-    <img src="./docs/static/github-check-run.png" alt="Github Check Run" width="467"/>
-    <img src="./docs/static/github-check-run-annotations.png" alt="Github Check Run Annotations" width="467"/>
-  </div>
-
-- Github Pull Request Review Comments
-  <div style="display: flex; justify-content: flex-start;">
-    <img src="./docs/static/github-pr-review-comments.png" alt="Github Pull Request Review Comments" width="467"/>
-  </div>
-
-This approach helps PR authors avoid searching for issues in lengthy console logs, significantly facilitating problem resolution.
-
-[see introduction blog](https://medium.com/@dacarl.ji/reviewbot-boost-your-code-quality-with-self-hosted-automated-analysis-and-review-83d8a459eb70)
+<div style="display: flex; justify-content: flex-start; gap: 10px;">
+  <img src="./docs/static/issue-comment.png" alt="Issue Comment" width="467"/>
+  <img src="./docs/static/ci-status.png" alt="CI Status" width="467"/>
+</div>
 
 ## Table of Contents
 
 - [Why Reviewbot](#why-reviewbot)
 - [Installation](#installation)
+- [Linter Integration Guide](#linter-integration-guide)
+  - [Universal Integration (No Coding Required)](#universal-linter-integration-no-coding-required)
+  - [Custom Integration](#custom-integration)
 - [Supported Linters](#supported-linters)
   - [Go](#go)
+  - [Python](#python)
   - [C/C++](#cc)
   - [Lua](#lua)
   - [Java](#java)
@@ -44,23 +43,23 @@ This approach helps PR authors avoid searching for issues in lengthy console log
   - [Cloning multiple repositories](#cloning-multiple-repositories)
   - [Executing Linters via Docker](#executing-linters-via-docker)
   - [Executing Linters via Kubernetes](#executing-linters-via-kubernetes)
+- [AI Enhancement](#ai-enhancement)
 - [Reviewbot Operational Flow](#reviewbot-operational-flow)
-- [How to add a new Linter](#how-to-add-a-new-linter)
 - [Monitoring Detection Results](#monitoring-detection-results)
 - [Contributing](#contributing)
 - [License](#license)
 
 ## Why Reviewbot
 
-Reviewbot is a self-hosted code analysis and review service supporting multiple languages and coding standards. It is particularly beneficial for organizations with numerous private repositories:
+Reviewbot is a self-hosted code analysis and review service with the following features:
 
+- **Universal Compatibility** - Provides a universal way to integrate new code checking tools without modifying source code
+- **Multi-Platform Support** - Currently supports both GitHub and GitLab platforms
+- **AI-Powered** - Issues detected are analyzed by AI to provide detailed context and fix suggestions
 - **Security** - Recommended self-hosting for data security and control
-- **Improvement-Oriented** - Detected issues are primarily reported in the form of Review Comments or Github Annotations, facilitating efficient problem resolution and code improvement
-- **Flexibility** - Supports multiple languages and coding standards, with easy integration of new code inspection tools
+- **Improvement-Oriented** - Detected issues are primarily reported as comments precise to code lines, facilitating efficient problem resolution
+- **Flexibility** - Supports multiple languages and coding standards with flexible configuration
 - **Observability** - Supports alert notifications for timely awareness of detected issues
-- **Configurable** - Supports configuration of linter execution commands, parameters, and environments, providing flexibility for complex scenarios
-
-Reviewbot is developed using Golang, featuring simple logic and clear code, making it easy to understand and maintain.
 
 ## Installation
 
@@ -71,13 +70,64 @@ The following are internal usage practices at Qiniu, which may provide you with 
 - Deployed in a [Kubernetes cluster](https://github.com/qiniu/reviewbot/tree/master/deploy/reviewbot.yaml)
 - Using this [Dockerfile](https://github.com/qiniu/reviewbot/tree/master/Dockerfile) to build the Reviewbot image
 
+## Linter Integration Guide
+
+### Universal Linter Integration (No Coding Required)
+
+Reviewbot provides a universal way to integrate new code checking tools without modifying the source code.
+
+For example:
+
+```yaml
+customLinters:
+  pylint:
+    languages: [".py"] # Specify supported languages
+    command: ["/bin/sh", "-c", "--"] # Specify execution command
+    args: # Specify execution arguments
+      - |
+        pylint --disable=line-too-long --output-format=text --msg-template='{path}:{line}:{column}: {msg} ({symbol})' --reports=n --score=n --recursive=y ./
+```
+
+Complete configuration reference:
+
+```yaml
+customLinters:
+  <linter-name>:
+    languages: <language-list> # optional, specify supported languages
+    enable: <true|false> # optional, enable/disable this linter
+    workDir: <work-dir> # optional, specify working directory
+    command: <command-list> # optional, specify execution command
+    args: <args-list> # optional, specify execution arguments
+    env: <env-list> # optional, specify environment variables
+    dockerAsRunner: # optional, use Docker image to execute linter
+      image: <docker-image>
+    kubernetesAsRunner: # optional, use Kubernetes to execute linter
+      namespace: <kubernetes-namespace>
+      image: <kubernetes-image>
+    reportType: <report-type> # optional, specify report type
+    configPath: <config-path> # optional, specify linter config file path
+```
+
+### Custom Integration
+
+For more complex scenarios, you can also consider code integration:
+
+- For self-implemented linters or standards, refer to [commit msg check](/internal/linters/git-flow/commit/), [go mod check](/internal/linters/go/gomodcheck/), etc.
+- For customizing linter execution logic in complex scenarios, refer to [golangci-lint](/internal/linters/go/golangci_lint/), [gofmt](/internal/linters/go/gofmt/), etc.
+
 ## Supported Linters
+
+The following are the linters currently supported by Reviewbot:
 
 ### Go
 
 - [golangci-lint](/internal/linters/go/golangci_lint/)
 - [gofmt](/internal/linters/go/gofmt/)
 - [gomodcheck](/internal/linters/go/gomodcheck/)
+
+### Python
+
+- pylint
 
 ### C/C++
 
@@ -106,9 +156,7 @@ The following are internal usage practices at Qiniu, which may provide you with 
 
 ## Configuration
 
-Reviewbot adheres to a **zero-configuration principle** whenever possible, with fixed code logic for general repository inspections. However, some special requirements can be met through configuration.
-
-Note: All configurable items are defined in the `config/config.go` file. Please refer to this file for detailed configuration options.
+Reviewbot adheres to a **zero-configuration principle** whenever possible, but also provides flexible configuration capabilities for special requirements. All configurable items are defined in the `config/config.go` file.
 
 The following are some common configuration scenarios:
 
@@ -164,6 +212,14 @@ qbox/net-gslb:
 
 This configuration means that the `golangci-lint` check is disabled for the `qbox/net-gslb` repository.
 
+We can also globally disable a linter, like this:
+
+```yaml
+customLinters:
+  golangci-lint:
+    enable: false
+```
+
 ### Cloning multiple repositories
 
 By default, Reviewbot clones the repository where the event occurs. However, in some scenarios, we might want to clone multiple repositories, and customizing the cloning path.
@@ -216,51 +272,19 @@ qiniu/reviewbot:
         namespace: "reviewbot"
 ```
 
+## AI Enhancement
+
+Reviewbot integrates AI analysis capabilities to provide more detailed explanations and improvement suggestions for detected issues:
+
+![AI Enhancement](./docs/static/ai-details.png)
+
 ## Reviewbot Operational Flow
 
-Reviewbot primarily operates as a GitHub Webhook service, accepting GitHub Events, executing various checks, and providing precise feedback on the corresponding code if issues are detected.
+Reviewbot primarily operates as a Webhook service, accepting GitHub or GitLab Events, executing various checks, and providing precise feedback on the corresponding code if issues are detected.
 
 ```
-Github Event -> Reviewbot -> Execute Linter -> Provide Feedback
+Webhook Event -> Reviewbot -> Execute Linter -> Provide Feedback
 ```
-
-### Basic Flow:
-
-- Event received, determine if it's a Pull Request
-- Retrieve code:
-  - Get the code affected by the PR
-  - Clone the main repository
-    - The main repository serves as a cache
-  - Checkout the PR and place it in a temporary directory
-  - Pull submodules
-    - If the repository uses submodule management, code is automatically pulled
-- Enter Linter execution logic
-  - Filter linters
-    - By default, all supported linters apply to all repositories unless individually configured
-      - Individual configurations need to be explicitly specified in the configuration file
-      - Explicitly specified configurations override default configurations
-  - Execute linter
-  - General logic
-    - Execute the corresponding command and obtain the output results
-    - Filter the output results, only obtaining the parts relevant to this PR
-      - Some linters focus on code
-      - Some linters focus on other aspects
-  - Provide feedback
-    - Some linters provide Code Comments, precise to the code line
-    - Some linters provide issue comments
-
-## How to Add a New Linter?
-
-- Please select an Issue you want to address from the [issues](https://github.com/qiniu/reviewbot/issues) list.
-  - Of course, if there isn't one, you can first create an Issue describing the Linter you want to add
-- Coding
-  - Based on the language or domain the linter focuses on, [choose the appropriate code location](https://github.com/qiniu/reviewbot/tree/master/internal/linters)
-  - The implementation logic for most linters is divided into three main parts:
-    - Execute the linter, generally by calling the relevant executable program
-    - Process the linter's output, focusing only on the output related to the current PR
-    - Provide feedback on the output related to the current PR, precise to the code line
-- Deployment: If your linter is an external executable program, you'll need to add instructions on how to install this linter in the [Dockerfile](https://github.com/qiniu/reviewbot/blob/master/Dockerfile)
-- Documentation: To facilitate subsequent use and maintenance, we should [add appropriate documentation here](https://github.com/qiniu/reviewbot/tree/master/docs/website/docs/components)
 
 ## Monitoring Detection Results
 
@@ -279,6 +303,10 @@ If unexpected output is encountered, notifications will also be sent, like this:
 </div>
 
 For unexpected outputs, **it usually means that the default execution configuration of the relevant linter does not support the current repository**. In such cases, you need to explicitly specify the configuration through a configuration file based on the actual situation.
+
+## Give it a Star! ⭐
+
+If you like this project or are using it to learn or start your own solution, please give it a star to receive updates about new versions. Your support matters!
 
 ## Contributing
 
