@@ -4,58 +4,59 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/qiniu/reviewbot)](https://goreportcard.com/report/github.com/qiniu/reviewbot)
 [![GitHub release](https://img.shields.io/github/v/tag/qiniu/reviewbot.svg?label=release)](https://github.com/qiniu/reviewbot/releases)
 
-Reviewbot 帮助你快速搭建一个自托管的代码分析和代码审查服务，支持多种语言和多种代码规范，尤其适合有大量私有仓库的组织。
+Reviewbot 帮助你快速搭建一个自托管的代码分析和代码审查服务，支持多种语言和多种代码规范，尤其适合有大量私有仓库的组织。它的主要特点是:
 
-所有的问题都会在 Pull Request 阶段，以 `Review Comments` 或`Github Annotations`形式来反馈，且精确到代码行。
+- **通用性强** - 提供了通用的 Linter 接入和执行方式，无需编写代码即可接入各种检查工具
+- **多平台支持** - 当前已支持 GitHub 和 GitLab
+- **AI 赋能** - 检测出的问题会通过 AI 分析并提供详细的解释说明, 方便理解和改进
+- **精准反馈** - 所有问题都会尽可能在 Pull/Merge Request 阶段，以评论形式精确反馈到代码行，省却了在 console log 中查找问题的时间
+- **自托管部署** - 推荐自托管方式部署，数据更安全可控
 
-- Github Check Run (Annotations)
+执行反馈示例:
 
-  <div style="display: flex; justify-content: flex-start; gap: 10px;">
-    <img src="./docs/static/github-check-run.png" alt="Github Check Run" width="467"/>
-    <img src="./docs/static/github-check-run-annotations.png" alt="Github Check Run Annotations" width="467"/>
-  </div>
-
-- Github Pull Request Review Comments
-  <div style="display: flex; justify-content: flex-start;">
-    <img src="./docs/static/github-pr-review-comments.png" alt="Github Pull Request Review Comments" width="467"/>
-  </div>
-
-这种方式能帮助 PR 的作者避免在冗长的 console log 中查找问题，非常有利于问题改进。
+<div style="display: flex; justify-content: flex-start; gap: 10px;">
+  <img src="./docs/static/issue-comment.png" alt="Issue Comment" width="467"/>
+  <img src="./docs/static/ci-status.png" alt="CI Status" width="467"/>
+</div>
 
 ## 目录
 
 - [为什么选择 Reviewbot](#why-reviewbot)
-- [安装](#installation)
-- [已支持的 linters](#已支持的-linters)
-  - [Go 语言](#go-语言)
+- [安装部署](#安装)
+- [Linter 接入指南](#如何接入-linter)
+  - [通用 Linter 接入(无需写代码)](#通用-linter-接入无需写代码)
+  - [定制化接入](#定制化接入)
+- [已接入的 Linters 示例](#已接入的-linters)
+  - [Go](#go-语言)
+  - [Python](#python)
   - [C/C++](#cc)
   - [Lua](#lua)
   - [Java](#java)
   - [Shell](#shell)
   - [Git 流程规范](#git-流程规范)
   - [文档规范](#文档规范)
-- [配置](#配置)
+- [高级配置](#高级配置)
   - [调整执行命令](#调整执行命令)
-  - [关闭 Linter](#关闭-Linter)
+  - [关闭 Linter](#关闭-linter)
   - [克隆多个仓库](#克隆多个仓库)
-  - [通过 Docker 执行 linter](#通过-Docker-执行-linter)
-  - [在 Kubernetes 集群中执行 linter](#在-Kubernetes-集群中执行-linter)
-- [Reviewbot 运行流程](#reviewbot-运行流程)
+  - [通过 Docker 执行 linter](#通过-docker-执行-linter)
+  - [在 Kubernetes 集群中执行 linter](#在-kubernetes-集群中执行-linter)
+- [AI 赋能](#ai-赋能)
+- [运行流程](#reviewbot-运行流程)
 - [观测检测结果](#观测检测结果)
-- [贡献](#贡献)
-- [许可证](#许可证)
+- [Talk](#talks)
 
 ## Why Reviewbot
 
-Reviewbot 是一个自托管的代码分析和代码审查服务，支持多种语言和多种代码规范，尤其适合有大量私有仓库的组织:
+Reviewbot 是一个自托管的代码分析和代码审查服务，具有以下特点:
 
+- **通用性强** - 提供了通用的 Linter 接入配置方式，只需要简单配置就能集成新的代码检查工具，无需修改源码
+- **多平台支持** - 目前已支持 GitHub 和 GitLab 两大主流代码托管平台
+- **AI 赋能** - 检测出的问题会通过 AI 进行分析，提供更详细的上下文说明和修复建议
 - **安全性** - 推荐自托管，数据安全可控
-- **面向改进** - 检测出的问题，都会优先以类 Review Comments 或 Github Annotations 形式优先反馈，方便问题改进
-- **灵活性** - 支持多种语言和多种代码规范，也非常容易添加新的代码检查工具
+- **面向改进** - 检测出的问题，都会优先以评论形式精确反馈到代码行，方便问题改进
+- **灵活性** - 支持多种语言和多种代码规范，配置灵活
 - **可观测** - 支持 alert 通知，方便及时感知检测出的问题
-- **可配置** - 支持通过配置来调整 linter 的执行命令、执行参数、执行环境等，非常灵活
-
-Reviewbot 基于 golang 开发，逻辑简单，代码清晰，容易理解和维护。
 
 ## 安装
 
@@ -66,13 +67,69 @@ Reviewbot 基于 golang 开发，逻辑简单，代码清晰，容易理解和�
 - 部署在 [Kubernetes 集群中](https://github.com/qiniu/reviewbot/tree/master/deploy/reviewbot.yaml)
 - 使用的 [Dockerfile](https://github.com/qiniu/reviewbot/tree/master/Dockerfile) 构建 Reviewbot 镜像
 
-### 已支持的 linters
+## 如何接入 Linter
+
+### 通用 Linter 接入(无需写代码)
+
+Reviewbot 提供了一种通用的 Linter 接入方式，让你可以在不修改源码的情况下集成新的代码检查工具。
+
+例如:
+
+```yaml
+customLinters:
+  pylint:
+    languages: [".py"] # 指定该 linter 支持的语言
+    command: ["/bin/sh", "-c", "--"] # 指定执行的命令
+    args: # 指定执行的参数
+      - |
+        pylint --disable=line-too-long --output-format=text --msg-template='{path}:{line}:{column}: {msg} ({symbol})' --reports=n --score=n --recursive=y ./
+```
+
+这样配置后, 当 PR/MR 里有改动 Python 代码时, 就会使用 pylint 来执行检查, 并将结果反馈到对应的代码行。
+
+值得注意的是，上述配置会使用默认执行环境中的 pylint 来执行检查。而如果需要使用特定版本的 pylint，或者想用其他的执行环境，也可以通过 `dockerAsRunner` 或 `kubernetesAsRunner` 来指定，甚至也可以选择在上述命令中，先检查和安装 pylint, 然后再执行。
+
+完整配置参见:
+
+```yaml
+customLinters:
+  <linter-name>:
+    languages: <language-list> # optional, 指定该 linter 支持的语言
+    enable: <true|false> # optional, 是否启用该 linter
+    workDir: <work-dir> # optional, 指定工作目录, 默认是仓库根目录
+    command: <command-list> # optional, 指定执行命令
+    args: <args-list> # optional, 指定执行参数
+    env: <env-list> # optional, 指定执行环境变量
+    dockerAsRunner: # optional, 指定使用 Docker 镜像来执行 linter
+      image: <docker-image> # optional, 指定 Docker 镜像
+    kubernetesAsRunner: # optional, 指定使用 Kubernetes 来执行 linter
+      namespace: <kubernetes-namespace> # 指定 Kubernetes 命名空间
+      image: <kubernetes-image> # 指定 Kubernetes 镜像
+    reportType: <report-type> # optional, 指定报告类型
+    configPath: <config-path> # optional, 指定Linter的配置文件路径
+```
+
+### 定制化接入
+
+无代码接入的姿势可以满足大部分场景，但如果你需要更复杂的场景，也可以考虑通过代码接入，例如：
+
+- 自己实现的 Linter 或者规范，参考[commit msg check](/internal/linters/git-flow/commit/)、[go mod check](/internal/linters/go/gomodcheck/) 等
+
+- 复杂场景下，定制化 linter 的执行逻辑，参考[golangci-lint](/internal/linters/go/golangci_lint/)、[gofmt](/internal/linters/go/gofmt/) 等
+
+## 已接入的 Linters 示例
+
+以下展示了目前已经在用的 Linters:
 
 #### Go 语言
 
 - [golangci-lint](/internal/linters/go/golangci_lint/)
 - [gofmt](/internal/linters/go/gofmt/)
 - [gomodcheck](/internal/linters/go/gomodcheck/)
+
+#### Python
+
+- pylint
 
 #### C/C++
 
@@ -99,11 +156,9 @@ Reviewbot 基于 golang 开发，逻辑简单，代码清晰，容易理解和�
 
 - [note check](/internal/linters/doc/note-check/)
 
-## 配置
+## 高级配置
 
-`Reviewbot` 在配置方面尽可能追求 **无配置原则**，针对一般性的仓库检查都会固定到代码逻辑中。但也有一些特殊需求，可以通过配置完成.
-
-注意: 所有的可配置项，都定义在 `config/config.go` 文件中，详细配置项可以参考这个文件。
+`Reviewbot` 在配置方面尽可能追求 **最小配置原则**，但也提供了灵活的配置能力来满足特殊需求。所有配置项都定义在 `config/config.go` 文件中。
 
 以下是一些常见的配置场景:
 
@@ -157,6 +212,14 @@ qbox/net-gslb:
       enable: false
 ```
 
+当然也可以全局关闭某个 linter，比如：
+
+```yaml
+customLinters:
+  golangci-lint:
+    enable: false
+```
+
 ### 克隆多个仓库
 
 默认情况下，`Reviewbot` 会克隆当前事件发生的仓库，但有些场景下，我们可能希望克隆多个仓库，甚至指定不同的路径别名。
@@ -208,53 +271,21 @@ qiniu/reviewbot:
         namespace: "reviewbot"
 ```
 
+## AI 赋能
+
+Reviewbot 集成了 AI 分析能力, 可以为检测出的问题提供更多的解释和改进建议:
+
+![AI 赋能](./docs/static/ai-details.png)
+
 ## Reviewbot 运行流程
 
-`Reviewbot` 目前主要作为 GitHub Webhook 服务运行，会接受 GitHub Events，然后执行各种检查，若检查出问题，会精确响应到对应代码上。
+`Reviewbot` 目前主要作为 Webhook 服务运行，会接受来自 GitHub 和 GitLab 的 Webhook 事件，然后执行各种检查，若检查出问题，会精确响应到对应代码上。
 
 ```
-Github 事件 -> Reviewbot -> 执行 linter -> 反馈结果
+Webhook 事件 -> Reviewbot -> 执行 linter -> 反馈结果
 ```
 
-### 基本流程如下:
-
-- 事件进来，判断是否是 Pull Request
-- 获取代码：
-  - 获取 PR 影响的代码
-  - clone 主仓
-    - 主仓会作为缓存
-  - checkout PR，并放置在临时目录
-  - pull 子模块
-    - 仓库若使用 submodule 管理则自动拉取代码
-- 进入 Linter 执行逻辑
-  - 筛选 linter
-    - 默认只要支持的 linter 都对所有仓库适用，除非有单独配置
-      - 单独配置需要通过配置文件显式指定
-      - 显式指定的配置会覆盖默认的配置
-  - 执行 linter
-  - 通用逻辑
-    - 执行相应命令，拿到输出结果
-    - filter 输出的结果，只获取本次 PR 关心的部分
-      - 有的 linter 关心代码
-      - 有的 linter 关心其他
-  - 做反馈
-    - 有的 linter 给 Code Comment，精确到代码行
-    - 有的 linter 给 issue comment
-
-## 如何添加新的 Linter？
-
-- 请从 [issues](https://github.com/qiniu/reviewbot/issues) 列表中选择你要处理的 Issue.
-  - 当然，如果没有，你可以先提个 Issue，描述清楚你要添加的 Linter
-- 编码
-  - 基于 linter 关注的语言或领域，[选好代码位置](https://github.com/qiniu/reviewbot/tree/master/internal/linters)
-  - 绝大部分的 linter 实现逻辑分三大块:
-    - 执行 linter，一般是调用相关的可执行程序
-    - 处理 linter 的输出，我们只会关注跟本次 PR 相关的输出
-    - 反馈 跟本次 PR 相关的输出，精确到代码行
-- 部署，如果你的 linter 是外部可执行程序，那么就需要在 [Dockerfile](https://github.com/qiniu/reviewbot/blob/master/Dockerfile) 中添加如何安装这个 linter
-- 文档，为方便后续的使用和运维，我们应当 [在这里](https://github.com/qiniu/reviewbot/tree/master/docs/website/docs/components) 添加合适的文档
-
-## 观察检测结果
+## 观测检测结果
 
 Reviewbot 支持通过企业微信 alert 来通知检测结果，具体实现参考[这里](https://github.com/qiniu/reviewbot/blob/8bfb122a2e4292f1cc74aedab8f51d1a0c149d55/internal/metric/metrics.go#L17)
 
@@ -270,14 +301,16 @@ Reviewbot 支持通过企业微信 alert 来通知检测结果，具体实现参
   <img src="./docs/static/found-unexpected-issue.png" alt="Found unexpected issue" width="467"/>
 </div>
 
-对于非预期输出，**通常意味着相关 linter 默认的执行配置不支持当前仓库**，你需要通过配置文件基于实际情况显式指定。
+对于非预期输出，**通常意味着相关 linter 默认的执行配置不支持当前仓库**，这时候需要基于实际情况显式指定。
 
-## 贡献
+## Talks
 
-Your contributions to Reviewbot are essential for its long-term maintenance and improvement. Thanks for supporting Reviewbot!
+- [Reviewbot 开源 | 为什么我们要打造自己的代码审查服务？](https://mp.weixin.qq.com/s/MJjzOCjnqIc2X885yRsMRA)
 
-If you find a bug while working with the Reviewbot, please open an issue on GitHub and let us know what went wrong. We will try to fix it as quickly as we can.
+## 给个 Star! ⭐
 
-## License
+如果你喜欢这个项目，或者正在使用它来学习或开始自己的解决方案，请给它一个 star 以获取新版本的更新。你的支持很重要！
 
-Reviewbot is released under the Apache 2.0 license. See the [LICENSE](/LICENSE) file for details.
+## 许可证
+
+Reviewbot 是根据 Apache 2.0 许可证发布的。详细信息请参阅 [LICENSE](/LICENSE) 文件。
