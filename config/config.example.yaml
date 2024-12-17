@@ -185,7 +185,7 @@ customLinters:
       - "--"
     args:
       - |
-        java -cp /source/p3c/p3c-pmd/target/p3c-pmd-2.1.1-jar-with-dependencies.jar net.sourceforge.pmd.PMD -f emacs -R rulesets/java/ali-comment.xml,rulesets/java/ali-concurrent.xml,rulesets/java/ali-constant.xml,rulesets/java/ali-exception.xml,rulesets/java/ali-flowcontrol.xml,rulesets/java/ali-naming.xml,rulesets/java/ali-oop.xml,rulesets/java/ali-orm.xml,rulesets/java/ali-other.xml,rulesets/java/ali-set.xml -d ./
+        docker run -v ./:/workspace/app/test harrell16805/ali-p3c-pmd:2.0.1 java -cp /opt/p3c-pmd-2.0.1.jar net.sourceforge.pmd.PMD -no-cache -R rulesets/java/ali-comment.xml,rulesets/java/ali-concurrent.xml,rulesets/java/ali-constant.xml,rulesets/java/ali-exception.xml,rulesets/java/ali-flowcontrol.xml,rulesets/java/ali-naming.xml,rulesets/java/ali-oop.xml,rulesets/java/ali-orm.xml,rulesets/java/ali-other.xml,rulesets/java/ali-set.xml -f emacs -d /workspace/app/test
     kubernetesAsRunner:
       namespace: "reviewbot"
       image: "aslan-spock-register.qiniu.io/reviewbot/base:go1.22.3-java11-p3cpmd2.1.1"
