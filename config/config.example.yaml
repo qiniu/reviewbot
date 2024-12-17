@@ -197,7 +197,7 @@ customLinters:
       - "--"
     args:
       - |
-        yamllint  ./ -f parsable -s --no-warnings  -d "{extends: relaxed, rules: {line-length: {max: 120}}}"
+        docker run  -v ./:/data -it pexio/yamllint:latest  /data/src/testfile/actions.yaml -f parsable -d "{extends: relaxed, rules: {line-length: {max: 120}, new-line-at-end-of-file: false, new-lines: false, trailing-spaces: false}}"
     kubernetesAsRunner:
       namespace: "reviewbot"
-      image: "aslan-spock-register.qiniu.io/reviewbot/base:go1.22.3-confcheck"
+      image: "oolulegan/yamllinter"
