@@ -17,8 +17,8 @@ Reviewbot assists you in rapidly establishing a self-hosted code analysis and re
 See practical examples:
 
 <div style="display: flex; justify-content: flex-start; gap: 10px;">
-  <img src="./docs/static/issue-comment.png" alt="Issue Comment" width="467"/>
-  <img src="./docs/static/ci-status.png" alt="CI Status" width="467"/>
+  <img src="./docs/static/issue-comment.png" alt="Issue Comment" width="567"/>
+  <img src="./docs/static/ci-status.png" alt="CI Status" width="567"/>
 </div>
 
 ## Table of Contents
@@ -88,7 +88,11 @@ customLinters:
         pylint --disable=line-too-long --output-format=text --msg-template='{path}:{line}:{column}: {msg} ({symbol})' --reports=n --score=n --recursive=y ./
 ```
 
-Complete configuration reference:
+After this configuration, when there are changes to Python code in PR/MR, `pylint` will be used to perform checks, and the results will be reported to the corresponding code lines.
+
+Note that the above configuration uses `pylint` from the default execution environment. If you need to use a specific version of `pylint` or want to use other execution environments, you can specify them through `dockerAsRunner` or `kubernetesAsRunner`, or even choose to check and install `pylint` in the above command before execution.
+
+See the full configuration:
 
 ```yaml
 customLinters:
@@ -251,7 +255,7 @@ qbox/net-gslb:
   linters:
     golangci-lint:
       dockerAsRunner:
-        image: "golangci/golangci-lint:v1.54.2"
+        image: "golangci/golangci-lint:v1.54.2" # specify the Docker image to use
 ```
 
 This configuration means that for the `golangci-lint` check of the `qbox/net-gslb` repository code, the `golangci/golangci-lint:v1.54.2` Docker image is used for execution.
@@ -268,8 +272,8 @@ qiniu/reviewbot:
     golangci-lint:
       enable: true
       kubernetesAsRunner:
-        image: "aslan-spock-register.qiniu.io/reviewbot/base:golangci-lint.1.61.0"
-        namespace: "reviewbot"
+        image: "golangci/golangci-lint:v1.61.0" # specify the Docker image to use
+        namespace: "reviewbot" # specify the Kubernetes namespace to use
 ```
 
 ## AI Enhancement
