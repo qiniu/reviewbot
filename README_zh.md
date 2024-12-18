@@ -251,7 +251,7 @@ qbox/net-gslb:
   linters:
     golangci-lint:
       dockerAsRunner:
-        image: "golangci/golangci-lint:v1.54.2"
+        image: "golangci/golangci-lint:v1.54.2" # specify the Docker image to use
 ```
 
 这个配置意味着，针对`qbox/net-gslb`仓库代码的`golangci-lint`检查，使用`golangci/golangci-lint:v1.54.2`这个 Docker 镜像来执行。
@@ -267,8 +267,8 @@ qiniu/reviewbot:
   linters:
     golangci-lint:
       kubernetesAsRunner:
-        image: "aslan-spock-register.qiniu.io/reviewbot/base:golangci-lint.1.61.0"
-        namespace: "reviewbot"
+        image: "golangci/golangci-lint:v1.61.0" # specify the Docker image to use
+        namespace: "reviewbot" # specify the Kubernetes namespace to use
 ```
 
 ## AI 赋能
