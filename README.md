@@ -46,6 +46,7 @@ See practical examples:
 - [AI Enhancement](#ai-enhancement)
 - [Reviewbot Operational Flow](#reviewbot-operational-flow)
 - [Monitoring Detection Results](#monitoring-detection-results)
+- [Talks](#talks)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -307,6 +308,10 @@ If unexpected output is encountered, notifications will also be sent, like this:
 </div>
 
 For unexpected outputs, **it usually means that the default execution configuration of the relevant linter does not support the current repository**. In such cases, you need to explicitly specify the configuration through a configuration file based on the actual situation.
+
+## Talks
+
+- [Reviewbot 开源 | 为什么我们要打造自己的代码审查服务？](https://mp.weixin.qq.com/s/MJjzOCjnqIc2X885yRsMRA)
 
 ## Give it a Star! ⭐
 
