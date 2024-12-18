@@ -71,5 +71,5 @@ func shellcheck(ctx context.Context, a lint.Agent) error {
 
 	// even if the lintResults is empty, we still need to report the result
 	// since we need delete the existed comments related to the linter
-	return lint.Report(ctx, a, lintResults)
+	return lint.Report(ctx, a, lintResults, nil)
 }
