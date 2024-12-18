@@ -281,6 +281,27 @@ func NewConfig(conf string) (Config, error) {
 	return c, nil
 }
 
+func GetCLILinterConfig(ln string) Linter {
+	linter := Linter{
+		Enable:   boolPtr(true),
+		Modifier: NewBaseModifier(),
+		Name:     ln,
+	}
+	if linter.Command == nil {
+		linter.Command = []string{ln}
+	}
+	if ln == "golangci-lint" {
+		linter.Args = []string{
+			"export GO111MODULE=auto\n",
+			"go mod tidy\n",
+			"golangci-lint run --timeout=10m0s --allow-parallel-runners=true --print-issued-lines=false --out-format=line-number\n",
+		}
+		linter.Command = []string{"/bin/bash", "-c"}
+	}
+
+	return linter
+}
+
 func (c Config) GetLinterConfig(org, repo, ln string, repoType Platform) Linter {
 	linter := Linter{
 		Enable:   boolPtr(true),
