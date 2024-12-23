@@ -1,19 +1,123 @@
-# 这是我们当前内部使用的配置文件，会基于实际的变化和我们的认知而迭代，仅供参考
+# This is the recommended config for golangci-lint based on our experience and opinion.
+# And it will be continuously updated.
+#
+# Philosophy:
+# 1. Strict but practical: We aim to detect real issues that require fixing
+# 2. High quality: We enable carefully selected, industry-proven linters(linters with 100+ stars)
+# 3. Best practices: Leverage community-accepted Go best practices
+# 4. False positive minimization: Configured to reduce noise while maintaining effectiveness
+#
+# Feel free to customize the config to your own project.
 
 run:
   # control the resource usage of golangci-lint to avoid OOM
   concurrency: 4
+  # Default: 1m
+  timeout: 3m
+
+linters:
+  disable-all: true
+  enable:
+    - errcheck # checking for unchecked errors, these unchecked errors can be critical bugs in some cases
+    - gosimple # specializes in simplifying a code
+    - govet # reports suspicious constructs, such as Printf calls whose arguments do not align with the format string
+    - ineffassign # detects when assignments to existing variables are not used
+    - staticcheck # is a go vet on steroids, applying a ton of static analysis checks
+    - unused # checks for unused constants, variables, functions and types
+    - bidichk # security checks for dangerous unicode character sequences
+    - bodyclose # checks whether HTTP response body is closed successfully
+    - copyloopvar # detects places where loop variables are copied (Go 1.22+)
+    - dupl # tool for code clone detection
+    - errorlint # finds code that will cause problems with the error wrapping scheme introduced in Go 1.13
+    - exhaustive # checks exhaustiveness of enum switch statements
+    - gocognit # computes and checks the cognitive complexity of functions
+    - goconst # finds repeated strings that could be replaced by a constant
+    - gocritic # provides diagnostics that check for bugs, performance and style issues
+    - gocyclo # computes and checks the cyclomatic complexity of functions
+    - goimports # in addition to fixing imports, goimports also formats your code in the same style as gofmt
+    - gosec # inspects source code for security problems
+    - nakedret # finds naked returns in functions greater than a specified function length
+    - noctx # finds sending http request without context.Context
+    - revive # fast, configurable, extensible, flexible, and beautiful linter for Go, drop-in replacement of golint
+    - sloglint # ensure consistent code style when using log/slog
+    - stylecheck # is a replacement for golint
+    - testifylint # checks usage of github.com/stretchr/testify
+    - unconvert # removes unnecessary type conversions
+    - unparam # reports unused function parameters
+    - gci # enforce consistent imports
+    - misspell # check for spelling mistakes
+    - prealloc # checks for slice pre-allocation
+
+issues:
+  exclude-rules:
+    - source: "(noinspection|TODO)"
+      linters: [godot]
+    - source: "//noinspection"
+      linters: [gocritic]
+    - path: "_test\\.go"
+      linters:
+        - bodyclose
+        - dupl
+        - revive # too strict for test scenarios
+        - gocognit # no need to check on test files
+        - errcheck
+        - funlen
+        - goconst
+        - gosec
+        - noctx
+        - wrapcheck
 
 linters-settings:
-  paralleltest:
-    # Ignore missing calls to `t.Parallel()` and only report incorrect uses of it.
+  errcheck:
+    # Report about not checking of errors in type assertions: `a := b.(MyStruct)`.
+    # Such cases aren't reported by default.
     # Default: false
-    # see: https://github.com/qiniu/reviewbot/issues/149
-    ignore-missing: true
-    # Ignore missing calls to `t.Parallel()` in subtests. Top-level tests are
-    # still required to have `t.Parallel`, but subtests are allowed to skip it.
+    check-type-assertions: true
+    exclude-functions:
+      - (net/http.ResponseWriter).Write
+      - (net/http.ResponseWriter).WriteHeader
+      - (net/http.ResponseWriter).Header
+      - (*flag.FlagSet).Parse
+
+  exhaustive:
+    # Presence of "default" case in switch statements satisfies exhaustiveness,
+    # even if all enum members are not listed.
     # Default: false
-    ignore-missing-subtests: true
+    default-signifies-exhaustive: true
+
+  gocritic:
+    # too many false positives
+    disabled-checks:
+      - appendAssign
+
+  govet:
+    # Enable all analyzers.
+    # Default: false
+    enable-all: true
+    # Disable analyzers by name.
+    # Run `go tool vet help` to see all analyzers.
+    # Default: []
+    disable:
+      - fieldalignment # too strict
+
+  sloglint:
+    # Enforce not using global loggers.
+    # Values:
+    # - "": disabled
+    # - "all": report all global loggers
+    # - "default": report only the default slog logger
+    # https://github.com/go-simpler/sloglint?tab=readme-ov-file#no-global
+    # Default: ""
+    no-global: "all"
+    # Enforce using methods that accept a context.
+    # Values:
+    # - "": disabled
+    # - "all": report all contextless calls
+    # - "scope": report only if a context exists in the scope of the outermost function
+    # https://github.com/go-simpler/sloglint?tab=readme-ov-file#context-only
+    # Default: ""
+    context: "scope"
+
   revive:
     enable-all-rules: true
     rules:
@@ -37,66 +141,6 @@ linters-settings:
         disabled: true
       - name: cyclomatic
         arguments: [30]
-      # revive 的 unhandled-error 误报太多, 本身已有 errcheck 检查
+      # too many false positives
       - name: unhandled-error
         disabled: true
-
-  errcheck:
-    exclude-functions:
-      - (net/http.ResponseWriter).Write
-      - (net/http.ResponseWriter).WriteHeader
-      - (net/http.ResponseWriter).Header
-      - (*flag.FlagSet).Parse
-
-  gocritic:
-    disabled-checks:
-      - appendAssign
-
-  exhaustive:
-    default-signifies-exhaustive: true
-
-issues:
-  exclude-rules:
-    - path: '(.+)_test\.go'
-      linters:
-        - funlen
-        - goconst
-        - noctx
-        - revive
-        - gocognit
-
-linters:
-  # Enable all available linters.
-  enable-all: true
-  # Disable specific linter
-  disable:
-    - nlreturn # see https://github.com/qiniu/reviewbot/issues/148
-    - wrapcheck # see https://github.com/qiniu/reviewbot/issues/180
-    - gochecknoglobals # see https://github.com/qiniu/reviewbot/issues/182
-    - varnamelen # seems too arbitrary
-    - testpackage # seems too arbitrary
-    - depguard # seems too arbitrary
-    - cyclop # seems too arbitrary
-    - exhaustruct # seems too arbitrary
-    - execinquery # deprecated
-    - gomnd # deprecated
-    - funlen # seems too arbitrary
-    - lll # seems too arbitrary
-    - mnd # seems too arbitrary
-    - nilnil # seems too arbitrary
-    - gofmt # there is a more elegant implementation. see ./internal/linters/go/gofmt/
-    - wsl # seems too arbitrary
-    - nonamedreturns # seems too arbitrary
-    - ireturn # seems too arbitrary. also see: https://github.com/go-proverbs/go-proverbs.github.io/issues/37
-    - godox # seems too arbitrary
-    - gochecknoinits # see too many false positives
-    - gofumpt # see too many false positives
-    - tagliatelle # see too many false positives
-    - intrange # see too many false positives
-    - gosmopolitan # see too many false positives
-    - gosec # it was used by customizedExtraLinter, see config.yaml
-    - canonicalheader # see https://github.com/qiniu/reviewbot/issues/457
-    - gomoddirectives # superseded by gomodcheck
-    - tagalign # see too many false positives
-    - interfacebloat # seems too arbitrary
-    - forbidigo # no requirement or necessity to prohibit the use of fmt
