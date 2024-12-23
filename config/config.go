@@ -233,16 +233,16 @@ func NewConfig(conf string) (Config, error) {
 	}
 
 	// ============ validate and update the config ============
-	if err := c.validateCustomLinters(); err != nil {
+	if err = c.validateCustomLinters(); err != nil {
 		return c, err
 	}
-	if err := c.parseCloneURLs(); err != nil {
+	if err = c.parseCloneURLs(); err != nil {
 		return c, err
 	}
-	if err := c.validateRefs(); err != nil {
+	if err = c.validateRefs(); err != nil {
 		return c, err
 	}
-	if err := c.parseIssueReferences(); err != nil {
+	if err = c.parseIssueReferences(); err != nil {
 		return c, err
 	}
 
