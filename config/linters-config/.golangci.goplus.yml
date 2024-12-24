@@ -121,6 +121,12 @@ linters-settings:
   revive:
     enable-all-rules: true
     rules:
+      - name: unused-parameter
+        disabled: true
+      - name: blank-imports
+        disabled: true
+      - name: unexported-return
+        disabled: true
       - name: line-length-limit
         disabled: true
       - name: cognitive-complexity
