@@ -42,6 +42,9 @@ customRepos: # custom config for specific orgs or repos
     refs:
       - org: qbox
         repo: kodo
+    linters:
+      pylint:
+        enable: false
 
   qbox/kodo:
     linters:
