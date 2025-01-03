@@ -66,7 +66,7 @@ func gofmtHandler(ctx context.Context, a lint.Agent) error {
 		return err
 	}
 
-	return lint.Report(ctx, a, parsedOutput)
+	return lint.Report(ctx, a, parsedOutput, nil)
 }
 
 type Gofmt struct {
