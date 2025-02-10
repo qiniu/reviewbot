@@ -28,7 +28,6 @@ spec:
             - -github.app-private-key=/secrets/github_app_key
             - -gitlab.host=$(GITLAB_HOST)
             - -gitlab.personal-access-token=$(GITLAB_PERSONAL_ACCESS_TOKEN)
-            - -debug=true
             - -s3-credentials-file=/root/.aws/credentials.json
             - -server-addr=http://qiniu-x.jfcs-k8s-qa1.qiniu.io # this is an intranet domain of qiniu.
             - -kube-config=/root/.kube/config

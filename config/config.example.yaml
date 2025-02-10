@@ -15,7 +15,7 @@ customRepos: # custom config for specific orgs or repos
   goplus:
     linters:
       golangci-lint:
-        enable: true
+        enable: false
         configPath: "/config/linters-config/.golangci.goplus.yml"
 
   goplus/llgo:
