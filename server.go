@@ -226,6 +226,13 @@ func (s *Server) handleGitHubEvent(ctx context.Context, event *github.PullReques
 		if err != nil {
 			return err
 		}
+		defer func() {
+			if s.debug { // debug mode, not delete workspace
+				return
+			}
+			_ = os.RemoveAll(workspace)
+		}()
+
 		info.workDir = workDir
 		info.repoDir = workspace
 
@@ -328,6 +335,12 @@ func (s *Server) handleGitLabEvent(ctx context.Context, event *gitlab.MergeEvent
 			log.Errorf("prepare repo dir failed: %v", err)
 			return ErrPrepareDir
 		}
+		defer func() {
+			if s.debug { // debug mode, not delete workspace
+				return
+			}
+			_ = os.RemoveAll(workspace)
+		}()
 		info.workDir = workDir
 		info.repoDir = workspace
 

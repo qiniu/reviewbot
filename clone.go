@@ -27,13 +27,6 @@ func (s *Server) prepareGitRepos(ctx context.Context, org, repo string, num int,
 		return "", "", err
 	}
 
-	defer func() {
-		if s.debug { // debug mode, not delete workspace
-			return
-		}
-		_ = os.RemoveAll(workspace)
-	}()
-
 	refs, workDir := s.fixRefs(workspace, org, repo)
 	log.Debugf("refs: %+v", refs)
 	for _, ref := range refs {
