@@ -45,6 +45,8 @@ customRepos: # custom config for specific orgs or repos
     linters:
       pylint:
         enable: false
+      golangci-lint:
+        enable: false
 
   qbox/kodo:
     linters:
