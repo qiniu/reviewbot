@@ -130,7 +130,9 @@ func GeneralHandler(ctx context.Context, log *xlog.Logger, a Agent, execRun func
 		if msg != "" {
 			// just log the unexpected lines and notify the webhook, no need to return error
 			log.Warnf("unexpected lines: %v", msg)
-			metric.NotifyWebhookByText(ConstructUnknownMsg(linterName, a.Provider.GetCodeReviewInfo().Org+"/"+a.Provider.GetCodeReviewInfo().Repo, a.Provider.GetCodeReviewInfo().URL, log.ReqId, msg))
+			if !a.CLIMode {
+				metric.NotifyWebhookByText(ConstructUnknownMsg(linterName, a.Provider.GetCodeReviewInfo().Org+"/"+a.Provider.GetCodeReviewInfo().Repo, a.Provider.GetCodeReviewInfo().URL, log.ReqId, msg))
+			}
 		}
 	}
 
@@ -180,6 +182,11 @@ func GeneralParse(log *xlog.Logger, output []byte) (map[string][]LinterOutput, [
 // and handle some special cases like auto-generated files.
 func Report(ctx context.Context, a Agent, lintResults map[string][]LinterOutput) error {
 	log := util.FromContext(ctx)
+
+	if a.CLIMode {
+		return a.CLIOutput(ctx, a.LinterConfig.Name, lintResults)
+	}
+
 	var (
 		num        = a.Provider.GetCodeReviewInfo().Number
 		orgRepo    = a.Provider.GetCodeReviewInfo().Org + "/" + a.Provider.GetCodeReviewInfo().Repo
