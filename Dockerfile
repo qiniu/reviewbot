@@ -1,13 +1,13 @@
 # go lint tool dependencies `go list` `gofmt`
 # image from qiniu registry, origin: https://hub.docker.com/_/golang
-FROM aslan-spock-register.qiniu.io/qa/golang:1.23.0-alpine3.20
+FROM aslan-spock-register.qiniu.io/qa/golang:1.24.1-alpine3.21
 
 # if you want to install other tools, please add them here.
 # Do not install unnecessary tools to reduce image size.
 RUN set -eux  \
     apk update && \
     apk --no-cache add ca-certificates luacheck cppcheck shellcheck git openssh yarn libpcap-dev curl openjdk11 bash build-base && \
-    curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b  /usr/local/bin v1.60.3
+    curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b  /usr/local/bin v1.64.6
 
 WORKDIR /
 # check binary
