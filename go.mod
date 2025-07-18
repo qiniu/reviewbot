@@ -1,6 +1,6 @@
 module github.com/qiniu/reviewbot
 
-go 1.22.5
+go 1.23.0
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.30.5
@@ -21,7 +21,7 @@ require (
 	github.com/tmc/langchaingo v0.1.12
 	github.com/xanzy/go-gitlab v0.109.0
 	golang.org/x/mod v0.21.0
-	golang.org/x/oauth2 v0.20.0
+	golang.org/x/oauth2 v0.27.0
 	k8s.io/api v0.28.3
 	k8s.io/apimachinery v0.28.3
 	k8s.io/client-go v0.28.3
