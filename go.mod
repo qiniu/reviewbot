@@ -8,7 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.61.2
 	github.com/aws/smithy-go v1.20.4
 	github.com/bradleyfalzon/ghinstallation/v2 v2.8.0
-	github.com/docker/docker v27.2.0+incompatible
+	github.com/docker/docker v28.0.0+incompatible
 	github.com/golang-jwt/jwt v3.2.1+incompatible
 	github.com/google/go-github/v57 v57.0.0
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79
