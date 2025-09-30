@@ -38,6 +38,10 @@ func init() {
 
 func commitMessageCheckHandler(ctx context.Context, a lint.Agent) error {
 	log := util.FromContext(ctx)
+	if a.CLIMode {
+		fmt.Println("CLI-info:skip to run commit-check")
+		return nil
+	}
 	info := a.Provider.GetCodeReviewInfo()
 	var (
 		org    = info.Org

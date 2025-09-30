@@ -17,7 +17,6 @@
 package gomodcheck
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -108,14 +107,10 @@ func TestGoModCheck(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.id, func(t *testing.T) {
-			p, err := lint.NewGithubProvider(context.TODO(), nil, github.PullRequestEvent{}, lint.WithPullRequestChangedFiles(tc.input))
-			if err != nil {
-				t.Errorf("Error creating github provider: %v", err)
-				return
-			}
+
 			// prepare go.mod files
-			for _, file := range p.GetFiles(nil) {
-				filename := file
+			for _, file := range tc.input {
+				filename := *file.Filename
 				dir := filepath.Dir(filename)
 				err := os.MkdirAll(dir, 0o755)
 				if err != nil {
@@ -131,9 +126,12 @@ func TestGoModCheck(t *testing.T) {
 				}
 			}
 
-			output, err := goModCheckOutput(&xlog.Logger{}, lint.Agent{
-				Provider: p,
-			})
+			repoDir, err := os.Getwd()
+			if err != nil {
+				t.Errorf("Error get current working directory: %v", err)
+				return
+			}
+			output, err := goModCheckOutput(&xlog.Logger{}, lint.Agent{RepoDir: repoDir})
 			if err != nil {
 				t.Errorf("Error execute goModCheckOutput : %v", err)
 			}

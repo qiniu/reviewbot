@@ -17,6 +17,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"expvar"
 	"flag"
@@ -52,7 +53,7 @@ import (
 	_ "github.com/qiniu/reviewbot/internal/linters/shell/shellcheck"
 )
 
-type options struct {
+type serverOptions struct {
 	port          int
 	dryRun        bool
 	debug         bool
@@ -95,7 +96,7 @@ var (
 	errLLMServerNotSet = errors.New("llm model or server url is not set")
 )
 
-func (o options) Validate() error {
+func (o serverOptions) Validate() error {
 	if o.gitHubAppID != 0 && o.gitHubAppPrivateKey == "" {
 		return errAppNotSet
 	}
@@ -121,9 +122,8 @@ func (o options) Validate() error {
 	return nil
 }
 
-func gatherOptions() options {
-	o := options{}
-	fs := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+func gatherSeverOptions(fs *flag.FlagSet) serverOptions {
+	o := serverOptions{}
 	fs.IntVar(&o.port, "port", 8888, "port to listen on")
 	fs.BoolVar(&o.dryRun, "dry-run", false, "dry run")
 	fs.BoolVar(&o.debug, "debug", false, "debug mode")
@@ -151,11 +151,29 @@ func gatherOptions() options {
 	fs.StringVar(&o.llmServerURL, "llm.server-url", "", "llm server url")
 	fs.StringVar(&o.llmAPIKey, "llm.api-key", "", "llm api key")
 
-	err := fs.Parse(os.Args[1:])
+	err := fs.Parse(os.Args[2:])
 	if err != nil {
 		log.Fatalf("failed to parse flags: %v", err)
 	}
 	return o
+}
+
+type cliOptions struct {
+	logDir string
+}
+
+func gatherCLIOptions(fs *flag.FlagSet) cliOptions {
+	o := cliOptions{}
+	fs.StringVar(&o.logDir, "logDir", "", "log dir")
+	err := fs.Parse(os.Args[3:])
+	if err != nil {
+		log.Fatalf("failed to parse flags: %v", err)
+	}
+	return o
+}
+
+func (o cliOptions) Validate() error {
+	return nil
 }
 
 var viewTemplate = template.Must(template.New("view").Parse(`
@@ -369,18 +387,36 @@ func extractTimestamp(line string) string {
 }
 
 func main() {
-	if len(os.Args) >= 2 && (os.Args[1] == "version" || os.Args[1] == "-v" || os.Args[1] == "--version") {
-		fmt.Println(version.Version())
+	if len(os.Args) < 2 {
+		fmt.Println("Usage: reviewbot server-run")
 		return
 	}
-	o := gatherOptions()
+
+	fs := flag.NewFlagSet(os.Args[1], flag.ExitOnError)
+	switch os.Args[1] {
+	case "server-run":
+		o := gatherSeverOptions(fs)
+		serverMode(o)
+
+	case "cli-run":
+		o := gatherCLIOptions(fs)
+		cliMode(o)
+
+	case "version", "-v", "--version":
+		fmt.Println(version.Version())
+
+	default:
+		fmt.Println("Usage: reviewbot [command] [flags]")
+	}
+}
+
+func serverMode(o serverOptions) {
 	if err := o.Validate(); err != nil {
 		log.Fatalf("invalid options: %v", err)
 	}
 
 	log.SetFlags(log.LstdFlags | log.Lshortfile | log.Llevel)
 	log.SetOutputLevel(o.logLevel)
-
 	if o.codeCacheDir != "" {
 		if err := os.MkdirAll(o.codeCacheDir, 0o755); err != nil {
 			log.Fatalf("failed to create code cache dir: %v", err)
@@ -488,4 +524,18 @@ func main() {
 	// TODO(CarlJi): graceful shutdown
 	//nolint:gocritic
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", o.port), mux))
+}
+
+func cliMode(o cliOptions) {
+	if err := o.Validate(); err != nil {
+		log.Fatalf("invalid options: %v", err)
+	}
+	log.SetFlags(log.LstdFlags | log.Lshortfile | log.Llevel)
+	log.SetOutputLevel(2)
+	inputPath := os.Args[2]
+	err := processForCLI(context.Background(), inputPath, o)
+	if err != nil {
+		log.Fatalf("failed to process for cli: %v", err)
+	}
+
 }
